@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::{fs, io};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::{fs, io};
 
 pub struct Dictionary {
     pub st_characters: HashMap<String, String>,
@@ -19,43 +19,43 @@ pub struct Dictionary {
     pub jps_characters: HashMap<String, String>,
     pub jps_phrases: HashMap<String, String>,
     pub jp_variants: HashMap<String, String>,
-    pub jp_variants_rev: HashMap<String, String>
+    pub jp_variants_rev: HashMap<String, String>,
 }
 
 impl Dictionary {
     pub fn new() -> Self {
-        let stc_filename = "src/dicts/STCharacters.txt";
-        let stp_filename = "src/dicts/STPhrases.txt";
-        let tsc_filename = "src/dicts/TSCharacters.txt";
-        let tsp_filename = "src/dicts/TSPhrases.txt";
-        let twp_filename = "src/dicts/TWPhrases.txt";
-        let twpr_filename = "src/dicts/TWPhrasesRev.txt";
-        let twv_filename = "src/dicts/TWVariants.txt";
-        let twvr_filename = "src/dicts/TWVariantsRev.txt";
-        let twvrp_filename = "src/dicts/TWVariantsRevPhrases.txt";
-        let hkv_filename = "src/dicts/HKVariants.txt";
-        let hkvr_filename = "src/dicts/HKVariantsRev.txt";
-        let hkvrp_filename = "src/dicts/HKVariantsRevPhrases.txt";
-        let jpsc_filename = "src/dicts/JPShinjitaiCharacters.txt";
-        let jpsp_filename = "src/dicts/JPShinjitaiPhrases.txt";
-        let jpv_filename = "src/dicts/JPVariants.txt";
-        let jpvr_filename = "src/dicts/JPVariantsRev.txt";
-        let stc_dict = Dictionary::load_dictionary(stc_filename).unwrap();
-        let stp_dict = Dictionary::load_dictionary(stp_filename).unwrap();
-        let tsc_dict = Dictionary::load_dictionary(tsc_filename).unwrap();
-        let tsp_dict = Dictionary::load_dictionary(tsp_filename).unwrap();
-        let twp_dict = Dictionary::load_dictionary(twp_filename).unwrap();
-        let twpr_dict = Dictionary::load_dictionary(twpr_filename).unwrap();
-        let twv_dict = Dictionary::load_dictionary(twv_filename).unwrap();
-        let twvr_dict = Dictionary::load_dictionary(twvr_filename).unwrap();
-        let twvrp_dict = Dictionary::load_dictionary(twvrp_filename).unwrap();
-        let hkv_dict = Dictionary::load_dictionary(hkv_filename).unwrap();
-        let hkvr_dict = Dictionary::load_dictionary(hkvr_filename).unwrap();
-        let hkvrp_dict = Dictionary::load_dictionary(hkvrp_filename).unwrap();
-        let jpsc_dict = Dictionary::load_dictionary(jpsc_filename).unwrap();
-        let jpsp_dict = Dictionary::load_dictionary(jpsp_filename).unwrap();
-        let jpv_dict = Dictionary::load_dictionary(jpv_filename).unwrap();
-        let jpvr_dict = Dictionary::load_dictionary(jpvr_filename).unwrap();
+        let stc_file_path = include_str!("dicts/STCharacters.txt");
+        let stp_file_path = include_str!("dicts/STPhrases.txt");
+        let tsc_file_path = include_str!("dicts/TSCharacters.txt");
+        let tsp_file_path = include_str!("dicts/TSPhrases.txt");
+        let twp_file_path = include_str!("dicts/TWPhrases.txt");
+        let twpr_file_path = include_str!("dicts/TWPhrasesRev.txt");
+        let twv_file_path = include_str!("dicts/TWVariants.txt");
+        let twvr_file_path = include_str!("dicts/TWVariantsRev.txt");
+        let twvrp_file_path = include_str!("dicts/TWVariantsRevPhrases.txt");
+        let hkv_file_path = include_str!("dicts/HKVariants.txt");
+        let hkvr_file_path = include_str!("dicts/HKVariantsRev.txt");
+        let hkvrp_file_path = include_str!("dicts/HKVariantsRevPhrases.txt");
+        let jpsc_file_path = include_str!("dicts/JPShinjitaiCharacters.txt");
+        let jpsp_file_path = include_str!("dicts/JPShinjitaiPhrases.txt");
+        let jpv_file_path = include_str!("dicts/JPVariants.txt");
+        let jpvr_file_path = include_str!("dicts/JPVariantsRev.txt");
+        let stc_dict = Dictionary::load_dictionary_from_str(stc_file_path).unwrap();
+        let stp_dict = Dictionary::load_dictionary_from_str(stp_file_path).unwrap();
+        let tsc_dict = Dictionary::load_dictionary_from_str(tsc_file_path).unwrap();
+        let tsp_dict = Dictionary::load_dictionary_from_str(tsp_file_path).unwrap();
+        let twp_dict = Dictionary::load_dictionary_from_str(twp_file_path).unwrap();
+        let twpr_dict = Dictionary::load_dictionary_from_str(twpr_file_path).unwrap();
+        let twv_dict = Dictionary::load_dictionary_from_str(twv_file_path).unwrap();
+        let twvr_dict = Dictionary::load_dictionary_from_str(twvr_file_path).unwrap();
+        let twvrp_dict = Dictionary::load_dictionary_from_str(twvrp_file_path).unwrap();
+        let hkv_dict = Dictionary::load_dictionary_from_str(hkv_file_path).unwrap();
+        let hkvr_dict = Dictionary::load_dictionary_from_str(hkvr_file_path).unwrap();
+        let hkvrp_dict = Dictionary::load_dictionary_from_str(hkvrp_file_path).unwrap();
+        let jpsc_dict = Dictionary::load_dictionary_from_str(jpsc_file_path).unwrap();
+        let jpsp_dict = Dictionary::load_dictionary_from_str(jpsp_file_path).unwrap();
+        let jpv_dict = Dictionary::load_dictionary_from_str(jpv_file_path).unwrap();
+        let jpvr_dict = Dictionary::load_dictionary_from_str(jpvr_file_path).unwrap();
 
         Dictionary {
             st_characters: stc_dict,
@@ -73,13 +73,14 @@ impl Dictionary {
             jps_characters: jpsc_dict,
             jps_phrases: jpsp_dict,
             jp_variants: jpv_dict,
-            jp_variants_rev: jpvr_dict
+            jp_variants_rev: jpvr_dict,
         }
     }
 
-    fn load_dictionary<P>(filename: P) -> io::Result<HashMap<String, String>>
-        where
-            P: AsRef<Path>,
+    #[allow(dead_code)]
+    fn load_dictionary_from_path<P>(filename: P) -> io::Result<HashMap<String, String>>
+    where
+        P: AsRef<Path>,
     {
         let file = fs::File::open(filename)?;
         let mut dictionary = HashMap::new();
@@ -89,6 +90,23 @@ impl Dictionary {
             // let parts: Vec<&str> = line.split('\t').collect();
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() > 1 {
+                let phrase = parts[0].to_string();
+                let translation = parts[1].to_string();
+                dictionary.insert(phrase, translation);
+            } else {
+                eprintln!("Invalid line format: {}", line);
+            }
+        }
+
+        Ok(dictionary)
+    }
+
+    fn load_dictionary_from_str(dictionary_content: &str) -> io::Result<HashMap<String, String>> {
+        let mut dictionary = HashMap::new();
+
+        for line in dictionary_content.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
                 let phrase = parts[0].to_string();
                 let translation = parts[1].to_string();
                 dictionary.insert(phrase, translation);
