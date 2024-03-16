@@ -35,18 +35,7 @@ impl OpenCC {
                 }
             }
             // 逐字转换
-            let mut phrase_builder = String::new();
-            for character in phrase.chars() {
-                let mut character_str = character.to_string();
-                for dictionary in dictionaries {
-                    if let Some(translation) = dictionary.get(&character_str) {
-                        character_str = translation.to_string();
-                        break;
-                    }
-                }
-                phrase_builder.push_str(&character_str);
-            }
-            phrase_builder
+            Self::convert_by_char(phrase, dictionaries)
         })
     }
 
@@ -56,34 +45,41 @@ impl OpenCC {
     ) -> impl Iterator<Item=String> + 'a {
         phrases.map(move |phrase| {
             // 整个词转换
-            for dictionary in dictionaries.iter() {
+            for dictionary in dictionaries {
                 if let Some(translation) = dictionary.get(&phrase) {
                     return translation.to_string(); // Clone the String translation
                 }
             }
             // 逐字转换
-            let mut phrase_builder = String::new();
-            for character in phrase.chars() {
-                let character_str = character.to_string();
-                let mut char_found = false;
-                for dictionary in dictionaries.iter() {
-                    if let Some(translation) = dictionary.get(&character_str) {
-                        phrase_builder.push_str(translation);
-                        char_found = true;
-                        break;
-                    }
-                }
-                if !char_found {
-                    phrase_builder.push_str(&character_str);
+            Self::convert_by_char(&phrase, dictionaries)
+        })
+    }
+
+    fn convert_by_char(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
+        let mut phrase_builder = String::new();
+        for character in phrase.chars() {
+            let character_str = character.to_string();
+            let mut char_found = false;
+            for dictionary in dictionaries {
+                if let Some(translation) = dictionary.get(&character_str) {
+                    phrase_builder.push_str(translation);
+                    char_found = true;
+                    break;
                 }
             }
-            phrase_builder
-        })
+            if !char_found {
+                phrase_builder.push_str(&character_str);
+            }
+        }
+        phrase_builder
     }
 
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
+        let dict_refs = [
+            &self.dictionary.st_characters,
+            &self.dictionary.st_phrases
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "s")
@@ -94,7 +90,10 @@ impl OpenCC {
 
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.ts_characters, &self.dictionary.ts_phrases];
+        let dict_refs = [
+            &self.dictionary.ts_characters,
+            &self.dictionary.ts_phrases
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "t")
@@ -105,8 +104,13 @@ impl OpenCC {
 
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
-        let dict_refs_round_2 = [&self.dictionary.tw_variants];
+        let dict_refs = [
+            &self.dictionary.st_characters,
+            &self.dictionary.st_phrases
+        ];
+        let dict_refs_round_2 = [
+            &self.dictionary.tw_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -120,9 +124,12 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
-            &self.dictionary.tw_variants_rev_phrases,
+            &self.dictionary.tw_variants_rev_phrases
         ];
-        let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+        let dict_refs_round_2 = [
+            &self.dictionary.ts_phrases,
+            &self.dictionary.ts_characters
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -134,9 +141,16 @@ impl OpenCC {
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases];
-        let dict_refs_round_3 = [&self.dictionary.tw_variants];
+        let dict_refs = [
+            &self.dictionary.st_characters,
+            &self.dictionary.st_phrases
+        ];
+        let dict_refs_round_2 = [
+            &self.dictionary.tw_phrases
+        ];
+        let dict_refs_round_3 = [
+            &self.dictionary.tw_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
@@ -151,10 +165,15 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
-            &self.dictionary.tw_variants_rev_phrases,
+            &self.dictionary.tw_variants_rev_phrases
         ];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
-        let dict_refs_round_3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+        let dict_refs_round_2 = [
+            &self.dictionary.tw_phrases_rev
+        ];
+        let dict_refs_round_3 = [
+            &self.dictionary.ts_phrases,
+            &self.dictionary.ts_characters
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
@@ -167,8 +186,13 @@ impl OpenCC {
 
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
-        let dict_refs_round_2 = [&self.dictionary.hk_variants];
+        let dict_refs = [
+            &self.dictionary.st_characters,
+            &self.dictionary.st_phrases
+        ];
+        let dict_refs_round_2 = [
+            &self.dictionary.hk_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -182,9 +206,12 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev,
-            &self.dictionary.hk_variants_rev_phrases,
+            &self.dictionary.hk_variants_rev_phrases
         ];
-        let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+        let dict_refs_round_2 = [
+            &self.dictionary.ts_phrases,
+            &self.dictionary.ts_characters
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -196,7 +223,9 @@ impl OpenCC {
 
     pub fn t2tw(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.tw_variants];
+        let dict_refs = [
+            &self.dictionary.tw_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "s")
@@ -207,8 +236,12 @@ impl OpenCC {
 
     pub fn t2twp(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.tw_phrases];
-        let dict_refs_round_2 = [&self.dictionary.tw_variants];
+        let dict_refs = [
+            &self.dictionary.tw_phrases
+        ];
+        let dict_refs_round_2 = [
+            &self.dictionary.tw_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -222,7 +255,7 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
-            &self.dictionary.tw_variants_rev_phrases,
+            &self.dictionary.tw_variants_rev_phrases
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
@@ -236,9 +269,11 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
-            &self.dictionary.tw_variants_rev_phrases,
+            &self.dictionary.tw_variants_rev_phrases
         ];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
+        let dict_refs_round_2 = [
+            &self.dictionary.tw_phrases_rev
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
@@ -250,7 +285,9 @@ impl OpenCC {
 
     pub fn t2hk(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.hk_variants];
+        let dict_refs = [
+            &self.dictionary.hk_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "s")
@@ -263,7 +300,7 @@ impl OpenCC {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
-            &self.dictionary.hk_variants_rev,
+            &self.dictionary.hk_variants_rev
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
@@ -275,7 +312,9 @@ impl OpenCC {
 
     pub fn t2jp(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.jp_variants];
+        let dict_refs = [
+            &self.dictionary.jp_variants
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
 
         String::from_iter(output)
@@ -283,7 +322,11 @@ impl OpenCC {
 
     pub fn jp2t(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.jps_phrases, &self.dictionary.jps_characters, &self.dictionary.jp_variants_rev];
+        let dict_refs = [
+            &self.dictionary.jps_phrases,
+            &self.dictionary.jps_characters,
+            &self.dictionary.jp_variants_rev
+        ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
 
         String::from_iter(output)
