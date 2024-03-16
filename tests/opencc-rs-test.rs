@@ -23,17 +23,17 @@ mod tests {
 
     #[test]
     fn t2s_test() {
-        let input = "你好，世界！龍馬精神！";
-        let expected_output = "你好，世界！龙马精神！";
+        let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
+        let expected_output = "“数大”便是美，碧绿的山坡前几千只绵羊，挨成一片的雪绒，是美；";
         let opencc = OpenCC::new();
-        let actual_output = opencc.t2s(input, false);
+        let actual_output = opencc.t2s(input, true);
         assert_eq!(actual_output, expected_output);
     }
 
     #[test]
     fn t2jp_test() {
-        let input = "讀賣";
-        let expected_output = "読売";
+        let input = "舊字體：廣國，讀賣。";
+        let expected_output = "旧字体：広国，読売。";
         let opencc = OpenCC::new();
         let actual_output = opencc.t2jp(input);
         assert_eq!(actual_output, expected_output);
@@ -41,8 +41,8 @@ mod tests {
 
     #[test]
     fn jp2t_test() {
-        let input = "読売";
-        let expected_output = "讀賣";
+        let input = "広国，読売。";
+        let expected_output = "廣國，讀賣。";
         let opencc = OpenCC::new();
         let actual_output = opencc.jp2t(input);
         assert_eq!(actual_output, expected_output);
