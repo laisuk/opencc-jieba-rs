@@ -31,6 +31,24 @@ mod tests {
     }
 
     #[test]
+    fn t2jp_test() {
+        let input = "讀賣";
+        let expected_output = "読売";
+        let opencc = OpenCC::new();
+        let actual_output = opencc.t2jp(input);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn jp2t_test() {
+        let input = "読売";
+        let expected_output = "讀賣";
+        let opencc = OpenCC::new();
+        let actual_output = opencc.jp2t(input);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
     fn s2t_punct_test() {
         let input = "你好，世界！“龙马精神”！";
         let expected_output = "你好，世界！「龍馬精神」！";
