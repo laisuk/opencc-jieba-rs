@@ -1,4 +1,4 @@
-use opencc_jieba_rs::{format_thousand, OpenCC, zho_check};
+use opencc_jieba_rs::{format_thousand, zho_check, OpenCC};
 
 #[cfg(test)]
 mod tests {
