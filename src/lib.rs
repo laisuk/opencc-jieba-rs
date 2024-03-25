@@ -79,7 +79,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
             String::from_iter(output)
         }
@@ -90,7 +90,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "t")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "t")
         } else {
             String::from_iter(output)
         }
@@ -103,7 +103,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
         } else {
             String::from_iter(output_2)
         }
@@ -119,7 +119,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "t")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "t")
         } else {
             String::from_iter(output_2)
         }
@@ -134,7 +134,7 @@ impl OpenCC {
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
         if punctuation {
-            convert_punctuation(String::from_iter(output_3).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output_3).as_str(), "s")
         } else {
             String::from_iter(output_3)
         }
@@ -152,7 +152,7 @@ impl OpenCC {
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
         if punctuation {
-            convert_punctuation(String::from_iter(output_3).as_str(), "t")
+            Self::convert_punctuation(String::from_iter(output_3).as_str(), "t")
         } else {
             String::from_iter(output_3)
         }
@@ -165,7 +165,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
         } else {
             String::from_iter(output_2)
         }
@@ -181,7 +181,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "h")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "h")
         } else {
             String::from_iter(output_2)
         }
@@ -192,7 +192,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
             String::from_iter(output)
         }
@@ -205,7 +205,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
         } else {
             String::from_iter(output_2)
         }
@@ -219,7 +219,7 @@ impl OpenCC {
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
             String::from_iter(output)
         }
@@ -235,7 +235,7 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
         } else {
             String::from_iter(output_2)
         }
@@ -246,7 +246,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.hk_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
             String::from_iter(output)
         }
@@ -260,7 +260,7 @@ impl OpenCC {
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
-            convert_punctuation(String::from_iter(output).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
             String::from_iter(output)
         }
@@ -286,7 +286,6 @@ impl OpenCC {
         String::from_iter(output)
     }
 
-    // #[allow(dead_code)]
     pub fn zho_check(&self, input: &str) -> i8 {
         if input.is_empty() {
             return 0;
@@ -311,9 +310,41 @@ impl OpenCC {
         }
         code
     }
+
+    fn convert_punctuation(sv: &str, config: &str) -> String {
+        let mut s2t_punctuation_chars: HashMap<&str, &str> = HashMap::new();
+        s2t_punctuation_chars.insert("“", "「");
+        s2t_punctuation_chars.insert("”", "」");
+        s2t_punctuation_chars.insert("‘", "『");
+        s2t_punctuation_chars.insert("’", "』");
+
+        let output_text;
+
+        if config.starts_with('s') {
+            let s2t_pattern = s2t_punctuation_chars.keys().cloned().collect::<String>();
+            let s2t_regex = Regex::new(&format!("[{}]", s2t_pattern)).unwrap();
+            output_text = s2t_regex
+                .replace_all(sv, |caps: &regex::Captures| {
+                    s2t_punctuation_chars[caps.get(0).unwrap().as_str()]
+                })
+                .into_owned();
+        } else {
+            let mut t2s_punctuation_chars: HashMap<&str, &str> = HashMap::new();
+            for (key, value) in s2t_punctuation_chars.iter() {
+                t2s_punctuation_chars.insert(value, key);
+            }
+            let t2s_pattern = t2s_punctuation_chars.keys().cloned().collect::<String>();
+            let t2s_regex = Regex::new(&format!("[{}]", t2s_pattern)).unwrap();
+            output_text = t2s_regex
+                .replace_all(sv, |caps: &regex::Captures| {
+                    t2s_punctuation_chars[caps.get(0).unwrap().as_str()]
+                })
+                .into_owned();
+        }
+        output_text
+    }
 }
 
-// #[allow(dead_code)]
 pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     // 1. No longer than max byte count
     if sv.len() <= max_byte_count {
@@ -325,40 +356,6 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
         byte_count -= 1;
     }
     byte_count
-}
-
-// #[allow(dead_code)]
-pub fn convert_punctuation(sv: &str, config: &str) -> String {
-    let mut s2t_punctuation_chars: HashMap<&str, &str> = HashMap::new();
-    s2t_punctuation_chars.insert("“", "「");
-    s2t_punctuation_chars.insert("”", "」");
-    s2t_punctuation_chars.insert("‘", "『");
-    s2t_punctuation_chars.insert("’", "』");
-
-    let output_text;
-
-    if config.starts_with('s') {
-        let s2t_pattern = s2t_punctuation_chars.keys().cloned().collect::<String>();
-        let s2t_regex = Regex::new(&format!("[{}]", s2t_pattern)).unwrap();
-        output_text = s2t_regex
-            .replace_all(sv, |caps: &regex::Captures| {
-                s2t_punctuation_chars[caps.get(0).unwrap().as_str()]
-            })
-            .into_owned();
-    } else {
-        let mut t2s_punctuation_chars: HashMap<&str, &str> = HashMap::new();
-        for (key, value) in s2t_punctuation_chars.iter() {
-            t2s_punctuation_chars.insert(value, key);
-        }
-        let t2s_pattern = t2s_punctuation_chars.keys().cloned().collect::<String>();
-        let t2s_regex = Regex::new(&format!("[{}]", t2s_pattern)).unwrap();
-        output_text = t2s_regex
-            .replace_all(sv, |caps: &regex::Captures| {
-                t2s_punctuation_chars[caps.get(0).unwrap().as_str()]
-            })
-            .into_owned();
-    }
-    output_text
 }
 
 pub fn format_thousand(n: i32) -> String {
