@@ -76,7 +76,7 @@ impl OpenCC {
 
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
+        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "s")
@@ -87,7 +87,7 @@ impl OpenCC {
 
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.ts_characters, &self.dictionary.ts_phrases];
+        let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         if punctuation {
             convert_punctuation(String::from_iter(output).as_str(), "t")
@@ -98,7 +98,7 @@ impl OpenCC {
 
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
+        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
@@ -127,7 +127,7 @@ impl OpenCC {
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
+        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases];
         let dict_refs_round_3 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
@@ -160,7 +160,7 @@ impl OpenCC {
 
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
-        let dict_refs = [&self.dictionary.st_characters, &self.dictionary.st_phrases];
+        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
@@ -174,8 +174,8 @@ impl OpenCC {
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
-            &self.dictionary.hk_variants_rev,
             &self.dictionary.hk_variants_rev_phrases,
+            &self.dictionary.hk_variants_rev,
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
@@ -285,33 +285,32 @@ impl OpenCC {
 
         String::from_iter(output)
     }
-}
 
-// #[allow(dead_code)]
-pub fn zho_check(input: &str) -> i8 {
-    if input.is_empty() {
-        return 0;
-    }
-    // let re = Regex::new(r"[[:punct:]\sA-Za-z0-9]").unwrap();
-    let re = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
-    let _strip_text = re.replace_all(input, "");
-    let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
-    let strip_text = match _strip_text.len() > max_bytes {
-        true => &_strip_text[..max_bytes],
-        false => &_strip_text,
-    };
-    let opencc = OpenCC::new();
-    let code;
-    if strip_text != opencc.t2s(strip_text, false) {
-        code = 1;
-    } else {
-        if strip_text != opencc.s2t(strip_text, false) {
-            code = 2;
-        } else {
-            code = 0;
+    // #[allow(dead_code)]
+    pub fn zho_check(&self, input: &str) -> i8 {
+        if input.is_empty() {
+            return 0;
         }
+        // let re = Regex::new(r"[[:punct:]\sA-Za-z0-9]").unwrap();
+        let re = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
+        let _strip_text = re.replace_all(input, "");
+        let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
+        let strip_text = match _strip_text.len() > max_bytes {
+            true => &_strip_text[..max_bytes],
+            false => &_strip_text,
+        };
+        let code;
+        if strip_text != &self.t2s(strip_text, false) {
+            code = 1;
+        } else {
+            if strip_text != &self.s2t(strip_text, false) {
+                code = 2;
+            } else {
+                code = 0;
+            }
+        }
+        code
     }
-    code
 }
 
 // #[allow(dead_code)]

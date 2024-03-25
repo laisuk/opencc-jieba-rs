@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 jieba-rs = "0.6.8"
-regex = "1.10.3"
+regex = "1.10.4"

@@ -1,4 +1,4 @@
-use opencc_jieba_rs::{format_thousand, zho_check, OpenCC};
+use opencc_jieba_rs::{format_thousand, OpenCC};
 
 #[cfg(test)]
 mod tests {
@@ -8,7 +8,8 @@ mod tests {
     fn zho_check_test() {
         let input = "你好，世界！龙马精神！";
         let expected_output = 2;
-        let actual_output = zho_check(input);
+        let opencc = OpenCC::new();
+        let actual_output = opencc.zho_check(input);
         assert_eq!(actual_output, expected_output);
     }
 
