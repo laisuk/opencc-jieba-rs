@@ -57,6 +57,7 @@ impl OpenCC {
 
     fn convert_by_char(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
         let mut phrase_builder = String::new();
+        phrase_builder.reserve(phrase.len());
         for character in phrase.chars() {
             let character_str = character.to_string();
             let mut char_found = false;
