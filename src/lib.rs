@@ -4,13 +4,13 @@ use std::io::BufReader;
 use jieba_rs::Jieba;
 use regex::Regex;
 
-use crate::zho_dictionary::Dictionary;
+use crate::dictionary_lib::Dictionary;
 
-mod zho_dictionary;
+pub mod dictionary_lib;
 
 pub struct OpenCC {
     pub jieba: Jieba,
-    dictionary: Dictionary,
+    pub dictionary: Dictionary,
 }
 
 impl OpenCC {
@@ -58,18 +58,18 @@ impl OpenCC {
     fn convert_by_char(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
         let mut phrase_builder = String::new();
         phrase_builder.reserve(phrase.len());
-        for character in phrase.chars() {
-            let character_str = character.to_string();
+        for ch in phrase.chars() {
+            let ch_str = ch.to_string();
             let mut char_found = false;
             for dictionary in dictionaries {
-                if let Some(translation) = dictionary.get(&character_str) {
+                if let Some(translation) = dictionary.get(&ch_str) {
                     phrase_builder.push_str(translation);
                     char_found = true;
                     break;
                 }
             }
             if !char_found {
-                phrase_builder.push_str(&character_str);
+                phrase_builder.push_str(&ch_str);
             }
         }
         phrase_builder
