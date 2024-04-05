@@ -94,5 +94,4 @@ impl Dictionary {
         file.write_all(json_string.as_bytes())?;
         Ok(())
     }
-
 }

@@ -47,7 +47,7 @@ fn main() {
                 match input_code {
                     1 => config = "t2s".to_string(),
                     2 => config = "s2tw".to_string(),
-                    _ => config = "none".to_string()
+                    _ => config = "none".to_string(),
                 }
             }
 
@@ -120,7 +120,7 @@ fn main() {
             }
 
             println!(
-                "Opencc-Clip-Jieba-rs Zho Converter version 1.0.0 Copyright (c) 2024 Bryan Lai"
+                "Opencc-Clip-Jieba Zho Converter version 1.0.0 Copyright (c) 2024 Bryan Lai"
             );
             println!("Config: {}{}, {}{}", BLUE, config, punct, RESET);
             println!(

@@ -1,9 +1,9 @@
-use opencc_jieba_rs::{format_thousand, OpenCC, dictionary_lib};
+use opencc_jieba_rs::{dictionary_lib, format_thousand, OpenCC};
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use super::*;
+    use std::fs;
 
     #[test]
     fn zho_check_test() {
@@ -20,6 +20,15 @@ mod tests {
         let expected_output = "你好，世界！龍馬精神！";
         let opencc = OpenCC::new();
         let actual_output = opencc.s2t(input, false);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn s2tw_test() {
+        let input = "你好，这里世界！龙马精神！";
+        let expected_output = "你好，這裡世界！龍馬精神！";
+        let opencc = OpenCC::new();
+        let actual_output = opencc.s2tw(input, false);
         assert_eq!(actual_output, expected_output);
     }
 

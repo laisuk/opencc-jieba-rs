@@ -10,7 +10,7 @@ pub mod dictionary_lib;
 
 pub struct OpenCC {
     pub jieba: Jieba,
-    pub dictionary: Dictionary,
+    dictionary: Dictionary,
 }
 
 impl OpenCC {
@@ -102,11 +102,11 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
@@ -118,11 +118,11 @@ impl OpenCC {
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "t")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "t")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
@@ -132,12 +132,12 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_phrases];
         let dict_refs_round_3 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
-        let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_3);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_3).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
-            String::from_iter(output_3)
+            String::from_iter(output)
         }
     }
 
@@ -150,12 +150,12 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let dict_refs_round_3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
-        let output_3 = Self::convert_by_string(output_2, &dict_refs_round_3);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_3);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_3).as_str(), "t")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "t")
         } else {
-            String::from_iter(output_3)
+            String::from_iter(output)
         }
     }
 
@@ -164,11 +164,11 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
@@ -180,11 +180,11 @@ impl OpenCC {
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "h")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "h")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
@@ -204,11 +204,11 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
@@ -234,11 +234,11 @@ impl OpenCC {
         ];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        let output_2 = Self::convert_by_string(output, &dict_refs_round_2);
+        let output = Self::convert_by_string(output, &dict_refs_round_2);
         if punctuation {
-            Self::convert_punctuation(String::from_iter(output_2).as_str(), "s")
+            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
         } else {
-            String::from_iter(output_2)
+            String::from_iter(output)
         }
     }
 
