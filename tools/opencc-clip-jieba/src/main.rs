@@ -1,9 +1,9 @@
-extern crate clipboard;
+extern crate copypasta;
 
 use std::env;
 
-use clipboard::ClipboardContext;
-use clipboard::ClipboardProvider;
+use copypasta::ClipboardContext;
+use copypasta::ClipboardProvider;
 use opencc_jieba_rs::{find_max_utf8_length, format_thousand, OpenCC};
 
 fn main() {
@@ -35,7 +35,7 @@ fn main() {
         config = "auto".to_string()
     }
     // Create a new clipboard context
-    let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+    let mut ctx: ClipboardContext = ClipboardContext::new().unwrap();
     // Attempt to read text from the clipboard
     match ctx.get_contents() {
         Ok(contents) => {
