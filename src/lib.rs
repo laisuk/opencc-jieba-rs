@@ -28,13 +28,11 @@ impl OpenCC {
         dictionaries: &'a [&HashMap<String, String>],
     ) -> impl Iterator<Item = String> + 'a {
         phrases.map(move |phrase| {
-            // 整个词转换
             for dictionary in dictionaries {
                 if let Some(translation) = dictionary.get(phrase) {
                     return translation.to_string(); // Clone the String translation
                 }
             }
-            // 逐字转换
             Self::convert_by_char(phrase, dictionaries)
         })
     }

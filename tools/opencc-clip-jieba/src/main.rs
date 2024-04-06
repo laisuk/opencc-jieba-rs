@@ -119,9 +119,7 @@ fn main() {
                 display_output = &output;
             }
 
-            println!(
-                "Opencc-Clip-Jieba Zho Converter version 1.0.0 Copyright (c) 2024 Bryan Lai"
-            );
+            println!("Opencc-Clip-Jieba Zho Converter version 1.0.0 Copyright (c) 2024 Bryan Lai");
             println!("Config: {}{}, {}{}", BLUE, config, punct, RESET);
             println!(
                 "{}Clipboard Input ({}):{}\n{}{}{}{}\n",
