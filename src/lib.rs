@@ -261,6 +261,20 @@ impl OpenCC {
         String::from_iter(output)
     }
 
+    fn st(&self, input: &str) -> String {
+        let phrases = self.jieba.cut(input, true);
+        let dict_refs = [&self.dictionary.st_characters];
+        let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
+        String::from_iter(output)
+    }
+
+    fn ts(&self, input: &str) -> String {
+        let phrases = self.jieba.cut(input, true);
+        let dict_refs = [&self.dictionary.ts_characters];
+        let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
+        String::from_iter(output)
+    }
+
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
         let result;
 
@@ -299,10 +313,10 @@ impl OpenCC {
             false => &_strip_text,
         };
         let code;
-        if strip_text != &self.t2s(strip_text, false) {
+        if strip_text != &self.ts(strip_text) {
             code = 1;
         } else {
-            if strip_text != &self.s2t(strip_text, false) {
+            if strip_text != &self.st(strip_text) {
                 code = 2;
             } else {
                 code = 0;
