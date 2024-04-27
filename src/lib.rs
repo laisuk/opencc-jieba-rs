@@ -15,7 +15,7 @@ pub struct OpenCC {
 
 impl OpenCC {
     pub fn new() -> Self {
-        let dict_hans_hant_txt = include_str!("dicts/dict_hans_hant.txt");
+        let dict_hans_hant_txt = include_str!("dictionary_lib/dicts/dict_hans_hant.txt");
         let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
         let jieba = Jieba::with_dict(&mut dict_hans_hant).unwrap();
         let dictionary = Dictionary::new();
@@ -186,45 +186,33 @@ impl OpenCC {
         }
     }
 
-    pub fn t2tw(&self, input: &str, punctuation: bool) -> String {
+    pub fn t2tw(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
-    pub fn t2twp(&self, input: &str, punctuation: bool) -> String {
+    pub fn t2twp(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output = Self::convert_by_string(output, &dict_refs_round_2);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
-    pub fn tw2t(&self, input: &str, punctuation: bool) -> String {
+    pub fn tw2t(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
-    pub fn tw2tp(&self, input: &str, punctuation: bool) -> String {
+    pub fn tw2tp(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
@@ -233,36 +221,24 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
         let output = Self::convert_by_string(output, &dict_refs_round_2);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
-    pub fn t2hk(&self, input: &str, punctuation: bool) -> String {
+    pub fn t2hk(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [&self.dictionary.hk_variants];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
-    pub fn hk2t(&self, input: &str, punctuation: bool) -> String {
+    pub fn hk2t(&self, input: &str) -> String {
         let phrases = self.jieba.cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        if punctuation {
-            Self::convert_punctuation(String::from_iter(output).as_str(), "s")
-        } else {
-            String::from_iter(output)
-        }
+        String::from_iter(output)
     }
 
     pub fn t2jp(&self, input: &str) -> String {
@@ -283,6 +259,31 @@ impl OpenCC {
         let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
 
         String::from_iter(output)
+    }
+
+    pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
+        let result;
+
+        match config.to_lowercase().as_str() {
+            "s2t" => result = self.s2t(input, punctuation),
+            "s2tw" => result = self.s2tw(input, punctuation),
+            "s2twp" => result = self.s2twp(input, punctuation),
+            "s2hk" => result = self.s2hk(input, punctuation),
+            "t2s" => result = self.t2s(input, punctuation),
+            "t2tw" => result = self.t2tw(input),
+            "t2twp" => result = self.t2twp(input),
+            "t2hk" => result = self.t2hk(input),
+            "tw2s" => result = self.tw2s(input, punctuation),
+            "tw2sp" => result = self.tw2sp(input, punctuation),
+            "tw2t" => result = self.tw2t(input),
+            "tw2tp" => result = self.tw2tp(input),
+            "hk2s" => result = self.hk2s(input, punctuation),
+            "hk2t" => result = self.hk2t(input),
+            "jp2t" => result = self.jp2t(input),
+            "t2jp" => result = self.t2jp(input),
+            _ => result = String::new(),
+        }
+        result
     }
 
     pub fn zho_check(&self, input: &str) -> i8 {
