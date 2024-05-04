@@ -35,45 +35,45 @@ impl Dictionary {
     }
 
     pub fn from_dicts() -> Self {
-        let stc_file_path = include_str!("dicts/STCharacters.txt");
-        let stp_file_path = include_str!("dicts/STPhrases.txt");
-        let tsc_file_path = include_str!("dicts/TSCharacters.txt");
-        let tsp_file_path = include_str!("dicts/TSPhrases.txt");
-        let twp_file_path = include_str!("dicts/TWPhrases.txt");
-        let twpr_file_path = include_str!("dicts/TWPhrasesRev.txt");
-        let twv_file_path = include_str!("dicts/TWVariants.txt");
-        let twvr_file_path = include_str!("dicts/TWVariantsRev.txt");
-        let twvrp_file_path = include_str!("dicts/TWVariantsRevPhrases.txt");
-        let hkv_file_path = include_str!("dicts/HKVariants.txt");
-        let hkvr_file_path = include_str!("dicts/HKVariantsRev.txt");
-        let hkvrp_file_path = include_str!("dicts/HKVariantsRevPhrases.txt");
-        let jpsc_file_path = include_str!("dicts/JPShinjitaiCharacters.txt");
-        let jpsp_file_path = include_str!("dicts/JPShinjitaiPhrases.txt");
-        let jpv_file_path = include_str!("dicts/JPVariants.txt");
-        let jpvr_file_path = include_str!("dicts/JPVariantsRev.txt");
-        let st_characters = Dictionary::load_dictionary_from_str(stc_file_path).unwrap();
-        let st_phrases = Dictionary::load_dictionary_from_str(stp_file_path).unwrap();
-        let ts_characters = Dictionary::load_dictionary_from_str(tsc_file_path).unwrap();
-        let ts_phrases = Dictionary::load_dictionary_from_str(tsp_file_path).unwrap();
-        let tw_phrases = Dictionary::load_dictionary_from_str(twp_file_path).unwrap();
+        let stc_file_str = include_str!("dicts/STCharacters.txt");
+        let stp_file_str = include_str!("dicts/STPhrases.txt");
+        let tsc_file_str = include_str!("dicts/TSCharacters.txt");
+        let tsp_file_str = include_str!("dicts/TSPhrases.txt");
+        let twp_file_str = include_str!("dicts/TWPhrases.txt");
+        let twpr_file_str = include_str!("dicts/TWPhrasesRev.txt");
+        let twv_file_str = include_str!("dicts/TWVariants.txt");
+        let twvr_file_str = include_str!("dicts/TWVariantsRev.txt");
+        let twvrp_file_str = include_str!("dicts/TWVariantsRevPhrases.txt");
+        let hkv_file_str = include_str!("dicts/HKVariants.txt");
+        let hkvr_file_str = include_str!("dicts/HKVariantsRev.txt");
+        let hkvrp_file_str = include_str!("dicts/HKVariantsRevPhrases.txt");
+        let jpsc_file_str = include_str!("dicts/JPShinjitaiCharacters.txt");
+        let jpsp_file_str = include_str!("dicts/JPShinjitaiPhrases.txt");
+        let jpv_file_str = include_str!("dicts/JPVariants.txt");
+        let jpvr_file_str = include_str!("dicts/JPVariantsRev.txt");
+        let st_characters = Dictionary::load_dictionary_from_str(stc_file_str).unwrap();
+        let st_phrases = Dictionary::load_dictionary_from_str(stp_file_str).unwrap();
+        let ts_characters = Dictionary::load_dictionary_from_str(tsc_file_str).unwrap();
+        let ts_phrases = Dictionary::load_dictionary_from_str(tsp_file_str).unwrap();
+        let tw_phrases = Dictionary::load_dictionary_from_str(twp_file_str).unwrap();
         let tw_phrases_rev =
-            Dictionary::load_dictionary_from_str(twpr_file_path).unwrap();
-        let tw_variants = Dictionary::load_dictionary_from_str(twv_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(twpr_file_str).unwrap();
+        let tw_variants = Dictionary::load_dictionary_from_str(twv_file_str).unwrap();
         let tw_variants_rev =
-            Dictionary::load_dictionary_from_str(twvr_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(twvr_file_str).unwrap();
         let tw_variants_rev_phrases =
-            Dictionary::load_dictionary_from_str(twvrp_file_path).unwrap();
-        let hk_variants = Dictionary::load_dictionary_from_str(hkv_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(twvrp_file_str).unwrap();
+        let hk_variants = Dictionary::load_dictionary_from_str(hkv_file_str).unwrap();
         let hk_variants_rev =
-            Dictionary::load_dictionary_from_str(hkvr_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(hkvr_file_str).unwrap();
         let hk_variants_rev_phrases =
-            Dictionary::load_dictionary_from_str(hkvrp_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(hkvrp_file_str).unwrap();
         let jps_characters =
-            Dictionary::load_dictionary_from_str(jpsc_file_path).unwrap();
-        let jps_phrases = Dictionary::load_dictionary_from_str(jpsp_file_path).unwrap();
-        let jp_variants = Dictionary::load_dictionary_from_str(jpv_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(jpsc_file_str).unwrap();
+        let jps_phrases = Dictionary::load_dictionary_from_str(jpsp_file_str).unwrap();
+        let jp_variants = Dictionary::load_dictionary_from_str(jpv_file_str).unwrap();
         let jp_variants_rev =
-            Dictionary::load_dictionary_from_str(jpvr_file_path).unwrap();
+            Dictionary::load_dictionary_from_str(jpvr_file_str).unwrap();
 
         Dictionary {
             st_characters,
