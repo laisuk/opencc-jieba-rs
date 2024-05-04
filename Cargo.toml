@@ -1,4 +1,4 @@
-workspace = { members = ["tools/opencc-clip-jieba"] }
+workspace = { members = [ "capi/opencc_jieba_capi","tools/opencc-clip-jieba"] }
 [package]
 name = "opencc-jieba-rs"
 version = "0.1.0"
@@ -11,3 +11,4 @@ jieba-rs = "0.7.0"
 regex = "1.10.4"
 serde = { version = "1.0.198", features = ["derive"] }
 serde_json = "1.0.116"
+lazy_static = "1.4.0"

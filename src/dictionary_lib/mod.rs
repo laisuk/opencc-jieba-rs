@@ -27,11 +27,36 @@ pub struct Dictionary {
     pub jp_variants_rev: HashMap<String, String>,
 }
 
+impl Default for Dictionary {
+    fn default() -> Self {
+        Dictionary {
+            st_characters: HashMap::new(),
+            st_phrases: HashMap::new(),
+            ts_characters: HashMap::new(),
+            ts_phrases: HashMap::new(),
+            tw_phrases: HashMap::new(),
+            tw_phrases_rev: HashMap::new(),
+            tw_variants: HashMap::new(),
+            tw_variants_rev: HashMap::new(),
+            tw_variants_rev_phrases: HashMap::new(),
+            hk_variants: HashMap::new(),
+            hk_variants_rev: HashMap::new(),
+            hk_variants_rev_phrases: HashMap::new(),
+            jps_characters: HashMap::new(),
+            jps_phrases: HashMap::new(),
+            jp_variants: HashMap::new(),
+            jp_variants_rev: HashMap::new(),
+        }
+    }
+}
+
 impl Dictionary {
     pub fn new() -> Self {
         let json_data = include_str!("dicts/dictionary.json");
-        let dictionary: Dictionary = serde_json::from_str(json_data).unwrap();
-        dictionary
+        serde_json::from_str(&json_data).unwrap_or_else(|_| {
+            eprintln!("Error: Failed to deserialize JSON data.");
+            Dictionary::default()
+        })
     }
 
     pub fn from_dicts() -> Self {
@@ -56,24 +81,17 @@ impl Dictionary {
         let ts_characters = Dictionary::load_dictionary_from_str(tsc_file_str).unwrap();
         let ts_phrases = Dictionary::load_dictionary_from_str(tsp_file_str).unwrap();
         let tw_phrases = Dictionary::load_dictionary_from_str(twp_file_str).unwrap();
-        let tw_phrases_rev =
-            Dictionary::load_dictionary_from_str(twpr_file_str).unwrap();
+        let tw_phrases_rev = Dictionary::load_dictionary_from_str(twpr_file_str).unwrap();
         let tw_variants = Dictionary::load_dictionary_from_str(twv_file_str).unwrap();
-        let tw_variants_rev =
-            Dictionary::load_dictionary_from_str(twvr_file_str).unwrap();
-        let tw_variants_rev_phrases =
-            Dictionary::load_dictionary_from_str(twvrp_file_str).unwrap();
+        let tw_variants_rev = Dictionary::load_dictionary_from_str(twvr_file_str).unwrap();
+        let tw_variants_rev_phrases = Dictionary::load_dictionary_from_str(twvrp_file_str).unwrap();
         let hk_variants = Dictionary::load_dictionary_from_str(hkv_file_str).unwrap();
-        let hk_variants_rev =
-            Dictionary::load_dictionary_from_str(hkvr_file_str).unwrap();
-        let hk_variants_rev_phrases =
-            Dictionary::load_dictionary_from_str(hkvrp_file_str).unwrap();
-        let jps_characters =
-            Dictionary::load_dictionary_from_str(jpsc_file_str).unwrap();
+        let hk_variants_rev = Dictionary::load_dictionary_from_str(hkvr_file_str).unwrap();
+        let hk_variants_rev_phrases = Dictionary::load_dictionary_from_str(hkvrp_file_str).unwrap();
+        let jps_characters = Dictionary::load_dictionary_from_str(jpsc_file_str).unwrap();
         let jps_phrases = Dictionary::load_dictionary_from_str(jpsp_file_str).unwrap();
         let jp_variants = Dictionary::load_dictionary_from_str(jpv_file_str).unwrap();
-        let jp_variants_rev =
-            Dictionary::load_dictionary_from_str(jpvr_file_str).unwrap();
+        let jp_variants_rev = Dictionary::load_dictionary_from_str(jpvr_file_str).unwrap();
 
         Dictionary {
             st_characters,

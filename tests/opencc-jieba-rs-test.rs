@@ -60,6 +60,16 @@ mod tests {
     }
 
     #[test]
+    fn test_jieba_cut() {
+        let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
+        let expected_output = "「/ 數大/ 」/ 便是/ 美/ ，/ 碧綠/ 的/ 山坡/ 前/ 幾千隻/ 綿羊/ ，/ 挨成/ 一片/ 的/ 雪絨/ ，/ 是/ 美/ ；";
+        let opencc = OpenCC::new();
+        let actual_output = opencc.jieba.cut(input, true).join("/ ");
+        println!("{}", actual_output);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
     fn s2t_punct_test() {
         let input = "你好，世界！“龙马精神”！";
         let expected_output = "你好，世界！「龍馬精神」！";
@@ -77,7 +87,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_to_json_test() {
+    fn test_zho_check() {
         let input = "你好，世界！龙马精神！";
         let expected_output = 2;
         let opencc = OpenCC::new();

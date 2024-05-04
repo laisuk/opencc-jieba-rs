@@ -388,9 +388,17 @@ name = "opencc-jieba-rs"
 version = "0.1.0"
 dependencies = [
  "jieba-rs",
+ "lazy_static",
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "opencc_jieba_capi"
+version = "0.1.0"
+dependencies = [
+ "opencc-jieba-rs",
 ]
 
 [[package]]

@@ -2,11 +2,16 @@ use std::collections::HashMap;
 use std::io::BufReader;
 
 use jieba_rs::Jieba;
+use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::dictionary_lib::Dictionary;
 
 pub mod dictionary_lib;
+
+lazy_static! {
+    static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
+}
 
 pub struct OpenCC {
     pub jieba: Jieba,
@@ -298,13 +303,11 @@ impl OpenCC {
         result
     }
 
-    pub fn zho_check(&self, input: &str) -> i8 {
+    pub fn zho_check(&self, input: &str) -> i32 {
         if input.is_empty() {
             return 0;
         }
-        // let re = Regex::new(r"[[:punct:]\sA-Za-z0-9]").unwrap();
-        let re = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
-        let _strip_text = re.replace_all(input, "");
+        let _strip_text = STRIP_REGEX.replace_all(input, "");
         let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
         let strip_text = &_strip_text[..max_bytes];
         let code;
