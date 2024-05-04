@@ -34,8 +34,68 @@ impl Dictionary {
         dictionary
     }
 
+    pub fn from_dicts() -> Self {
+        let stc_file_path = include_str!("dicts/STCharacters.txt");
+        let stp_file_path = include_str!("dicts/STPhrases.txt");
+        let tsc_file_path = include_str!("dicts/TSCharacters.txt");
+        let tsp_file_path = include_str!("dicts/TSPhrases.txt");
+        let twp_file_path = include_str!("dicts/TWPhrases.txt");
+        let twpr_file_path = include_str!("dicts/TWPhrasesRev.txt");
+        let twv_file_path = include_str!("dicts/TWVariants.txt");
+        let twvr_file_path = include_str!("dicts/TWVariantsRev.txt");
+        let twvrp_file_path = include_str!("dicts/TWVariantsRevPhrases.txt");
+        let hkv_file_path = include_str!("dicts/HKVariants.txt");
+        let hkvr_file_path = include_str!("dicts/HKVariantsRev.txt");
+        let hkvrp_file_path = include_str!("dicts/HKVariantsRevPhrases.txt");
+        let jpsc_file_path = include_str!("dicts/JPShinjitaiCharacters.txt");
+        let jpsp_file_path = include_str!("dicts/JPShinjitaiPhrases.txt");
+        let jpv_file_path = include_str!("dicts/JPVariants.txt");
+        let jpvr_file_path = include_str!("dicts/JPVariantsRev.txt");
+        let st_characters = Dictionary::load_dictionary_from_str(stc_file_path).unwrap();
+        let st_phrases = Dictionary::load_dictionary_from_str(stp_file_path).unwrap();
+        let ts_characters = Dictionary::load_dictionary_from_str(tsc_file_path).unwrap();
+        let ts_phrases = Dictionary::load_dictionary_from_str(tsp_file_path).unwrap();
+        let tw_phrases = Dictionary::load_dictionary_from_str(twp_file_path).unwrap();
+        let tw_phrases_rev =
+            Dictionary::load_dictionary_from_str(twpr_file_path).unwrap();
+        let tw_variants = Dictionary::load_dictionary_from_str(twv_file_path).unwrap();
+        let tw_variants_rev =
+            Dictionary::load_dictionary_from_str(twvr_file_path).unwrap();
+        let tw_variants_rev_phrases =
+            Dictionary::load_dictionary_from_str(twvrp_file_path).unwrap();
+        let hk_variants = Dictionary::load_dictionary_from_str(hkv_file_path).unwrap();
+        let hk_variants_rev =
+            Dictionary::load_dictionary_from_str(hkvr_file_path).unwrap();
+        let hk_variants_rev_phrases =
+            Dictionary::load_dictionary_from_str(hkvrp_file_path).unwrap();
+        let jps_characters =
+            Dictionary::load_dictionary_from_str(jpsc_file_path).unwrap();
+        let jps_phrases = Dictionary::load_dictionary_from_str(jpsp_file_path).unwrap();
+        let jp_variants = Dictionary::load_dictionary_from_str(jpv_file_path).unwrap();
+        let jp_variants_rev =
+            Dictionary::load_dictionary_from_str(jpvr_file_path).unwrap();
+
+        Dictionary {
+            st_characters,
+            st_phrases,
+            ts_characters,
+            ts_phrases,
+            tw_phrases,
+            tw_phrases_rev,
+            tw_variants,
+            tw_variants_rev,
+            tw_variants_rev_phrases,
+            hk_variants,
+            hk_variants_rev,
+            hk_variants_rev_phrases,
+            jps_characters,
+            jps_phrases,
+            jp_variants,
+            jp_variants_rev,
+        }
+    }
     #[allow(dead_code)]
-    pub fn from_json(filename: &str) -> io::Result<Self> {
+    pub fn from_json_file(filename: &str) -> io::Result<Self> {
         // Read the contents of the JSON file
         let json_string = fs::read_to_string(filename)?;
         // Deserialize the JSON string into a Dictionary struct

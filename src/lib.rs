@@ -262,17 +262,15 @@ impl OpenCC {
     }
 
     fn st(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
         let dict_refs = [&self.dictionary.st_characters];
-        let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        String::from_iter(output)
+        let output = Self::convert_by_char(input, &dict_refs);
+        output
     }
 
     fn ts(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
         let dict_refs = [&self.dictionary.ts_characters];
-        let output = Self::convert_by_slice(phrases.into_iter(), &dict_refs);
-        String::from_iter(output)
+        let output = Self::convert_by_char(input, &dict_refs);
+        output
     }
 
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
@@ -308,10 +306,7 @@ impl OpenCC {
         let re = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
         let _strip_text = re.replace_all(input, "");
         let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
-        let strip_text = match _strip_text.len() > max_bytes {
-            true => &_strip_text[..max_bytes],
-            false => &_strip_text,
-        };
+        let strip_text = &_strip_text[..max_bytes];
         let code;
         if strip_text != &self.ts(strip_text) {
             code = 1;

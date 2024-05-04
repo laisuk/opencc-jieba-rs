@@ -87,11 +87,13 @@ mod tests {
 
     #[test]
     #[ignore]
+    // In case there are new update to dictionaries contents,
+    // run this test to generate new dictionary.json
     fn test_serialize_to_json() {
         // Define the filename for testing
-        let filename = "test_dictionary.json";
+        let filename = "dictionary.json";
         // let opencc = OpenCC::new();
-        let dictionary = dictionary_lib::Dictionary::new();
+        let dictionary = dictionary_lib::Dictionary::from_dicts();
         // Serialize to JSON and write to file
         dictionary.serialize_to_json(filename).unwrap();
 
@@ -103,6 +105,6 @@ mod tests {
         assert_eq!(file_contents.trim().len(), expected_json);
 
         // Clean up: Delete the test file
-        fs::remove_file(filename).unwrap();
+        // fs::remove_file(filename).unwrap();
     }
 }
