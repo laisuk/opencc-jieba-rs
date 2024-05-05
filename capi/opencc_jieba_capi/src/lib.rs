@@ -56,15 +56,15 @@ pub extern "C" fn opencc_jieba_cut(
     input: *const c_char,
     hmm: bool,
 ) -> *mut *mut c_char {
-    let input_str = unsafe {
-        assert!(!input.is_null());
-        CStr::from_ptr(input).to_str().unwrap()
-    };
+    if instance.is_null() {
+        return std::ptr::null_mut();
+    }
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
 
-    let opencc = unsafe {
-        assert!(!instance.is_null());
-        &(*instance)
-    };
+    let opencc = unsafe { &(*instance) };
 
     let result = opencc.jieba.cut(input_str, hmm);
 
@@ -133,9 +133,7 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     let result_ptr = opencc_jieba_cut(instance, input, hmm);
     let joined_ptr = join_str(result_ptr, delimiter);
     if !result_ptr.is_null() {
-        unsafe {
-            opencc_free_string_array(result_ptr);
-        }
+        opencc_free_string_array(result_ptr);
     }
     joined_ptr
 }
