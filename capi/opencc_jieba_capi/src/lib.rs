@@ -239,7 +239,7 @@ mod tests {
         let input = CString::new("你好，世界！").unwrap().into_raw();
 
         // Perform segmentation
-        let result = opencc_jieba_cut(&opencc as *const OpenCC, input, false);
+        let result = opencc_jieba_cut(&opencc as *const OpenCC, input, true);
 
         // Convert result to Vec<String>
         let mut result_strings = Vec::new();
