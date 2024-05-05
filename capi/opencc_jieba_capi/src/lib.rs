@@ -45,7 +45,7 @@ pub extern "C" fn opencc_convert(
 pub extern "C" fn opencc_string_free(ptr: *mut std::os::raw::c_char) {
     if !ptr.is_null() {
         unsafe {
-            let _ = CString::from_raw(ptr);
+            let _ = Box::from_raw(ptr);
         };
     }
 }
