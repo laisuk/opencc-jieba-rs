@@ -1,6 +1,7 @@
 import ctypes
 import os
 import platform
+from typing import List
 
 # Determine the DLL file based on the operating system
 if platform.system() == 'Windows':
@@ -38,6 +39,8 @@ class OpenCC:
         self.lib.opencc_jieba_cut_and_join.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool, ctypes.c_char_p]
         self.lib.opencc_string_free.argtypes = [ctypes.c_char_p]
         self.lib.opencc_free_string_array.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
+        self.lib.join_str.restype = ctypes.c_char_p
+        self.lib.join_str.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_char_p]
 
     def convert(self, text, punctuation=False):
         opencc = self.lib.opencc_new()
@@ -81,3 +84,15 @@ class OpenCC:
         # self.lib.opencc_string_free(result_ptr)
         self.lib.opencc_free(opencc)
         return result
+
+    def jieba_join_str(self, strings: List[str], delimiter: str = " ") -> str:
+        # Convert the list of strings to a list of c_char_p
+        string_pointers = [ctypes.c_char_p(s.encode('utf-8')) for s in strings]
+        # Append a NULL pointer to the end of the array
+        string_pointers.append(None)
+        # Convert the list of c_char_p to a ctypes pointer to c_char_p
+        string_array = (ctypes.c_char_p * len(string_pointers))(*string_pointers)
+        # Call the C function
+        result = self.lib.join_str(string_array, delimiter.encode('utf-8'))
+
+        return result.decode('utf-8')

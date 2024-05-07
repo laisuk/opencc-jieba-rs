@@ -1,5 +1,6 @@
 use opencc_jieba_rs::OpenCC;
 use std::ffi::{c_char, CStr, CString};
+use std::ptr;
 
 #[no_mangle]
 pub extern "C" fn opencc_new() -> *mut OpenCC {
@@ -24,7 +25,7 @@ pub extern "C" fn opencc_convert(
     punctuation: bool,
 ) -> *mut std::os::raw::c_char {
     if instance.is_null() {
-        return std::ptr::null_mut();
+        return ptr::null_mut();
     }
     // Convert the instance pointer back into a reference
     let opencc = unsafe { &*instance };
@@ -45,7 +46,8 @@ pub extern "C" fn opencc_convert(
 pub extern "C" fn opencc_string_free(ptr: *mut std::os::raw::c_char) {
     if !ptr.is_null() {
         unsafe {
-            let _ = Box::from_raw(ptr);
+            let _ = CString::from_raw(ptr);
+            // let _ = Box::from_raw(ptr);
         };
     }
 }
@@ -57,10 +59,10 @@ pub extern "C" fn opencc_jieba_cut(
     hmm: bool,
 ) -> *mut *mut c_char {
     if instance.is_null() {
-        return std::ptr::null_mut();
+        return ptr::null_mut();
     }
     if input.is_null() {
-        return std::ptr::null_mut();
+        return ptr::null_mut();
     }
     let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
 
@@ -73,7 +75,7 @@ pub extern "C" fn opencc_jieba_cut(
         .map(|s| CString::new(s.to_string()).unwrap().into_raw())
         .collect();
 
-    result_ptrs.push(std::ptr::null_mut());
+    result_ptrs.push(ptr::null_mut());
 
     let result_ptr = result_ptrs.as_mut_ptr();
     std::mem::forget(result_ptrs);
@@ -98,28 +100,49 @@ pub extern "C" fn opencc_free_string_array(array: *mut *mut c_char) {
 
 #[no_mangle]
 pub extern "C" fn join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
+    // Ensure delimiter is not null
+    assert!(!delimiter.is_null());
+
+    // Convert delimiter to a Rust string
     let delimiter_str = unsafe {
-        assert!(!delimiter.is_null());
-        CStr::from_ptr(delimiter).to_str().unwrap()
+        CStr::from_ptr(delimiter)
+            .to_str()
+            .expect("Failed to convert delimiter to a Rust string")
     };
 
+    // Create a new empty string to store the result
     let mut result = String::new();
 
+    // Iterate through the strings until we find a null pointer
     let mut i = 0;
     loop {
+        // Get the pointer to the current string
         let ptr = unsafe { *strings.offset(i) };
+        // If the pointer is null, we've reached the end of the array
         if ptr.is_null() {
             break;
         }
+        // Convert the pointer to a C string
         let c_str = unsafe { CStr::from_ptr(ptr) };
-        let string = c_str.to_str().unwrap();
-        result.push_str(string);
-        if !unsafe { *strings.offset(i + 1) }.is_null() {
-            result.push_str(delimiter_str);
+        // Convert the C string to a Rust string
+        match c_str.to_str() {
+            Ok(string) => {
+                // Append the string to the result
+                result.push_str(string);
+                // If there's another string, append the delimiter
+                if !unsafe { *strings.offset(i + 1) }.is_null() {
+                    result.push_str(delimiter_str);
+                }
+            }
+            Err(_) => {
+                // Replace invalid UTF-8 byte sequence with a placeholder character
+                result.push('�');
+            }
         }
         i += 1;
     }
 
+    // Convert the result to a CString and return a raw pointer to it
     CString::new(result).unwrap().into_raw()
 }
 
@@ -287,9 +310,24 @@ mod tests {
         assert_eq!(result_str, expected);
         // Free memory
         unsafe {
-            // opencc_string_free(result);
+            opencc_string_free(result);
             let _ = CString::from_raw(input);
             let _ = CString::from_raw(delimiter);
         }
+    }
+
+    #[test]
+    fn test_join_str() {
+        let strings = vec![
+            CString::new("Hello").unwrap().into_raw(),
+            CString::new("World").unwrap().into_raw(),
+            ptr::null_mut(), // Add null pointer to the end of the array
+        ];
+        let delimiter = CString::new(" ").unwrap().into_raw();
+        let result = join_str(strings.as_ptr() as *mut _, delimiter);
+        // Ensure result is not null
+        assert!(!result.is_null());
+        let result_string = unsafe { CString::from_raw(result).into_string().unwrap() };
+        assert_eq!(result_string, "Hello World");
     }
 }
