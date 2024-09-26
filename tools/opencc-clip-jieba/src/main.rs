@@ -85,10 +85,11 @@ fn main() {
             }
 
             if contents.len() > 600 {
-                let max_utf8_length = find_max_utf8_length(&contents, 600);
-                display_input = &contents[..max_utf8_length];
+                let contents_max_utf8_length = find_max_utf8_length(&contents, 600);
+                display_input = &contents[..contents_max_utf8_length];
                 etc = "...";
-                display_output = &output[..max_utf8_length];
+                let output_max_utf8_length = find_max_utf8_length(&output, 600);
+                display_output = &output[..output_max_utf8_length];
             } else {
                 display_input = &contents;
                 etc = "";
@@ -109,7 +110,7 @@ fn main() {
             match ctx.set_contents(output) {
                 Ok(..) => {
                     println!(
-                        "{}(Output set to clipboard: {} chars.){}",
+                        "{}(Output set to clipboard: {} chars){}",
                         BLUE,
                         format_thousand(input_length as i32),
                         RESET

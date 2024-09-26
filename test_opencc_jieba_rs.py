@@ -1,7 +1,9 @@
-from opencc_jieba_rs import OpenCC
+from python.opencc_jieba_rs import OpenCC
 
 config = "s2t"
-input_text = "白日依山尽，黄河入海流"
+# input_text = "白日依山尽，黄河入海流"
+# input_text = "潦水尽而寒潭清，烟光凝而暮山紫。俨骖𬴂于上路，访风景于崇阿"
+input_text = "「100人参加了这次活动」"
 input_text2 = "數大了似乎按照著一種自然律，自然的會有一種特別的排列，一種特別的節奏，一種特殊的式樣，激動我們審美的本能，激發我們審美的情緒。"
 opencc = OpenCC()
 converted = opencc.convert(input_text)

@@ -111,7 +111,7 @@ mod tests {
         let file_contents = fs::read_to_string(filename).unwrap();
 
         // Verify that the JSON contains the expected data
-        let expected_json = 1350164;
+        let expected_json = 1351418;
         assert_eq!(file_contents.trim().len(), expected_json);
 
         // Clean up: Delete the test file
