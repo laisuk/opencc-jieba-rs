@@ -14,8 +14,10 @@ void opencc_free(const void *instance);
 void opencc_string_free(const char *ptr);
 char **opencc_jieba_cut(const void *instance, const char *input, bool hmm);
 void opencc_free_string_array(char **array);
-char *join_str(char **strings, const char *delimiter);
+char *opencc_join_str(char **strings, const char *delimiter);
 char *opencc_jieba_cut_and_join(const void *instance, const char *input, bool hmm, const char *delimiter);
+char **opencc_jieba_keyword_extract_textrank(const void *instance, const char *input, int top_k);
+char **opencc_jieba_keyword_extract_tfidf(const void *instance, const char *input, int top_k);
 
 #ifdef __cplusplus
 }

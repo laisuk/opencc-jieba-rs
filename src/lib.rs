@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::BufReader;
 
-use jieba_rs::Jieba;
+use jieba_rs::{Jieba, TfIdf};
+use jieba_rs::{KeywordExtract, TextRank};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -354,6 +355,31 @@ impl OpenCC {
                 .into_owned();
         }
         output_text
+    }
+
+    pub fn keyword_extract_textrank(&self, input: &str, tok_k: usize) -> Vec<String> {
+        let keyword_extractor = TextRank::default();
+        let top_k = keyword_extractor.extract_keywords(
+            &self.jieba,
+            input,
+            tok_k,
+            // vec![String::from("ns"), String::from("n"), String::from("vn"), String::from("v")],
+            vec![]
+        );
+        // Extract only the keyword strings from the Keyword struct
+        top_k.into_iter().map(|k| k.keyword).collect()
+    }
+
+    pub fn keyword_extract_tfidf(&self, input: &str, tok_k: usize) -> Vec<String> {
+        let keyword_extractor = TfIdf::default();
+        let top_k = keyword_extractor.extract_keywords(
+            &self.jieba,
+            input,
+            tok_k,
+            vec![]
+        );
+        // Extract only the keyword strings from the Keyword struct
+        top_k.into_iter().map(|k| k.keyword).collect()
     }
 }
 

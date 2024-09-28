@@ -96,10 +96,22 @@ pub extern "C" fn opencc_free_string_array(array: *mut *mut c_char) {
         }
         i += 1;
     }
+    // Nullify the pointers (optional for safety)
+    i = 0;
+    loop {
+        let ptr = unsafe { *array.offset(i) };
+        if ptr.is_null() {
+            break; // Exit loop if null is found
+        }
+        unsafe {
+            *array.offset(i) = ptr::null_mut(); // Set each pointer to NULL
+        }
+        i += 1; // Move to the next pointer in the array
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
+pub extern "C" fn opencc_join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
     // Ensure delimiter is not null
     assert!(!delimiter.is_null());
 
@@ -154,7 +166,7 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     delimiter: *const c_char,
 ) -> *mut c_char {
     let result_ptr = opencc_jieba_cut(instance, input, hmm);
-    let joined_ptr = join_str(result_ptr, delimiter);
+    let joined_ptr = opencc_join_str(result_ptr, delimiter);
     if !result_ptr.is_null() {
         opencc_free_string_array(result_ptr);
     }
@@ -170,11 +182,73 @@ pub extern "C" fn opencc_zho_check(
         return -1; // Return an error code if the instance pointer is null
     }
     let opencc = unsafe { &*instance }; // Convert the instance pointer back into a reference
-                                        // Convert input from C string to Rust string
+    // Convert input from C string to Rust string
     let c_str = unsafe { CStr::from_ptr(input) };
     let str_slice = c_str.to_str().unwrap_or("");
     // let input_str = str_slice.to_owned();
     opencc.zho_check(str_slice)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_keyword_extract_textrank(
+    instance: *const OpenCC,
+    input: *const c_char,
+    top_k: i32,
+) -> *mut *mut c_char {
+    if instance.is_null() {
+        return ptr::null_mut();
+    }
+    if input.is_null() {
+        return ptr::null_mut();
+    }
+    let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
+
+    let opencc = unsafe { &(*instance) };
+
+    let result = opencc.keyword_extract_textrank(input_str, top_k as usize);
+
+    let mut result_ptrs: Vec<*mut c_char> = result
+        .iter()
+        .map(|s| CString::new(s.to_string()).unwrap().into_raw())
+        .collect();
+
+    result_ptrs.push(ptr::null_mut());
+
+    let result_ptr = result_ptrs.as_mut_ptr();
+    std::mem::forget(result_ptrs);
+
+    result_ptr
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_keyword_extract_tfidf(
+    instance: *const OpenCC,
+    input: *const c_char,
+    top_k: i32,
+) -> *mut *mut c_char {
+    if instance.is_null() {
+        return ptr::null_mut();
+    }
+    if input.is_null() {
+        return ptr::null_mut();
+    }
+    let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
+
+    let opencc = unsafe { &(*instance) };
+
+    let result = opencc.keyword_extract_tfidf(input_str, top_k as usize);
+
+    let mut result_ptrs: Vec<*mut c_char> = result
+        .iter()
+        .map(|s| CString::new(s.to_string()).unwrap().into_raw())
+        .collect();
+
+    result_ptrs.push(ptr::null_mut());
+
+    let result_ptr = result_ptrs.as_mut_ptr();
+    std::mem::forget(result_ptrs);
+
+    result_ptr
 }
 
 #[cfg(test)]
@@ -187,7 +261,7 @@ mod tests {
         let opencc = OpenCC::new();
         // Define a sample input string
         let input = "你好，世界，欢迎"; // Chinese characters meaning "Hello, world!"
-                                        // Convert the input string to a C string
+        // Convert the input string to a C string
         let c_input = CString::new(input)
             .expect("CString conversion failed")
             .into_raw();
@@ -317,17 +391,81 @@ mod tests {
     }
 
     #[test]
-    fn test_join_str() {
+    fn test_opencc_join_str() {
         let strings = vec![
             CString::new("Hello").unwrap().into_raw(),
             CString::new("World").unwrap().into_raw(),
             ptr::null_mut(), // Add null pointer to the end of the array
         ];
         let delimiter = CString::new(" ").unwrap().into_raw();
-        let result = join_str(strings.as_ptr() as *mut _, delimiter);
+        let result = opencc_join_str(strings.as_ptr() as *mut _, delimiter);
         // Ensure result is not null
         assert!(!result.is_null());
         let result_string = unsafe { CString::from_raw(result).into_string().unwrap() };
         assert_eq!(result_string, "Hello World");
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_extract_textrank() {
+        // Create OpenCC instance
+        let opencc = OpenCC::new();
+
+        // Input string
+        let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
+
+        // Perform segmentation
+        let result = opencc_jieba_keyword_extract_textrank(&opencc as *const OpenCC, input, 10);
+
+        // Convert result to Vec<String>
+        let mut result_strings = Vec::new();
+        let mut i = 0;
+        loop {
+            let ptr = unsafe { *result.offset(i) };
+            if ptr.is_null() {
+                break;
+            }
+            let c_str = unsafe { CString::from_raw(ptr) };
+            let string = c_str.to_str().unwrap().to_owned();
+            result_strings.push(string);
+            i += 1;
+        }
+        println!("TextRank: {:?}", result_strings);
+        // Free memory
+        unsafe {
+            // opencc_free_string_array(result);
+            let _ = CString::from_raw(input);
+        }
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_extract_tfidf() {
+        // Create OpenCC instance
+        let opencc = OpenCC::new();
+
+        // Input string
+        let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
+
+        // Perform segmentation
+        let result = opencc_jieba_keyword_extract_tfidf(&opencc as *const OpenCC, input, 10);
+
+        // Convert result to Vec<String>
+        let mut result_strings = Vec::new();
+        let mut i = 0;
+        loop {
+            let ptr = unsafe { *result.offset(i) };
+            if ptr.is_null() {
+                break;
+            }
+            let c_str = unsafe { CString::from_raw(ptr) };
+            let string = c_str.to_str().unwrap().to_owned();
+            result_strings.push(string);
+            i += 1;
+        }
+        println!("TF-IDF :{:?}", result_strings);
+        // Free memory
+        unsafe {
+            // opencc_free_string_array(result);
+            let _ = CString::from_raw(input);
+        }
     }
 }
