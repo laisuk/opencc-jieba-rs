@@ -4,3 +4,4 @@ gcc -o use_opencc_jieba_c use_opencc_jieba_c.c -I . -L . -l opencc_jieba_capi -W
 C++ build command:
 g++ -o use_opencc_jieba_cpp use_opencc_jieba_cpp.cpp -I . -L. -lopencc_jieba_capi -Wl,-rpath='$ORIGIN'
 g++ -o use_opencc_jieba_cut use_opencc_jieba_cut.cpp -I . -L. -lopencc_jieba_capi -Wl,-rpath='$ORIGIN'
+g++ -o use_opencc_jieba_keyword_extract use_opencc_jieba_keyword_extract.cpp -I . -L. -lopencc_jieba_capi -Wl,-rpath='$ORIGIN'
