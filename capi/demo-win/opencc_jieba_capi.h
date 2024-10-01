@@ -19,22 +19,23 @@ char **opencc_jieba_cut(const void *instance, const char *input, bool hmm);
 void opencc_free_string_array(char **array);
 char *opencc_join_str(char **strings, const char *delimiter);
 char *opencc_jieba_cut_and_join(const void *instance, const char *input, bool hmm, const char *delimiter);
-char **opencc_jieba_keyword_extract_textrank(const void *instance, const char *input, int top_k);
-char **opencc_jieba_keyword_extract_tfidf(const void *instance, const char *input, int top_k);
-// Function to extract keywords and their weights using TextRank
+char **opencc_jieba_keyword_extract(const void *instance, const char *input, int top_k, const char *method);
+// Function to extract keywords and their weights using TextRank/ TF-TIDF
 // Parameters:
 // - instance: Pointer to the OpenCC instance
 // - input: Input text as a C string (null-terminated)
 // - top_k: Number of top keywords to extract
+// - method: TextRank/ TF-TIDF
 // - out_len: Pointer to store the length of the returned keyword array
 // - out_keywords: Pointer to store the array of extracted keywords (as C strings)
 // - out_weights: Pointer to store the array of weights corresponding to the keywords
 // Returns:
 // - 0 on success, negative value on error
-int32_t opencc_jieba_keyword_weight_textrank(
+int32_t opencc_jieba_keyword_weight(
     const struct OpenCC* instance,
     const char* input,
     size_t top_k,
+    const char* method,
     size_t* out_len,
     char*** out_keywords,
     double** out_weights

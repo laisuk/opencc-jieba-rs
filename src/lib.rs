@@ -394,12 +394,12 @@ impl OpenCC {
         top_k.into_iter().map(|k| k.keyword).collect()
     }
 
-    pub fn keyword_weight_tfidf(&self, input: &str, tok_k: usize) -> Vec<Keyword> {
+    pub fn keyword_weight_tfidf(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         let keyword_extractor = TfIdf::default();
         let top_k = keyword_extractor.extract_keywords(
             &self.jieba,
             input,
-            tok_k,
+            top_k,
             vec![]
         );
 

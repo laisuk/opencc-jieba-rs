@@ -190,10 +190,11 @@ pub extern "C" fn opencc_zho_check(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keyword_extract_textrank(
+pub extern "C" fn opencc_jieba_keyword_extract(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: i32,
+    method: *const c_char,
 ) -> *mut *mut c_char {
     if instance.is_null() {
         return ptr::null_mut();
@@ -202,10 +203,15 @@ pub extern "C" fn opencc_jieba_keyword_extract_textrank(
         return ptr::null_mut();
     }
     let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
+    let method_str = unsafe { CStr::from_ptr(method).to_str().unwrap() };
 
     let opencc = unsafe { &(*instance) };
 
-    let result = opencc.keyword_extract_textrank(input_str, top_k as usize);
+    let result = if method_str == "textrank" {
+        opencc.keyword_extract_textrank(input_str, top_k as usize)
+    } else {
+        opencc.keyword_extract_tfidf(input_str, top_k as usize)
+    };
 
     let mut result_ptrs: Vec<*mut c_char> = result
         .iter()
@@ -221,41 +227,11 @@ pub extern "C" fn opencc_jieba_keyword_extract_textrank(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keyword_extract_tfidf(
-    instance: *const OpenCC,
-    input: *const c_char,
-    top_k: i32,
-) -> *mut *mut c_char {
-    if instance.is_null() {
-        return ptr::null_mut();
-    }
-    if input.is_null() {
-        return ptr::null_mut();
-    }
-    let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap() };
-
-    let opencc = unsafe { &(*instance) };
-
-    let result = opencc.keyword_extract_tfidf(input_str, top_k as usize);
-
-    let mut result_ptrs: Vec<*mut c_char> = result
-        .iter()
-        .map(|s| CString::new(s.to_string()).unwrap().into_raw())
-        .collect();
-
-    result_ptrs.push(ptr::null_mut());
-
-    let result_ptr = result_ptrs.as_mut_ptr();
-    std::mem::forget(result_ptrs);
-
-    result_ptr
-}
-
-#[no_mangle]
-pub extern "C" fn opencc_jieba_keyword_weight_textrank(
+pub extern "C" fn opencc_jieba_keyword_weight(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
+    method: *const c_char,
     out_len: *mut usize,
     out_keywords: *mut *mut *mut c_char,
     out_weights: *mut *mut f64,
@@ -266,10 +242,21 @@ pub extern "C" fn opencc_jieba_keyword_weight_textrank(
         Ok(s) => s,
         Err(_) => return -1,  // Return error code if input conversion fails
     };
-
+    // Convert method C string to Rust string
+    let method_c_str = unsafe { CStr::from_ptr(method) };
+    let method_str = match method_c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,  // Return error code if method conversion fails
+    };
     // Call the Rust function that returns Vec<Keyword>
     let opencc = unsafe { &(*instance) };
-    let keywords = opencc.keyword_weight_textrank(input_str, top_k);
+    let keywords = if method_str == "textrank" {
+        opencc.keyword_weight_textrank(input_str, top_k)
+    } else if method_str == "tfidf" {
+        opencc.keyword_weight_tfidf(input_str, top_k)
+    } else {
+        return -1;  // Return error code if method is unrecognized
+    };
 
     let keyword_len = keywords.len();
     unsafe { *out_len = keyword_len };  // Set the output length
@@ -277,7 +264,6 @@ pub extern "C" fn opencc_jieba_keyword_weight_textrank(
     if keyword_len == 0 {
         return 0;  // No keywords found
     }
-
     // Allocate memory for keyword strings and weights arrays
     let mut keyword_array = Vec::with_capacity(keyword_len);
     let mut weight_array = Vec::with_capacity(keyword_len);
@@ -287,13 +273,11 @@ pub extern "C" fn opencc_jieba_keyword_weight_textrank(
         keyword_array.push(c_keyword.into_raw());  // Store the raw C string
         weight_array.push(keyword.weight);  // Store the weight
     }
-
     // Return the pointers to the arrays
     unsafe {
         *out_keywords = keyword_array.as_mut_ptr();
         *out_weights = weight_array.as_mut_ptr();
     }
-
     // Prevent Rust from deallocating the arrays
     std::mem::forget(keyword_array);
     std::mem::forget(weight_array);
@@ -490,9 +474,9 @@ mod tests {
 
         // Input string
         let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
-
+        let method_str = CString::new("textrank").unwrap().into_raw();
         // Perform segmentation
-        let result = opencc_jieba_keyword_extract_textrank(&opencc as *const OpenCC, input, 10);
+        let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
         // Convert result to Vec<String>
         let mut result_strings = Vec::new();
@@ -522,9 +506,9 @@ mod tests {
 
         // Input string
         let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
-
+        let method_str = CString::new("tfidf").unwrap().into_raw();
         // Perform segmentation
-        let result = opencc_jieba_keyword_extract_tfidf(&opencc as *const OpenCC, input, 10);
+        let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
         // Convert result to Vec<String>
         let mut result_strings = Vec::new();
@@ -556,20 +540,23 @@ mod tests {
         // Convert Rust string to C string
         let c_input = CString::new(input).unwrap();
         let c_input_ptr = c_input.as_ptr();
+        let c_method = CString::new("textrank").unwrap();
+        let c_method_ptr = c_method.as_ptr();
 
         // Initialize the OpenCC instance
         let opencc = OpenCC::new();  // Assuming OpenCC has a new() method
 
         // Output variables
         let mut keyword_count: usize = 0;
-        let mut keywords: *mut *mut c_char = std::ptr::null_mut();
-        let mut weights: *mut f64 = std::ptr::null_mut();
+        let mut keywords: *mut *mut c_char = ptr::null_mut();
+        let mut weights: *mut f64 = ptr::null_mut();
 
         // Call the FFI function
-        let result = opencc_jieba_keyword_weight_textrank(
+        let result = opencc_jieba_keyword_weight(
             &opencc as *const OpenCC,  // Pass the OpenCC instance as a raw pointer
             c_input_ptr,               // Input text
-            top_k,                     // Number of top keywords
+            top_k,                      // Number of top keywords
+            c_method_ptr,
             &mut keyword_count as *mut usize,  // Output keyword count
             &mut keywords as *mut *mut *mut c_char,  // Output keywords
             &mut weights as *mut *mut f64,  // Output weights
