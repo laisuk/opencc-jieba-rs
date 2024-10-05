@@ -41,10 +41,8 @@ class OpenCC:
         self.lib.opencc_free_string_array.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
         self.lib.opencc_join_str.restype = ctypes.c_char_p
         self.lib.opencc_join_str.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_char_p]
-        self.lib.opencc_jieba_keyword_extract_textrank.restype = ctypes.POINTER(ctypes.c_char_p)
-        self.lib.opencc_jieba_keyword_extract_textrank.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
-        self.lib.opencc_jieba_keyword_extract_tfidf.restype = ctypes.POINTER(ctypes.c_char_p)
-        self.lib.opencc_jieba_keyword_extract_tfidf.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+        self.lib.opencc_jieba_keyword_extract.restype = ctypes.POINTER(ctypes.c_char_p)
+        self.lib.opencc_jieba_keyword_extract.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p]
 
     def convert(self, text, punctuation=False):
         opencc = self.lib.opencc_new()
@@ -105,7 +103,7 @@ class OpenCC:
 
     def jieba_keyword_extract_textrank(self, text, top_k=10):
         opencc = self.lib.opencc_new()
-        result_ptr = self.lib.opencc_jieba_keyword_extract_textrank(opencc, text.encode('utf-8'), top_k)
+        result_ptr = self.lib.opencc_jieba_keyword_extract(opencc, text.encode('utf-8'), top_k, "textrank".encode('utf-8'))
         if result_ptr is None:
             self.lib.opencc_free(opencc)
             return [text]
@@ -125,7 +123,7 @@ class OpenCC:
 
     def jieba_keyword_extract_tfidf(self, text, top_k=10):
         opencc = self.lib.opencc_new()
-        result_ptr = self.lib.opencc_jieba_keyword_extract_tfidf(opencc, text.encode('utf-8'), top_k)
+        result_ptr = self.lib.opencc_jieba_keyword_extract(opencc, text.encode('utf-8'), top_k, "tfidf".encode('utf-8'))
         if result_ptr is None:
             self.lib.opencc_free(opencc)
             return [text]
