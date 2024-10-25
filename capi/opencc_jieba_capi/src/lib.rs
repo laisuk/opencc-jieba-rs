@@ -400,19 +400,7 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_cut(&opencc as *const OpenCC, input, true);
 
-        // Convert result to Vec<String>
-        let mut result_strings = Vec::new();
-        let mut i = 0;
-        loop {
-            let ptr = unsafe { *result.offset(i) };
-            if ptr.is_null() {
-                break;
-            }
-            let c_str = unsafe { CString::from_raw(ptr) };
-            let string = c_str.to_str().unwrap().to_owned();
-            result_strings.push(string);
-            i += 1;
-        }
+        let result_strings = keyword_to_vec_string(result);
         println!("{:?}", result_strings);
         // Expected result
         let expected = vec!["你好", "，", "世界", "！"];
@@ -478,19 +466,7 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
-        // Convert result to Vec<String>
-        let mut result_strings = Vec::new();
-        let mut i = 0;
-        loop {
-            let ptr = unsafe { *result.offset(i) };
-            if ptr.is_null() {
-                break;
-            }
-            let c_str = unsafe { CString::from_raw(ptr) };
-            let string = c_str.to_str().unwrap().to_owned();
-            result_strings.push(string);
-            i += 1;
-        }
+        let result_strings = keyword_to_vec_string(result);
         println!("TextRank: {:?}", result_strings);
         // Free memory
         unsafe {
@@ -510,11 +486,21 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
+        let result_strings = keyword_to_vec_string(result);
+        println!("TF-IDF :{:?}", result_strings);
+        // Free memory
+        unsafe {
+            // opencc_free_string_array(result);
+            let _ = CString::from_raw(input);
+        }
+    }
+
+    fn keyword_to_vec_string(keyword: *mut *mut c_char) -> Vec<String> {
         // Convert result to Vec<String>
         let mut result_strings = Vec::new();
         let mut i = 0;
         loop {
-            let ptr = unsafe { *result.offset(i) };
+            let ptr = unsafe { *keyword.offset(i) };
             if ptr.is_null() {
                 break;
             }
@@ -523,12 +509,7 @@ mod tests {
             result_strings.push(string);
             i += 1;
         }
-        println!("TF-IDF :{:?}", result_strings);
-        // Free memory
-        unsafe {
-            // opencc_free_string_array(result);
-            let _ = CString::from_raw(input);
-        }
+        result_strings
     }
 
     #[test]
