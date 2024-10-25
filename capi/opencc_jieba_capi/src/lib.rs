@@ -70,17 +70,18 @@ pub extern "C" fn opencc_jieba_cut(
 
     let result = opencc.jieba.cut(input_str, hmm);
 
-    let mut result_ptrs: Vec<*mut c_char> = result
-        .iter()
-        .map(|s| CString::new(s.to_string()).unwrap().into_raw())
-        .collect();
-
-    result_ptrs.push(ptr::null_mut());
-
-    let result_ptr = result_ptrs.as_mut_ptr();
-    std::mem::forget(result_ptrs);
-
-    result_ptr
+    // let mut result_ptrs: Vec<*mut c_char> = result
+    //     .iter()
+    //     .map(|s| CString::new(s.to_string()).unwrap().into_raw())
+    //     .collect();
+    //
+    // result_ptrs.push(ptr::null_mut());
+    //
+    // let result_ptr = result_ptrs.as_mut_ptr();
+    // std::mem::forget(result_ptrs);
+    //
+    // result_ptr
+    vec_to_cstr_ptr(result)
 }
 
 #[no_mangle]
@@ -213,15 +214,30 @@ pub extern "C" fn opencc_jieba_keyword_extract(
         opencc.keyword_extract_tfidf(input_str, top_k as usize)
     };
 
-    let mut result_ptrs: Vec<*mut c_char> = result
+    // let mut result_ptrs: Vec<*mut c_char> = result
+    //     .iter()
+    //     .map(|s| CString::new(s.to_string()).unwrap().into_raw())
+    //     .collect();
+    //
+    // result_ptrs.push(ptr::null_mut());
+    //
+    // let result_ptr = result_ptrs.as_mut_ptr();
+    // std::mem::forget(result_ptrs);
+    //
+    // result_ptr
+    vec_to_cstr_ptr(result)
+}
+
+// Helper function to convert Vec<&str> or Vec<String> to *mut *mut c_char
+fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
+    let mut result_ptrs: Vec<*mut c_char> = vec
         .iter()
-        .map(|s| CString::new(s.to_string()).unwrap().into_raw())
+        .map(|s| CString::new(s.as_ref()).unwrap().into_raw())
         .collect();
 
-    result_ptrs.push(ptr::null_mut());
-
+    result_ptrs.push(ptr::null_mut()); // Add null terminator
     let result_ptr = result_ptrs.as_mut_ptr();
-    std::mem::forget(result_ptrs);
+    std::mem::forget(result_ptrs); // Prevent Rust from deallocating memory
 
     result_ptr
 }
@@ -400,7 +416,7 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_cut(&opencc as *const OpenCC, input, true);
 
-        let result_strings = keyword_to_vec_string(result);
+        let result_strings = cstr_ptr_to_vec(result);
         println!("{:?}", result_strings);
         // Expected result
         let expected = vec!["你好", "，", "世界", "！"];
@@ -466,7 +482,7 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
-        let result_strings = keyword_to_vec_string(result);
+        let result_strings = cstr_ptr_to_vec(result);
         println!("TextRank: {:?}", result_strings);
         // Free memory
         unsafe {
@@ -486,7 +502,7 @@ mod tests {
         // Perform segmentation
         let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
 
-        let result_strings = keyword_to_vec_string(result);
+        let result_strings = cstr_ptr_to_vec(result);
         println!("TF-IDF :{:?}", result_strings);
         // Free memory
         unsafe {
@@ -495,7 +511,7 @@ mod tests {
         }
     }
 
-    fn keyword_to_vec_string(keyword: *mut *mut c_char) -> Vec<String> {
+    fn cstr_ptr_to_vec(keyword: *mut *mut c_char) -> Vec<String> {
         // Convert result to Vec<String>
         let mut result_strings = Vec::new();
         let mut i = 0;
