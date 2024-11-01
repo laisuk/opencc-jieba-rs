@@ -44,19 +44,6 @@ impl OpenCC {
     //     })
     // }
 
-    // fn convert_by_slice_par<'a>(
-    //     phrases: impl ParallelIterator<Item=&'a str> + 'a,
-    //     dictionaries: &'a [&HashMap<String, String>],
-    // ) -> impl ParallelIterator<Item=String> + 'a {
-    //     phrases.map(move |phrase| {
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(phrase) {
-    //                 return translation.to_string(); // Clone the String translation
-    //             }
-    //         }
-    //         Self::convert_by_char_par(phrase, dictionaries)
-    //     })
-    // }
 
     // fn convert_by_string<'a>(
     //     phrases: impl Iterator<Item = String> + 'a,
@@ -71,22 +58,6 @@ impl OpenCC {
     //         }
     //         // 逐字转换
     //         Self::convert_by_char(&phrase, dictionaries)
-    //     })
-    // }
-
-    // fn convert_by_string_par<'a>(
-    //     phrases: impl ParallelIterator<Item=String> + 'a,
-    //     dictionaries: &'a [&HashMap<String, String>],
-    // ) -> impl ParallelIterator<Item=String> + 'a {
-    //     phrases.map(move |phrase| {
-    //         // 整个词转换
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(&phrase) {
-    //                 return translation.to_string(); // Clone the String translation
-    //             }
-    //         }
-    //         // 逐字转换
-    //         Self::convert_by_char_par(&phrase, dictionaries)
     //     })
     // }
 
