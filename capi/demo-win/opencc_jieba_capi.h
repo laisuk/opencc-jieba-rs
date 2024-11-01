@@ -32,7 +32,7 @@ char **opencc_jieba_keyword_extract(const void *instance, const char *input, int
 // Returns:
 // - 0 on success, negative value on error
 int32_t opencc_jieba_keyword_weight(
-    const struct OpenCC* instance,
+    const void *instance,
     const char* input,
     size_t top_k,
     const char* method,
