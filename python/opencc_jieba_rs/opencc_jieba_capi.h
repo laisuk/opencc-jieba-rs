@@ -10,16 +10,16 @@ extern "C" {
 #include <stdlib.h>  // For malloc/free
 #include <stdbool.h> // For bool type
 
-void *opencc_new();
-char *opencc_convert(const void *instance, const char *input, const char *config, bool punctuation);
-int opencc_zho_check(const void *instance, const char *input);
-void opencc_free(const void *instance);
-void opencc_string_free(const char *ptr);
+void *opencc_jieba_new();
+char *opencc_jieba_convert(const void *instance, const char *input, const char *config, bool punctuation);
+int opencc_jieba_zho_check(const void *instance, const char *input);
+void opencc_jieba_free(const void *instance);
+void opencc_jieba_free_string(const char *ptr);
 char **opencc_jieba_cut(const void *instance, const char *input, bool hmm);
-void opencc_free_string_array(char **array);
-char *opencc_join_str(char **strings, const char *delimiter);
+void opencc_jieba_free_string_array(char **array);
+char *opencc_jieba_join_str(char **strings, const char *delimiter);
 char *opencc_jieba_cut_and_join(const void *instance, const char *input, bool hmm, const char *delimiter);
-char **opencc_jieba_keyword_extract(const void *instance, const char *input, int top_k, const char *method);
+char **opencc_jieba_keywords(const void *instance, const char *input, int top_k, const char *method);
 // Function to extract keywords and their weights using TextRank/ TF-TIDF
 // Parameters:
 // - instance: Pointer to the OpenCC instance
@@ -31,8 +31,8 @@ char **opencc_jieba_keyword_extract(const void *instance, const char *input, int
 // - out_weights: Pointer to store the array of weights corresponding to the keywords
 // Returns:
 // - 0 on success, negative value on error
-int32_t opencc_jieba_keyword_weight(
-    const struct OpenCC* instance,
+int32_t opencc_jieba_keywords_and_weights(
+    const void *instance,
     const char* input,
     size_t top_k,
     const char* method,

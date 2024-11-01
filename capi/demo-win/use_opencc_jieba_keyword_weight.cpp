@@ -5,7 +5,7 @@
 int main() {
     SetConsoleOutputCP(65001);
     // Create OpenCC instance
-    void *instance = opencc_new();
+    void *instance = opencc_jieba_new();
     // Input string
     const char *input = "该剧讲述三位男女在平安夜这一天各自的故事。平安夜的0点，横滨山下码头发生枪杀事件。胜吕寺诚司（二宫和也）在码头的一个角落醒来，眼前躺着一具头部被击中的尸体，失去记忆的他成为了被警察追赶的逃犯。";
     // Perform keyword extraction using TextRank
@@ -15,8 +15,8 @@ int main() {
     char **keywords = nullptr; // Pointer for keyword strings
     double *weights = nullptr; // Pointer for weights
 
-    int32_t result = opencc_jieba_keyword_weight(
-        (const struct OpenCC*)instance,
+    int32_t result = opencc_jieba_keywords_and_weights(
+        instance,
         input,
         top_k,
         method,
@@ -37,10 +37,10 @@ int main() {
         std::cerr << "Keyword extraction failed with error code: " << result << "\n";
     }
     // Perform segmentation and join with delimiter
-    char **result_segments = opencc_jieba_keyword_extract(instance, input, 10, "textrank");
-    char *join_result = opencc_join_str(result_segments, "/");
+    char **result_segments = opencc_jieba_keywords(instance, input, 10, "textrank");
+    char *join_result = opencc_jieba_join_str(result_segments, "/");
     std::cout << "Joined output: " << join_result << "\n";
-    opencc_string_free(join_result);
+    opencc_jieba_free_string(join_result);
 
     if (result_segments != NULL) {
         // Print the segmentation result
@@ -53,10 +53,10 @@ int main() {
         }
         std::cout << std::endl;
         // Free memory
-        opencc_free_string_array(result_segments);
+        opencc_jieba_free_string_array(result_segments);
     }
     // Free OpenCC instance
-    opencc_free(instance);
+    opencc_jieba_free(instance);
 
     return 0;
 }

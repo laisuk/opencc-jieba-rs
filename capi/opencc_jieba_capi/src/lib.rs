@@ -3,12 +3,12 @@ use std::ffi::{c_char, CStr, CString};
 use std::ptr;
 
 #[no_mangle]
-pub extern "C" fn opencc_new() -> *mut OpenCC {
+pub extern "C" fn opencc_jieba_new() -> *mut OpenCC {
     Box::into_raw(Box::new(OpenCC::new()))
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_free(instance: *mut OpenCC) {
+pub extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
     if !instance.is_null() {
         // Convert the raw pointer back into a Box and let it drop
         unsafe {
@@ -18,7 +18,7 @@ pub extern "C" fn opencc_free(instance: *mut OpenCC) {
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_convert(
+pub extern "C" fn opencc_jieba_convert(
     instance: *const OpenCC,
     input: *const std::os::raw::c_char,
     config: *const std::os::raw::c_char,
@@ -43,11 +43,10 @@ pub extern "C" fn opencc_convert(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_string_free(ptr: *mut std::os::raw::c_char) {
+pub extern "C" fn opencc_jieba_free_string(ptr: *mut std::os::raw::c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);
-            // let _ = Box::from_raw(ptr);
         };
     }
 }
@@ -85,7 +84,7 @@ pub extern "C" fn opencc_jieba_cut(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_free_string_array(array: *mut *mut c_char) {
+pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
     let mut i = 0;
     loop {
         let ptr = unsafe { *array.offset(i) };
@@ -112,7 +111,7 @@ pub extern "C" fn opencc_free_string_array(array: *mut *mut c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
+pub extern "C" fn opencc_jieba_join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
     // Ensure delimiter is not null
     assert!(!delimiter.is_null());
 
@@ -167,15 +166,15 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     delimiter: *const c_char,
 ) -> *mut c_char {
     let result_ptr = opencc_jieba_cut(instance, input, hmm);
-    let joined_ptr = opencc_join_str(result_ptr, delimiter);
+    let joined_ptr = opencc_jieba_join_str(result_ptr, delimiter);
     if !result_ptr.is_null() {
-        opencc_free_string_array(result_ptr);
+        opencc_jieba_free_string_array(result_ptr);
     }
     joined_ptr
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_zho_check(
+pub extern "C" fn opencc_jieba_zho_check(
     instance: *const OpenCC,
     input: *const std::os::raw::c_char,
 ) -> i32 {
@@ -191,7 +190,7 @@ pub extern "C" fn opencc_zho_check(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keyword_extract(
+pub extern "C" fn opencc_jieba_keywords(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: i32,
@@ -243,7 +242,7 @@ fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keyword_weight(
+pub extern "C" fn opencc_jieba_keywords_and_weights(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
@@ -334,7 +333,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_opencc_zho_check() {
+    fn test_opencc_jieba_zho_check() {
         // Create a sample OpenCC instance
         let opencc = OpenCC::new();
         // Define a sample input string
@@ -344,7 +343,7 @@ mod tests {
             .expect("CString conversion failed")
             .into_raw();
         // Call the function under test
-        let result = opencc_zho_check(&opencc as *const OpenCC, c_input);
+        let result = opencc_jieba_zho_check(&opencc as *const OpenCC, c_input);
         // Free the allocated C string
         unsafe {
             let _ = CString::from_raw(c_input);
@@ -354,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn test_opencc_convert() {
+    fn test_opencc_jieba_convert() {
         // Instance from Rust
         let opencc = OpenCC::new();
         let input = "意大利罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。";
@@ -365,7 +364,7 @@ mod tests {
             .expect("CString conversion failed")
             .into_raw();
         let punctuation = true;
-        let result_ptr = opencc_convert(&opencc as *const OpenCC, c_input, c_config, punctuation);
+        let result_ptr = opencc_jieba_convert(&opencc as *const OpenCC, c_input, c_config, punctuation);
         let result_str = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
         // Free the allocated C string
         unsafe {
@@ -380,9 +379,9 @@ mod tests {
     }
 
     #[test]
-    fn test_opencc_convert_2() {
+    fn test_opencc_jieba_convert_2() {
         // Create instance from CAPI
-        let opencc = opencc_new();
+        let opencc = opencc_jieba_new();
         let input = "豫章故郡，洪都新府。星分翼軫，地接衡廬。襟三江而帶五湖，控蠻荊而引甌越。";
         let c_config = CString::new("t2s")
             .expect("CString conversion failed")
@@ -391,7 +390,7 @@ mod tests {
             .expect("CString conversion failed")
             .into_raw();
         let punctuation = true;
-        let result_ptr = opencc_convert(opencc, c_input, c_config, punctuation);
+        let result_ptr = opencc_jieba_convert(opencc, c_input, c_config, punctuation);
         let result_str = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
         // Free the allocated C string
         unsafe {
@@ -450,21 +449,21 @@ mod tests {
         assert_eq!(result_str, expected);
         // Free memory
         unsafe {
-            opencc_string_free(result);
+            opencc_jieba_free_string(result);
             let _ = CString::from_raw(input);
             let _ = CString::from_raw(delimiter);
         }
     }
 
     #[test]
-    fn test_opencc_join_str() {
+    fn test_opencc_jieba_join_str() {
         let strings = vec![
             CString::new("Hello").unwrap().into_raw(),
             CString::new("World").unwrap().into_raw(),
             ptr::null_mut(), // Add null pointer to the end of the array
         ];
         let delimiter = CString::new(" ").unwrap().into_raw();
-        let result = opencc_join_str(strings.as_ptr() as *mut _, delimiter);
+        let result = opencc_jieba_join_str(strings.as_ptr() as *mut _, delimiter);
         // Ensure result is not null
         assert!(!result.is_null());
         let result_string = unsafe { CString::from_raw(result).into_string().unwrap() };
@@ -480,7 +479,7 @@ mod tests {
         let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
         let method_str = CString::new("textrank").unwrap().into_raw();
         // Perform segmentation
-        let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
+        let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
 
         let result_strings = cstr_ptr_to_vec(result);
         println!("TextRank: {:?}", result_strings);
@@ -500,7 +499,7 @@ mod tests {
         let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
         let method_str = CString::new("tfidf").unwrap().into_raw();
         // Perform segmentation
-        let result = opencc_jieba_keyword_extract(&opencc as *const OpenCC, input, 10, method_str);
+        let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
 
         let result_strings = cstr_ptr_to_vec(result);
         println!("TF-IDF :{:?}", result_strings);
@@ -549,7 +548,7 @@ mod tests {
         let mut weights: *mut f64 = ptr::null_mut();
 
         // Call the FFI function
-        let result = opencc_jieba_keyword_weight(
+        let result = opencc_jieba_keywords_and_weights(
             &opencc as *const OpenCC,  // Pass the OpenCC instance as a raw pointer
             c_input_ptr,               // Input text
             top_k,                      // Number of top keywords

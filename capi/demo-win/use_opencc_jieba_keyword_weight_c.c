@@ -6,7 +6,7 @@
 int main() {
     SetConsoleOutputCP(65001);
     // Create OpenCC instance
-    void *instance = opencc_new();
+    void *instance = opencc_jieba_new();
     if (instance == NULL) {
         fprintf(stderr, "Failed to create OpenCC instance.\n");
         return -1;
@@ -20,8 +20,8 @@ int main() {
     char **keywords = NULL;
     double *weights = NULL;
 
-    int32_t result = opencc_jieba_keyword_weight(
-        (const struct OpenCC*)instance,
+    int32_t result = opencc_jieba_keywords_and_weights(
+        instance,
         input,
         top_k,
         method,
@@ -41,10 +41,10 @@ int main() {
     }
 
     // Perform segmentation and join with delimiter
-    char **result_segments = opencc_jieba_keyword_extract(instance, input, 10, "textrank");
-    char *join_result = opencc_join_str(result_segments, "/");
+    char **result_segments = opencc_jieba_keywords(instance, input, 10, "textrank");
+    char *join_result = opencc_jieba_join_str(result_segments, "/");
     printf("Joined output: %s\n", join_result);
-    opencc_string_free(join_result);
+    opencc_jieba_free_string(join_result);
 
     if (result_segments != NULL) {
         printf("Segmentation Result: ");
@@ -55,10 +55,10 @@ int main() {
             }
         }
         printf("\n");
-        opencc_free_string_array(result_segments);
+        opencc_jieba_free_string_array(result_segments);
     }
 
-    opencc_free(instance);
+    opencc_jieba_free(instance);
 
     return 0;
 }
