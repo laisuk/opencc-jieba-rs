@@ -5,7 +5,7 @@
 int main() {
     SetConsoleOutputCP(65001);
     // Create OpenCC instance
-    void *instance = opencc_new();
+    void *instance = opencc_jieba_new();
     // Input string
     const char *input = "你好，世界！";
     // Delimiter
@@ -16,10 +16,10 @@ int main() {
         // Print the result
         std::cout << "Result: " << result << std::endl;
         // Free memory
-        opencc_string_free(result);
+        opencc_jieba_free_string(result);
     }
     // Free OpenCC instance
-    opencc_free(instance);
+    opencc_jieba_free(instance);
 
     return 0;
 }
