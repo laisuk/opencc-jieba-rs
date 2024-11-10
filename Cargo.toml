@@ -1,4 +1,4 @@
-workspace = { members = [ "capi/opencc_jieba_capi","tools/opencc-clip-jieba"] }
+workspace = { members = [ "capi/opencc_jieba_capi","tools/opencc-clip-jieba", "tools/opencc-jieba"] }
 [package]
 name = "opencc-jieba-rs"
 version = "0.2.0"
@@ -13,3 +13,13 @@ serde = { version = "1.0.214", features = ["derive"] }
 serde_json = "1.0.132"
 lazy_static = "1.5.0"
 rayon = "1.10.0"
+
+[profile.release]
+opt-level = 3            # Maximize speed (better suited for C API performance)
+codegen-units = 1          # Optimize across the entire codebase for better performance
+lto = "fat"                # Full Link Time Optimization for improved binary performance
+panic = "abort"            # Prevents Rust panics from unwinding, reducing binary size
+incremental = false        # Disable incremental builds to fully optimize the release binary
+strip = "symbols"          # Strips debug symbols while retaining export symbols needed for the C API
+debug = 0                  # No debug info in the final binary to reduce size
+crt-static = false         # Ensures the C runtime is linked dynamically (important for shared libraries)

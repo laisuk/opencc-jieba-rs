@@ -11,6 +11,7 @@
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/tools/opencc-clip-jieba/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/capi/opencc_jieba_capi/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/tools/opencc-jieba/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
