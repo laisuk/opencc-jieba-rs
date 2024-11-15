@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 jieba-rs = { version = "0.7.0", features = ["tfidf", "textrank"] }
 regex = "1.11.1"
-serde = { version = "1.0.214", features = ["derive"] }
+serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.132"
 lazy_static = "1.5.0"
 rayon = "1.10.0"
@@ -22,4 +22,4 @@ panic = "abort"            # Prevents Rust panics from unwinding, reducing binar
 incremental = false        # Disable incremental builds to fully optimize the release binary
 strip = "symbols"          # Strips debug symbols while retaining export symbols needed for the C API
 debug = 0                  # No debug info in the final binary to reduce size
-crt-static = false         # Ensures the C runtime is linked dynamically (important for shared libraries)
+#crt-static = false         # Ensures the C runtime is linked dynamically (important for shared libraries)
