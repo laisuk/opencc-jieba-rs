@@ -328,28 +328,25 @@ impl OpenCC {
     }
 
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
-        let result;
-
         match config.to_lowercase().as_str() {
-            "s2t" => result = self.s2t(input, punctuation),
-            "s2tw" => result = self.s2tw(input, punctuation),
-            "s2twp" => result = self.s2twp(input, punctuation),
-            "s2hk" => result = self.s2hk(input, punctuation),
-            "t2s" => result = self.t2s(input, punctuation),
-            "t2tw" => result = self.t2tw(input),
-            "t2twp" => result = self.t2twp(input),
-            "t2hk" => result = self.t2hk(input),
-            "tw2s" => result = self.tw2s(input, punctuation),
-            "tw2sp" => result = self.tw2sp(input, punctuation),
-            "tw2t" => result = self.tw2t(input),
-            "tw2tp" => result = self.tw2tp(input),
-            "hk2s" => result = self.hk2s(input, punctuation),
-            "hk2t" => result = self.hk2t(input),
-            "jp2t" => result = self.jp2t(input),
-            "t2jp" => result = self.t2jp(input),
-            _ => result = String::new(),
+            "s2t" => self.s2t(input, punctuation),
+            "s2tw" => self.s2tw(input, punctuation),
+            "s2twp" => self.s2twp(input, punctuation),
+            "s2hk" => self.s2hk(input, punctuation),
+            "t2s" => self.t2s(input, punctuation),
+            "t2tw" => self.t2tw(input),
+            "t2twp" => self.t2twp(input),
+            "t2hk" => self.t2hk(input),
+            "tw2s" => self.tw2s(input, punctuation),
+            "tw2sp" => self.tw2sp(input, punctuation),
+            "tw2t" => self.tw2t(input),
+            "tw2tp" => self.tw2tp(input),
+            "hk2s" => self.hk2s(input, punctuation),
+            "hk2t" => self.hk2t(input),
+            "jp2t" => self.jp2t(input),
+            "t2jp" => self.t2jp(input),
+            _ => String::new(),
         }
-        result
     }
 
     pub fn zho_check(&self, input: &str) -> i32 {
