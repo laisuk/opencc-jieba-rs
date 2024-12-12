@@ -100,20 +100,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
     match in_enc {
         "UTF-8" => {
-            // input.read_to_string(&mut input_str)?;
-            let mut buffer = [0; 1024]; // Buffer to hold chunks of data
-            while let Ok(n) = input.read(&mut buffer) {
-                if n == 0 { break; }
-                input_str.push_str(&String::from_utf8_lossy(&buffer[..n]));
+            if let Some(file_name) = input_file {
+                // File input: read all data at once
+                let mut file = File::open(file_name)?;
+                file.read_to_string(&mut input_str)?;
+            } else {
+                // Console input: use buffered reading
+                let mut buffer = [0; 1024]; // Buffer to hold chunks of data
+                while let Ok(n) = input.read(&mut buffer) {
+                    if n == 0 {
+                        break;
+                    }
+                    input_str.push_str(&String::from_utf8_lossy(&buffer[..n]));
+                }
             }
         }
         _ => {
-            // input.read_to_end(&mut bytes)?;
-            let mut buffer = [0; 1024]; // Buffer for chunked reading
             let mut bytes = Vec::new();
-            while let Ok(n) = input.read(&mut buffer) {
-                if n == 0 { break; }
-                bytes.extend_from_slice(&buffer[..n]); // Collect bytes in chunks
+            if let Some(file_name) = input_file {
+                // File input: read all bytes at once
+                let mut file = File::open(file_name)?;
+                file.read_to_end(&mut bytes)?;
+            } else {
+                // Console input: use buffered reading
+                let mut buffer = [0; 1024]; // Buffer for chunked reading
+                while let Ok(n) = input.read(&mut buffer) {
+                    if n == 0 {
+                        break;
+                    }
+                    bytes.extend_from_slice(&buffer[..n]); // Collect bytes in chunks
+                }
             }
             let encoding = Encoding::for_label(in_enc.as_bytes()).ok_or_else(|| {
                 let err_msg = format!("Unsupported input encoding: {}", in_enc);
