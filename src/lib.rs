@@ -1,15 +1,17 @@
-use std::collections::HashMap;
-use std::io::BufReader;
-
+use include_flate::flate;
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
+use std::collections::HashMap;
+use std::io::BufReader;
 
 use crate::dictionary_lib::Dictionary;
 
 pub mod dictionary_lib;
+
+flate!(static DICT_HANS_HANT_TXT: str from "src/dictionary_lib/dicts/dict_hans_hant.txt");
 
 lazy_static! {
     static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
@@ -22,8 +24,8 @@ pub struct OpenCC {
 
 impl OpenCC {
     pub fn new() -> Self {
-        let dict_hans_hant_txt = include_str!("dictionary_lib/dicts/dict_hans_hant.txt");
-        let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
+        // let dict_hans_hant_txt = include_str!("dictionary_lib/dicts/dict_hans_hant.txt");
+        let mut dict_hans_hant = BufReader::new(DICT_HANS_HANT_TXT.as_bytes());
         let jieba = Jieba::with_dict(&mut dict_hans_hant).unwrap();
         let dictionary = Dictionary::new();
 
@@ -43,7 +45,6 @@ impl OpenCC {
     //         Self::convert_by_char(phrase, dictionaries)
     //     })
     // }
-
 
     // fn convert_by_string<'a>(
     //     phrases: impl Iterator<Item = String> + 'a,
@@ -82,9 +83,9 @@ impl OpenCC {
     // }
 
     fn convert_by_phrases_par<'a, T>(
-        phrases: impl ParallelIterator<Item=T> + 'a,
+        phrases: impl ParallelIterator<Item = T> + 'a,
         dictionaries: &'a [&HashMap<String, String>],
-    ) -> impl ParallelIterator<Item=String> + 'a
+    ) -> impl ParallelIterator<Item = String> + 'a
     where
         T: AsRef<str> + 'a, // T must implement AsRef<str> to support both &str and String
     {
@@ -104,7 +105,8 @@ impl OpenCC {
     }
 
     fn convert_by_char_par(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
-        phrase.par_chars()
+        phrase
+            .par_chars()
             .map(|ch| {
                 let ch_str = ch.to_string();
                 for dictionary in dictionaries {
@@ -145,7 +147,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
         } else {
@@ -162,7 +165,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
         } else {
@@ -178,8 +182,10 @@ impl OpenCC {
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(
                 Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-                &dict_refs_round_2),
-            &dict_refs_round_3);
+                &dict_refs_round_2,
+            ),
+            &dict_refs_round_3,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
         } else {
@@ -198,8 +204,10 @@ impl OpenCC {
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(
                 Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-                &dict_refs_round_2),
-            &dict_refs_round_3);
+                &dict_refs_round_2,
+            ),
+            &dict_refs_round_3,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
         } else {
@@ -213,7 +221,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
         } else {
@@ -230,7 +239,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         if punctuation {
             Self::convert_punctuation(String::from_par_iter(output).as_str(), "h")
         } else {
@@ -251,7 +261,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         String::from_par_iter(output)
     }
 
@@ -274,7 +285,8 @@ impl OpenCC {
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
-            &dict_refs_round_2);
+            &dict_refs_round_2,
+        );
         String::from_par_iter(output)
     }
 
@@ -435,12 +447,7 @@ impl OpenCC {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
         let keyword_extractor = TfIdf::default();
-        let top_k = keyword_extractor.extract_keywords(
-            &self.jieba,
-            &cleaned_input,
-            top_k,
-            vec![],
-        );
+        let top_k = keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![]);
         // Extract only the keyword strings from the Keyword struct
         top_k.into_iter().map(|k| k.keyword).collect()
     }
@@ -449,12 +456,7 @@ impl OpenCC {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
         let keyword_extractor = TfIdf::default();
-        let top_k = keyword_extractor.extract_keywords(
-            &self.jieba,
-            &cleaned_input,
-            top_k,
-            vec![],
-        );
+        let top_k = keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![]);
 
         top_k
     }

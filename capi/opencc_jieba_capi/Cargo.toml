@@ -1,13 +1,13 @@
 [package]
 name = "opencc_jieba_capi"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-libc = "0.2.161"
+libc = "0.2.169"
 
 [lib]
 crate-type = ["cdylib"]
