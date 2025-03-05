@@ -381,37 +381,31 @@ impl OpenCC {
         code
     }
 
-    fn convert_punctuation(sv: &str, config: &str) -> String {
+    fn convert_punctuation(text: &str, config: &str) -> String {
         let mut s2t_punctuation_chars: HashMap<&str, &str> = HashMap::new();
         s2t_punctuation_chars.insert("“", "「");
         s2t_punctuation_chars.insert("”", "」");
         s2t_punctuation_chars.insert("‘", "『");
         s2t_punctuation_chars.insert("’", "』");
 
-        let output_text;
-
-        if config.starts_with('s') {
-            let s2t_pattern = s2t_punctuation_chars.keys().cloned().collect::<String>();
-            let s2t_regex = Regex::new(&format!("[{}]", s2t_pattern)).unwrap();
-            output_text = s2t_regex
-                .replace_all(sv, |caps: &regex::Captures| {
-                    s2t_punctuation_chars[caps.get(0).unwrap().as_str()]
-                })
-                .into_owned();
+        let mapping = if config.starts_with('s') {
+            &s2t_punctuation_chars
         } else {
-            let mut t2s_punctuation_chars: HashMap<&str, &str> = HashMap::new();
-            for (key, value) in s2t_punctuation_chars.iter() {
-                t2s_punctuation_chars.insert(value, key);
-            }
-            let t2s_pattern = t2s_punctuation_chars.keys().cloned().collect::<String>();
-            let t2s_regex = Regex::new(&format!("[{}]", t2s_pattern)).unwrap();
-            output_text = t2s_regex
-                .replace_all(sv, |caps: &regex::Captures| {
-                    t2s_punctuation_chars[caps.get(0).unwrap().as_str()]
-                })
-                .into_owned();
-        }
-        output_text
+            // Correctly create a new HashMap with reversed key-value pairs
+            &s2t_punctuation_chars
+                .iter()
+                .map(|(&k, &v)| (v, k))
+                .collect::<HashMap<&str, &str>>()
+        };
+
+        let pattern = format!("[{}]", mapping.keys().cloned().collect::<String>());
+        let regex = Regex::new(&pattern).unwrap();
+
+        regex
+            .replace_all(text, |caps: &regex::Captures| {
+                mapping[caps.get(0).unwrap().as_str()]
+            })
+            .into_owned()
     }
 
     pub fn keyword_extract_textrank(&self, input: &str, tok_k: usize) -> Vec<String> {
