@@ -6,6 +6,8 @@ use std::path::Path;
 use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
+use std::io::{Cursor, Read};
+use zstd::stream::read::Decoder;
 
 #[derive(Serialize, Deserialize)]
 pub struct Dictionary {
@@ -52,7 +54,15 @@ impl Default for Dictionary {
 
 impl Dictionary {
     pub fn new() -> Self {
-        let json_data = include_str!("dicts/dictionary.json");
+        const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
+
+        let cursor = Cursor::new(DICTIONARY_JSON_ZSTD);
+        let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
+        let mut json_data = String::new();
+        decoder
+            .read_to_string(&mut json_data)
+            .expect("Failed to decompress dictionary.json");
+
         serde_json::from_str(&json_data).unwrap_or_else(|_| {
             eprintln!("Error: Failed to deserialize JSON data.");
             Dictionary::default()
@@ -60,38 +70,40 @@ impl Dictionary {
     }
 
     pub fn from_dicts() -> Self {
-        let stc_file_str = include_str!("dicts/STCharacters.txt");
-        let stp_file_str = include_str!("dicts/STPhrases.txt");
-        let tsc_file_str = include_str!("dicts/TSCharacters.txt");
-        let tsp_file_str = include_str!("dicts/TSPhrases.txt");
-        let twp_file_str = include_str!("dicts/TWPhrases.txt");
-        let twpr_file_str = include_str!("dicts/TWPhrasesRev.txt");
-        let twv_file_str = include_str!("dicts/TWVariants.txt");
-        let twvr_file_str = include_str!("dicts/TWVariantsRev.txt");
-        let twvrp_file_str = include_str!("dicts/TWVariantsRevPhrases.txt");
-        let hkv_file_str = include_str!("dicts/HKVariants.txt");
-        let hkvr_file_str = include_str!("dicts/HKVariantsRev.txt");
-        let hkvrp_file_str = include_str!("dicts/HKVariantsRevPhrases.txt");
-        let jpsc_file_str = include_str!("dicts/JPShinjitaiCharacters.txt");
-        let jpsp_file_str = include_str!("dicts/JPShinjitaiPhrases.txt");
-        let jpv_file_str = include_str!("dicts/JPVariants.txt");
-        let jpvr_file_str = include_str!("dicts/JPVariantsRev.txt");
-        let st_characters = Dictionary::load_dictionary_from_str(stc_file_str).unwrap();
-        let st_phrases = Dictionary::load_dictionary_from_str(stp_file_str).unwrap();
-        let ts_characters = Dictionary::load_dictionary_from_str(tsc_file_str).unwrap();
-        let ts_phrases = Dictionary::load_dictionary_from_str(tsp_file_str).unwrap();
-        let tw_phrases = Dictionary::load_dictionary_from_str(twp_file_str).unwrap();
-        let tw_phrases_rev = Dictionary::load_dictionary_from_str(twpr_file_str).unwrap();
-        let tw_variants = Dictionary::load_dictionary_from_str(twv_file_str).unwrap();
-        let tw_variants_rev = Dictionary::load_dictionary_from_str(twvr_file_str).unwrap();
-        let tw_variants_rev_phrases = Dictionary::load_dictionary_from_str(twvrp_file_str).unwrap();
-        let hk_variants = Dictionary::load_dictionary_from_str(hkv_file_str).unwrap();
-        let hk_variants_rev = Dictionary::load_dictionary_from_str(hkvr_file_str).unwrap();
-        let hk_variants_rev_phrases = Dictionary::load_dictionary_from_str(hkvrp_file_str).unwrap();
-        let jps_characters = Dictionary::load_dictionary_from_str(jpsc_file_str).unwrap();
-        let jps_phrases = Dictionary::load_dictionary_from_str(jpsp_file_str).unwrap();
-        let jp_variants = Dictionary::load_dictionary_from_str(jpv_file_str).unwrap();
-        let jp_variants_rev = Dictionary::load_dictionary_from_str(jpvr_file_str).unwrap();
+        let stc_file_str = "dicts/STCharacters.txt";
+        let stp_file_str = "dicts/STPhrases.txt";
+        let tsc_file_str = "dicts/TSCharacters.txt";
+        let tsp_file_str = "dicts/TSPhrases.txt";
+        let twp_file_str = "dicts/TWPhrases.txt";
+        let twpr_file_str = "dicts/TWPhrasesRev.txt";
+        let twv_file_str = "dicts/TWVariants.txt";
+        let twvr_file_str = "dicts/TWVariantsRev.txt";
+        let twvrp_file_str = "dicts/TWVariantsRevPhrases.txt";
+        let hkv_file_str = "dicts/HKVariants.txt";
+        let hkvr_file_str = "dicts/HKVariantsRev.txt";
+        let hkvrp_file_str = "dicts/HKVariantsRevPhrases.txt";
+        let jpsc_file_str = "dicts/JPShinjitaiCharacters.txt";
+        let jpsp_file_str = "dicts/JPShinjitaiPhrases.txt";
+        let jpv_file_str = "dicts/JPVariants.txt";
+        let jpvr_file_str = "dicts/JPVariantsRev.txt";
+        let st_characters = Dictionary::load_dictionary_from_path(stc_file_str).unwrap();
+        let st_phrases = Dictionary::load_dictionary_from_path(stp_file_str).unwrap();
+        let ts_characters = Dictionary::load_dictionary_from_path(tsc_file_str).unwrap();
+        let ts_phrases = Dictionary::load_dictionary_from_path(tsp_file_str).unwrap();
+        let tw_phrases = Dictionary::load_dictionary_from_path(twp_file_str).unwrap();
+        let tw_phrases_rev = Dictionary::load_dictionary_from_path(twpr_file_str).unwrap();
+        let tw_variants = Dictionary::load_dictionary_from_path(twv_file_str).unwrap();
+        let tw_variants_rev = Dictionary::load_dictionary_from_path(twvr_file_str).unwrap();
+        let tw_variants_rev_phrases =
+            Dictionary::load_dictionary_from_path(twvrp_file_str).unwrap();
+        let hk_variants = Dictionary::load_dictionary_from_path(hkv_file_str).unwrap();
+        let hk_variants_rev = Dictionary::load_dictionary_from_path(hkvr_file_str).unwrap();
+        let hk_variants_rev_phrases =
+            Dictionary::load_dictionary_from_path(hkvrp_file_str).unwrap();
+        let jps_characters = Dictionary::load_dictionary_from_path(jpsc_file_str).unwrap();
+        let jps_phrases = Dictionary::load_dictionary_from_path(jpsp_file_str).unwrap();
+        let jp_variants = Dictionary::load_dictionary_from_path(jpv_file_str).unwrap();
+        let jp_variants_rev = Dictionary::load_dictionary_from_path(jpvr_file_str).unwrap();
 
         Dictionary {
             st_characters,
@@ -122,7 +134,6 @@ impl Dictionary {
         Ok(dictionary)
     }
 
-    #[allow(dead_code)]
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<HashMap<String, String>>
     where
         P: AsRef<Path>,

@@ -1,4 +1,3 @@
-use include_flate::flate;
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
 use lazy_static::lazy_static;
@@ -6,12 +5,12 @@ use rayon::prelude::*;
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::BufReader;
+use std::io::{Cursor, Read};
+use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::Dictionary;
-
 pub mod dictionary_lib;
-
-flate!(static DICT_HANS_HANT_TXT: str from "src/dictionary_lib/dicts/dict_hans_hant.txt");
+const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
 lazy_static! {
     static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
@@ -24,8 +23,8 @@ pub struct OpenCC {
 
 impl OpenCC {
     pub fn new() -> Self {
-        // let dict_hans_hant_txt = include_str!("dictionary_lib/dicts/dict_hans_hant.txt");
-        let mut dict_hans_hant = BufReader::new(DICT_HANS_HANT_TXT.as_bytes());
+        let dict_hans_hant_txt = decompress_dict();
+        let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
         let jieba = Jieba::with_dict(&mut dict_hans_hant).unwrap();
         let dictionary = Dictionary::new();
 
@@ -481,4 +480,14 @@ pub fn format_thousand(n: i32) -> String {
         offset += 4; // Including the added comma
     }
     result_str
+}
+
+fn decompress_dict() -> String {
+    let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
+    let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
+    let mut decompressed = String::new();
+    decoder
+        .read_to_string(&mut decompressed)
+        .expect("Failed to decompress dictionary");
+    decompressed
 }
