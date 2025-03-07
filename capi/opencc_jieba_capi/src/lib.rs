@@ -111,7 +111,10 @@ pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_join_str(strings: *mut *mut c_char, delimiter: *const c_char) -> *mut c_char {
+pub extern "C" fn opencc_jieba_join_str(
+    strings: *mut *mut c_char,
+    delimiter: *const c_char,
+) -> *mut c_char {
     // Ensure delimiter is not null
     assert!(!delimiter.is_null());
 
@@ -182,7 +185,7 @@ pub extern "C" fn opencc_jieba_zho_check(
         return -1; // Return an error code if the instance pointer is null
     }
     let opencc = unsafe { &*instance }; // Convert the instance pointer back into a reference
-    // Convert input from C string to Rust string
+                                        // Convert input from C string to Rust string
     let c_str = unsafe { CStr::from_ptr(input) };
     let str_slice = c_str.to_str().unwrap_or("");
     // let input_str = str_slice.to_owned();
@@ -255,13 +258,13 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
     let c_str = unsafe { CStr::from_ptr(input) };
     let input_str = match c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return -1,  // Return error code if input conversion fails
+        Err(_) => return -1, // Return error code if input conversion fails
     };
     // Convert method C string to Rust string
     let method_c_str = unsafe { CStr::from_ptr(method) };
     let method_str = match method_c_str.to_str() {
         Ok(s) => s,
-        Err(_) => return -1,  // Return error code if method conversion fails
+        Err(_) => return -1, // Return error code if method conversion fails
     };
     // Call the Rust function that returns Vec<Keyword>
     let opencc = unsafe { &(*instance) };
@@ -270,23 +273,23 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
     } else if method_str == "tfidf" {
         opencc.keyword_weight_tfidf(input_str, top_k)
     } else {
-        return -1;  // Return error code if method is unrecognized
+        return -1; // Return error code if method is unrecognized
     };
 
     let keyword_len = keywords.len();
-    unsafe { *out_len = keyword_len };  // Set the output length
+    unsafe { *out_len = keyword_len }; // Set the output length
 
     if keyword_len == 0 {
-        return 0;  // No keywords found
+        return 0; // No keywords found
     }
     // Allocate memory for keyword strings and weights arrays
     let mut keyword_array = Vec::with_capacity(keyword_len);
     let mut weight_array = Vec::with_capacity(keyword_len);
 
     for keyword in keywords {
-        let c_keyword = CString::new(keyword.keyword).unwrap();  // Convert Rust String to C string
-        keyword_array.push(c_keyword.into_raw());  // Store the raw C string
-        weight_array.push(keyword.weight);  // Store the weight
+        let c_keyword = CString::new(keyword.keyword).unwrap(); // Convert Rust String to C string
+        keyword_array.push(c_keyword.into_raw()); // Store the raw C string
+        weight_array.push(keyword.weight); // Store the weight
     }
     // Return the pointers to the arrays
     unsafe {
@@ -297,7 +300,7 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
     std::mem::forget(keyword_array);
     std::mem::forget(weight_array);
 
-    0  // Success
+    0 // Success
 }
 
 #[no_mangle]
@@ -311,7 +314,7 @@ pub extern "C" fn opencc_jieba_free_keywords_and_weights(
         unsafe {
             for i in 0..len {
                 if !(*keywords.add(i)).is_null() {
-                    let _ = CString::from_raw(*keywords.add(i));  // Reclaim ownership and free C string
+                    let _ = CString::from_raw(*keywords.add(i)); // Reclaim ownership and free C string
                 }
             }
             // Free the keyword array itself
@@ -327,7 +330,6 @@ pub extern "C" fn opencc_jieba_free_keywords_and_weights(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,7 +340,7 @@ mod tests {
         let opencc = OpenCC::new();
         // Define a sample input string
         let input = "你好，世界，欢迎"; // Chinese characters meaning "Hello, world!"
-        // Convert the input string to a C string
+                                        // Convert the input string to a C string
         let c_input = CString::new(input)
             .expect("CString conversion failed")
             .into_raw();
@@ -364,7 +366,8 @@ mod tests {
             .expect("CString conversion failed")
             .into_raw();
         let punctuation = true;
-        let result_ptr = opencc_jieba_convert(&opencc as *const OpenCC, c_input, c_config, punctuation);
+        let result_ptr =
+            opencc_jieba_convert(&opencc as *const OpenCC, c_input, c_config, punctuation);
         let result_str = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
         // Free the allocated C string
         unsafe {
@@ -476,7 +479,9 @@ mod tests {
         let opencc = OpenCC::new();
 
         // Input string
-        let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
         let method_str = CString::new("textrank").unwrap().into_raw();
         // Perform segmentation
         let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
@@ -496,7 +501,9 @@ mod tests {
         let opencc = OpenCC::new();
 
         // Input string
-        let input = CString::new(include_str!("../../../src/OneDay.txt")).unwrap().into_raw();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
         let method_str = CString::new("tfidf").unwrap().into_raw();
         // Perform segmentation
         let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
@@ -540,7 +547,7 @@ mod tests {
         let c_method_ptr = c_method.as_ptr();
 
         // Initialize the OpenCC instance
-        let opencc = OpenCC::new();  // Assuming OpenCC has a new() method
+        let opencc = OpenCC::new(); // Assuming OpenCC has a new() method
 
         // Output variables
         let mut keyword_count: usize = 0;
@@ -549,17 +556,17 @@ mod tests {
 
         // Call the FFI function
         let result = opencc_jieba_keywords_and_weights(
-            &opencc as *const OpenCC,  // Pass the OpenCC instance as a raw pointer
-            c_input_ptr,               // Input text
-            top_k,                      // Number of top keywords
+            &opencc as *const OpenCC, // Pass the OpenCC instance as a raw pointer
+            c_input_ptr,              // Input text
+            top_k,                    // Number of top keywords
             c_method_ptr,
-            &mut keyword_count as *mut usize,  // Output keyword count
-            &mut keywords as *mut *mut *mut c_char,  // Output keywords
-            &mut weights as *mut *mut f64,  // Output weights
+            &mut keyword_count as *mut usize, // Output keyword count
+            &mut keywords as *mut *mut *mut c_char, // Output keywords
+            &mut weights as *mut *mut f64,    // Output weights
         );
 
         // Check if the function was successful
-        assert_eq!(result, 0);  // 0 indicates success
+        assert_eq!(result, 0); // 0 indicates success
 
         // Ensure that some keywords were extracted
         assert!(keyword_count > 0);
@@ -575,7 +582,8 @@ mod tests {
                 .collect()
         };
 
-        let weight_vec: Vec<f64> = unsafe { Vec::from_raw_parts(weights, keyword_count, keyword_count) };
+        let weight_vec: Vec<f64> =
+            unsafe { Vec::from_raw_parts(weights, keyword_count, keyword_count) };
 
         // Print the keywords and weights for verification
         for (i, keyword) in keyword_vec.iter().enumerate() {
