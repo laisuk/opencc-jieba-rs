@@ -54,14 +54,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .long("in-enc")
                 .value_name("encoding")
                 .default_value("UTF-8")
-                .help("Encoding for input"),
+                .help("Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5"),
         )
         .arg(
             Arg::new("out_enc")
                 .long("out-enc")
                 .value_name("encoding")
                 .default_value("UTF-8")
-                .help("Encoding for output"),
+                .help("Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5"),
         )
         .about(format!(
             "{}OpenCC Rust: Command Line Open Chinese Converter{}",

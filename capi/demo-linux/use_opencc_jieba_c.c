@@ -4,7 +4,7 @@
 int main(int argc, char **argv) {
     void *opencc = opencc_jieba_new();
     const char *config = u8"s2twp";
-    const char *text = u8"意大利罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。";
+    const char *text = u8"意大利邻国法兰西罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。";
     printf("Text: %s\n", text);
     int code = opencc_jieba_zho_check(opencc, text);
     printf("Text Code: %d\n", code);
