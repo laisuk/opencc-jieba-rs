@@ -28,16 +28,17 @@ class OpenCC:
         # Define function prototypes
         self.lib.opencc_jieba_new.restype = ctypes.c_void_p
         self.lib.opencc_jieba_new.argtypes = []
-        self.lib.opencc_jieba_convert.restype = ctypes.c_char_p
+        self.lib.opencc_jieba_convert.restype = ctypes.c_void_p
         self.lib.opencc_jieba_convert.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_bool]
         self.lib.opencc_jieba_zho_check.restype = ctypes.c_int
         self.lib.opencc_jieba_zho_check.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
         self.lib.opencc_jieba_free.argtypes = [ctypes.c_void_p]
         self.lib.opencc_jieba_cut.restype = ctypes.POINTER(ctypes.c_char_p)
         self.lib.opencc_jieba_cut.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool]
-        self.lib.opencc_jieba_cut_and_join.restype = ctypes.c_char_p
+        self.lib.opencc_jieba_cut_and_join.restype = ctypes.c_void_p
         self.lib.opencc_jieba_cut_and_join.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool, ctypes.c_char_p]
-        self.lib.opencc_jieba_free_string.argtypes = [ctypes.c_char_p]
+        self.lib.opencc_jieba_free_string.restype = None
+        self.lib.opencc_jieba_free_string.argtypes = [ctypes.c_void_p]
         self.lib.opencc_jieba_free_string_array.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
         self.lib.opencc_jieba_join_str.restype = ctypes.c_char_p
         self.lib.opencc_jieba_join_str.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_char_p]
@@ -49,8 +50,10 @@ class OpenCC:
         if opencc is None:
             return text
         result = self.lib.opencc_jieba_convert(opencc, text.encode('utf-8'), self.config.encode('utf-8'), punctuation)
+        py_result = ctypes.string_at(result).decode('UTF-8')
+        self.lib.opencc_jieba_free_string(result)
         self.lib.opencc_jieba_free(opencc)
-        return result.decode('utf-8')
+        return py_result
 
     def zho_check(self, text):
         opencc = self.lib.opencc_jieba_new()
@@ -85,7 +88,7 @@ class OpenCC:
             self.lib.opencc_jieba_free(opencc)
             return text
         result = ctypes.string_at(result_ptr).decode('utf-8')
-        # self.lib.opencc_string_free(result_ptr)
+        self.lib.opencc_jieba_free_string(result_ptr)
         self.lib.opencc_jieba_free(opencc)
         return result
 
