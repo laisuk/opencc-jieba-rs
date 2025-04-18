@@ -1,3 +1,148 @@
 # opencc-jieba-rs
+
+A Rust-based Chinese text converter that performs word segmentation using **JIEBA**, powered by **OpenCC lexicons**. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant) conversion.
+
+## Features
+
+- 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
+- 🔍 Lexicon-driven segmentation using OpenCC dictionaries.
+- ⚡ Higher accuracy by using Jieba segmentation processing.
+- 🛠️ Designed to be easily embedded as a Rust library or used standalone.
+
+## Installation
+
+```bash
+git clone https://github.com/laisuk/opencc-jieba-rs
+cd opencc-jieba-rs
+cargo build --release --workspace
+```
+
+The CLI tool will be located at:
+
+```
+target/release/opencc-jieba
+```
+
+## Usage
+
+```
+(Windows)
+opencc-jieba.exe [OPTIONS] --config <conversion>
+(Linux / macOS)
+opencc-jieba [OPTIONS] --config <conversion>
+
+Options:
+  -i, --input <file>         Read original text from <file>.
+  -o, --output <file>        Write converted text to <file>.
+  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]
+  -p, --punct <boolean>      Punctuation conversion: [true|false] [default: false]
+      --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -h, --help                 Print help
+```
+
+### Example
+
+```bash
+./opencc-jieba -c s2t -i text_simplified.txt -o text_traditional.txt
+```
+
+- Supported conversions:
+  - `s2t` – Simplified to Traditional
+  - `s2tw` – Simplified to Traditional Taiwan
+  - `s2twp` – Simplified to Traditional Taiwan with idioms
+  - `t2s` – Traditional to Simplified
+  - `tw2s` – Traditional Taiwan to Simplified
+  - `tw2sp` – Traditional Taiwan to Simplified with idioms
+  - etc
+
+### Lexicons
+
+By default, it uses OpenCC's built-in lexicon paths. You can also provide your own lexicon folder as the fourth argument.
+
+## Library Usage
+
+You can also use `opencc-jieba-rs` as a library:
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() {
+  let input = "这是一个测试";
+  let opencc = OpenCC::new();
+  let output = opencc.convert(input, "s2t", false);
+  println!("{}", output); // -> "這是一個測試"
+}
+```
+
+## C API Usage (`opencc_jieba_capi`)
+
+You can also use `opencc-jieba-rs` via a C API for integration with C/C++ projects.
+
+### Example
+
+```c
+#include <stdio.h>
+#include "opencc_jieba_capi.h"
+
+int main(int argc, char **argv) {
+    void *opencc = opencc_jieba_new();
+    const char *config = u8"s2twp";
+    const char *text = u8"意大利邻国法兰西罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。";
+    printf("Text: %s\n", text);
+    int code = opencc_jieba_zho_check(opencc, text);
+    printf("Text Code: %d\n", code);
+    char *result = opencc_jieba_convert(opencc, text, config, true);
+    code = opencc_jieba_zho_check(opencc, result);
+    printf("Converted: %s\n", result);
+    printf("Converted Code: %d\n", code);
+    if (result != NULL) {
+        opencc_jieba_free_string(result);
+    }
+    if (opencc != NULL) {
+        opencc_jieba_free(opencc);
+    }
+
+    return 0;
+}
+```
+
+### Output
+```
+Text: 意大利邻国法兰西罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。
+Text Code: 2
+Converted: 義大利鄰國法蘭西羅浮宮裡收藏的「蒙娜麗莎的微笑」畫像是曠世之作。
+Converted Code: 1
+```
+### Notes
+
+- `opencc_jieba_new()` initializes the engine.
+- `opencc_jieba_convert(...)` performs the conversion with the specified config (e.g., `s2t`, `t2s`, `s2twp`).
+- `opencc_jieba_free_string(...)` must be called to free the returned string.
+- `opencc_jieba_free(...)` must be called to free OpenCC instance.
+- `opencc_jieba_zho_check(...)` to detect zh-Hant (1), zh-Hans (2), others (0).
+
+
+## Project Structure
+
+- `src/lib.rs` – Main library with segmentation logic.
+- `capi/opencc-jieba-capi` C API source and demo.
+- `tools/opencc-jieba/src/main.rs` – CLI tool (`opencc-cs`) implementation.
+- `dicts/` – OpenCC text lexicons which converted into JSON format.
+
+## Dictionary compression (ZStd)
+```
 zstd -19 src/dictionary_lib/dicts/dictionary.json -o src/dictionary_lib/dicts/dictionary.json.zst
 zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_hans_hant.txt.zst
+```
+
+## Credits
+
+- [OpenCC](https://github.com/BYVoid/OpenCC) – Lexicon source.
+- [jieba-rs](https://github.com/messense/jieba-rs) - Jieba tokenization.
+
+## License
+
+MIT License
+
+

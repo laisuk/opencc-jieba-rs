@@ -32,6 +32,7 @@ class OpenCC:
         self.lib.opencc_jieba_convert.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_bool]
         self.lib.opencc_jieba_zho_check.restype = ctypes.c_int
         self.lib.opencc_jieba_zho_check.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self.lib.opencc_jieba_free.restype = None
         self.lib.opencc_jieba_free.argtypes = [ctypes.c_void_p]
         self.lib.opencc_jieba_cut.restype = ctypes.POINTER(ctypes.c_char_p)
         self.lib.opencc_jieba_cut.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool]
@@ -39,8 +40,9 @@ class OpenCC:
         self.lib.opencc_jieba_cut_and_join.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool, ctypes.c_char_p]
         self.lib.opencc_jieba_free_string.restype = None
         self.lib.opencc_jieba_free_string.argtypes = [ctypes.c_void_p]
+        self.lib.opencc_jieba_free_string_array.restype = None
         self.lib.opencc_jieba_free_string_array.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
-        self.lib.opencc_jieba_join_str.restype = ctypes.c_char_p
+        self.lib.opencc_jieba_join_str.restype = ctypes.c_void_p
         self.lib.opencc_jieba_join_str.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_char_p]
         self.lib.opencc_jieba_keywords.restype = ctypes.POINTER(ctypes.c_char_p)
         self.lib.opencc_jieba_keywords.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p]
@@ -94,15 +96,15 @@ class OpenCC:
 
     def jieba_join_str(self, strings: List[str], delimiter: str = " ") -> str:
         # Convert the list of strings to a list of c_char_p
-        string_pointers = [ctypes.c_char_p(s.encode('utf-8')) for s in strings]
-        # Append a NULL pointer to the end of the array
-        string_pointers.append(None)
-        # Convert the list of c_char_p to a ctypes pointer to c_char_p
-        string_array = (ctypes.c_char_p * len(string_pointers))(*string_pointers)
+        string_array = (ctypes.c_char_p * (len(strings) + 1))(
+            *[ctypes.c_char_p(s.encode('utf-8')) for s in strings],
+            ctypes.c_char_p(None)
+        )
         # Call the C function
-        result = self.lib.opencc_jieba_join_str(string_array, delimiter.encode('utf-8'))
-
-        return result.decode('utf-8')
+        result_ptr = self.lib.opencc_jieba_join_str(string_array, delimiter.encode('utf-8'))
+        result = ctypes.string_at(result_ptr).decode('utf-8')
+        self.lib.opencc_jieba_free_string(result_ptr)
+        return result
 
     def jieba_keyword_extract_textrank(self, text, top_k=10):
         opencc = self.lib.opencc_jieba_new()

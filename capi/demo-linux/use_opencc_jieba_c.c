@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
     char *result = opencc_jieba_convert(opencc, text, config, true);
     code = opencc_jieba_zho_check(opencc, result);
     printf("Converted: %s\n", result);
-    printf("Text Code: %d\n", code);
+    printf("Converted Code: %d\n", code);
     if (result != NULL) {
         opencc_jieba_free_string(result);
     }

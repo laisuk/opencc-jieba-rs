@@ -7,7 +7,7 @@ int main() {
     // Create OpenCC instance
     void *instance = opencc_jieba_new();
     // Input string
-    const char *input = "你好，世界！";
+    const char *input = "你好，美丽的世界！";
     // Delimiter
     const char *delimiter = "/ ";
     // Perform segmentation and join with delimiter
