@@ -1,13 +1,18 @@
 # opencc-jieba-rs
 
-A Rust-based Chinese text converter that performs word segmentation using **JIEBA**, powered by **OpenCC lexicons**. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant) conversion.
+A Rust-based Chinese text converter that performs word segmentation using **Jieba**, powered by **OpenCC lexicons**. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant) conversion.
+
+![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/ci.yml/badge.svg)
+![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)
+![License](https://img.shields.io/github/license/laisuk/opencc-jieba-rs/LICENSE)
 
 ## Features
 
 - 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
 - 🔍 Lexicon-driven segmentation using OpenCC dictionaries.
-- ⚡ Higher accuracy by using Jieba segmentation processing.
+- ⚡ Utilizes Jieba's probabilistic models for more accurate word segmentation, improving the quality of Simplified ↔ Traditional Chinese conversion.
 - 🛠️ Designed to be easily embedded as a Rust library or used standalone.
+
 
 ## Installation
 
@@ -44,7 +49,12 @@ Options:
 ### Example
 
 ```bash
-./opencc-jieba -c s2t -i text_simplified.txt -o text_traditional.txt
+# Convert Simplified Chinese to Traditional Chinese
+opencc-jieba -i input.txt -o output.txt --config s2t
+
+# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
+opencc-jieba -i input.txt -o output.txt --config tw2s
+
 ```
 
 - Supported conversions:
@@ -143,6 +153,10 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 
 ## License
 
-MIT License
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+
+
+## Contributing
+Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
 
 
