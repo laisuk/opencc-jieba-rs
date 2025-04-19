@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::{self, BufWriter, Read, Write};
-
+use atty::Stream;
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
+use std::fs::File;
+use std::io::{self, BufWriter, Read, Write};
 
 use opencc_jieba_rs;
 use opencc_jieba_rs::OpenCC;
@@ -13,26 +13,32 @@ const CONFIG_LIST: [&str; 16] = [
     "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t",
 ];
 
-fn read_input(
+const BLUE: &str = "\x1B[1;34m";
+const RESET: &str = "\x1B[0m";
+
+pub fn read_input(
     input_file: Option<&String>,
     in_enc: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let mut input: Box<dyn Read> = match input_file {
-        Some(file_name) => Box::new(File::open(file_name)?),
-        None => {
-            println!("\x1B[1;34mInput text, <ctrl-z> or <ctrl-d> to submit:\x1B[0m");
-            Box::new(io::stdin())
-        }
-    };
-
     let mut input_str = String::new();
+
     match in_enc {
         "UTF-8" => {
             if let Some(file_name) = input_file {
+                // Read file directly into a String
                 File::open(file_name)?.read_to_string(&mut input_str)?;
             } else {
-                let mut buffer = [0; 1024];
-                while let Ok(n) = input.read(&mut buffer) {
+                // Terminal prompt only if input is from terminal
+                if atty::is(Stream::Stdin) {
+                    println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
+                }
+
+                // Use locked and buffered stdin
+                let stdin = io::stdin();
+                let mut handle = stdin.lock();
+                let mut buffer = [0u8; 1024];
+
+                while let Ok(n) = handle.read(&mut buffer) {
                     if n == 0 {
                         break;
                     }
@@ -40,13 +46,22 @@ fn read_input(
                 }
             }
         }
+
         _ => {
             let mut bytes = Vec::new();
+
             if let Some(file_name) = input_file {
                 File::open(file_name)?.read_to_end(&mut bytes)?;
             } else {
-                let mut buffer = [0; 1024];
-                while let Ok(n) = input.read(&mut buffer) {
+                if atty::is(Stream::Stdin) {
+                    println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
+                }
+
+                let stdin = io::stdin();
+                let mut handle = stdin.lock();
+                let mut buffer = [0u8; 1024];
+
+                while let Ok(n) = handle.read(&mut buffer) {
                     if n == 0 {
                         break;
                     }
@@ -56,18 +71,29 @@ fn read_input(
 
             let encoding = Encoding::for_label(in_enc.as_bytes()).ok_or_else(|| {
                 io::Error::new(
-                    io::ErrorKind::Other,
+                    io::ErrorKind::InvalidInput,
                     format!("Unsupported input encoding: {}", in_enc),
                 )
             })?;
+
             let mut decoder = DecodeReaderBytesBuilder::new()
                 .encoding(Some(encoding))
                 .build(&*bytes);
+
             decoder.read_to_string(&mut input_str)?;
         }
     }
 
+    // Strip BOM if present
+    remove_utf8_bom_str(&mut input_str);
+
     Ok(input_str)
+}
+
+fn remove_utf8_bom_str(input: &mut String) {
+    if input.starts_with('\u{FEFF}') {
+        *input = input[1..].to_string(); // Remove BOM (Unicode 0xFEFF)
+    }
 }
 
 fn write_output(
@@ -97,8 +123,6 @@ fn write_output(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const BLUE: &str = "\x1B[1;34m";
-    const RESET: &str = "\x1B[0m";
     let matches = Command::new("opencc-jieba")
         .about(format!(
             "{}OpenCC Jieba Rust: Command Line Open Chinese Converter{}",
@@ -227,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         write_output(output_file, out_enc, &output_str)?;
 
         println!(
-            "\x1B[1;34mConversion completed ({config}): {} -> {}\x1B[0m",
+            "{BLUE}Conversion completed ({config}): {} -> {}{RESET}",
             input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
         );
@@ -248,7 +272,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         write_output(output_file, out_enc, &output_str)?;
 
         println!(
-            "\x1B[1;34mSegmentation completed ({delimiter}): {} -> {}\x1B[0m",
+            "{BLUE}Segmentation completed ({delimiter}): {} -> {}{RESET}",
             input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
         );
