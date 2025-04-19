@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Write};
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
 
@@ -13,100 +13,25 @@ const CONFIG_LIST: [&str; 16] = [
     "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t",
 ];
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const BLUE: &str = "\x1B[1;34m";
-    const RESET: &str = "\x1B[0m";
-    let matches = Command::new("OpenCC Rust")
-        .arg(
-            Arg::new("input")
-                .short('i')
-                .long("input")
-                .value_name("file")
-                .help("Read original text from <file>."),
-        )
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .value_name("file")
-                .help("Write converted text to <file>."),
-        )
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .value_name("conversion")
-                .help(
-                    "Conversion configuration: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]",
-                )
-                .required(true),
-        )
-        .arg(
-            Arg::new("punct")
-                .short('p')
-                .long("punct")
-                .value_name("boolean")
-                .default_value("false")
-                .help("Punctuation conversion: [true|false]"),
-        )
-        .arg(
-            Arg::new("in_enc")
-                .long("in-enc")
-                .value_name("encoding")
-                .default_value("UTF-8")
-                .help("Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5"),
-        )
-        .arg(
-            Arg::new("out_enc")
-                .long("out-enc")
-                .value_name("encoding")
-                .default_value("UTF-8")
-                .help("Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5"),
-        )
-        .about(format!(
-            "{}OpenCC Rust: Command Line Open Chinese Converter{}",
-            BLUE, RESET
-        ))
-        .get_matches();
-
-    let input_file = matches.get_one::<String>("input");
-    let output_file = matches.get_one::<String>("output");
-    let config = matches.get_one::<String>("config").unwrap().as_str();
-    if !CONFIG_LIST.contains(&config) {
-        println!("Invalid config: {}", config);
-        println!("Valid Config are: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]");
-        return Ok(());
-    }
-    let punctuation = matches
-        .get_one::<String>("punct")
-        .map_or(false, |value| value == "true");
-
+fn read_input(
+    input_file: Option<&String>,
+    in_enc: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut input: Box<dyn Read> = match input_file {
         Some(file_name) => Box::new(File::open(file_name)?),
         None => {
-            println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to summit:{RESET}");
+            println!("\x1B[1;34mInput text, <ctrl-z> or <ctrl-d> to submit:\x1B[0m");
             Box::new(io::stdin())
         }
     };
 
-    let output: Box<dyn Write> = match output_file {
-        Some(file_name) => Box::new(File::create(file_name)?),
-        None => Box::new(io::stdout()),
-    };
-
-    let mut output_buf = BufWriter::new(output);
-
     let mut input_str = String::new();
-    let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
     match in_enc {
         "UTF-8" => {
             if let Some(file_name) = input_file {
-                // File input: read all data at once
-                let mut file = File::open(file_name)?;
-                file.read_to_string(&mut input_str)?;
+                File::open(file_name)?.read_to_string(&mut input_str)?;
             } else {
-                // Console input: use buffered reading
-                let mut buffer = [0; 1024]; // Buffer to hold chunks of data
+                let mut buffer = [0; 1024];
                 while let Ok(n) = input.read(&mut buffer) {
                     if n == 0 {
                         break;
@@ -118,23 +43,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => {
             let mut bytes = Vec::new();
             if let Some(file_name) = input_file {
-                // File input: read all bytes at once
-                let mut file = File::open(file_name)?;
-                file.read_to_end(&mut bytes)?;
+                File::open(file_name)?.read_to_end(&mut bytes)?;
             } else {
-                // Console input: use buffered reading
-                let mut buffer = [0; 1024]; // Buffer for chunked reading
+                let mut buffer = [0; 1024];
                 while let Ok(n) = input.read(&mut buffer) {
                     if n == 0 {
                         break;
                     }
-                    bytes.extend_from_slice(&buffer[..n]); // Collect bytes in chunks
+                    bytes.extend_from_slice(&buffer[..n]);
                 }
             }
+
             let encoding = Encoding::for_label(in_enc.as_bytes()).ok_or_else(|| {
-                let err_msg = format!("Unsupported input encoding: {}", in_enc);
-                eprintln!("{}", &err_msg);
-                io::Error::new(io::ErrorKind::Other, err_msg)
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Unsupported input encoding: {}", in_enc),
+                )
             })?;
             let mut decoder = DecodeReaderBytesBuilder::new()
                 .encoding(Some(encoding))
@@ -143,39 +67,193 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let opencc = OpenCC::new();
+    Ok(input_str)
+}
 
-    let output_str = opencc.convert(&input_str, config, punctuation);
+fn write_output(
+    output_file: Option<&String>,
+    out_enc: &str,
+    content: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output: Box<dyn Write> = match output_file {
+        Some(file_name) => Box::new(File::create(file_name)?),
+        None => Box::new(io::stdout()),
+    };
 
-    let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
+    let mut output_buf = BufWriter::new(output);
+
     match out_enc {
-        "UTF-8" => {
-            write!(output_buf, "{}", output_str)?;
+        "UTF-8" => write!(output_buf, "{}", content)?,
+        _ => {
+            let encoding = Encoding::for_label(out_enc.as_bytes())
+                .ok_or_else(|| format!("Unsupported output encoding: {}", out_enc))?;
+            let encoded_bytes = encoding.encode(content).0;
+            output_buf.write_all(&encoded_bytes)?;
         }
-        _ => match Encoding::for_label(out_enc.as_bytes()) {
-            None => {
-                return Err(format!("Unsupported output encoding: {}", out_enc).into());
-            }
-            Some(encoding) => {
-                let encoded_bytes = encoding.encode(&output_str).0;
-                output_buf.write_all(&encoded_bytes)?;
-            }
-        },
     }
 
-    output_buf.flush()?; // Flush buffer to ensure all data is written
+    output_buf.flush()?;
+    Ok(())
+}
 
-    if let Some(input_file) = input_file {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const BLUE: &str = "\x1B[1;34m";
+    const RESET: &str = "\x1B[0m";
+    let matches = Command::new("opencc-jieba")
+        .about(format!(
+            "{}OpenCC Jieba Rust: Command Line Open Chinese Converter{}",
+            BLUE, RESET
+        ))
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .arg(
+            Arg::new("in_enc")
+                .long("in-enc")
+                .value_name("encoding")
+                .default_value("UTF-8")
+                .global(true)
+                .help("Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5"),
+        )
+        .arg(
+            Arg::new("out_enc")
+                .long("out-enc")
+                .value_name("encoding")
+                .default_value("UTF-8")
+                .global(true)
+                .help("Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5"),
+        )
+        .subcommand(
+            Command::new("convert")
+                .about(format!(
+                    "{}opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC{}",
+                    BLUE,
+                    RESET
+                ))
+                .arg(
+                    Arg::new("input")
+                        .short('i')
+                        .long("input")
+                        .value_name("file")
+                        .help("Read original text from <file>."),
+                )
+                .arg(
+                    Arg::new("output")
+                        .short('o')
+                        .long("output")
+                        .value_name("file")
+                        .help("Write converted text to <file>."),
+                )
+                .arg(
+                    Arg::new("config")
+                        .short('c')
+                        .long("config")
+                        .value_name("conversion")
+                        .help(
+                            "Conversion configuration: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]",
+                        )
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("punct")
+                        .short('p')
+                        .long("punct")
+                        .value_name("boolean")
+                        .default_value("false")
+                        .help("Punctuation conversion: [true|false]"),
+                ),
+        )
+        .subcommand(
+            Command::new("segment")
+                .about(format!(
+                    "{}opencc-jieba segment: Segment Chinese input text into words{}",
+                    BLUE, RESET
+                ))
+                .arg(
+                    Arg::new("input")
+                        .short('i')
+                        .long("input")
+                        .value_name("file")
+                        .help("Input file to segment")
+                        .required(false),
+                )
+                .arg(
+                    Arg::new("output")
+                        .short('o')
+                        .long("output")
+                        .value_name("file")
+                        .help("Write segmented result to file")
+                        .required(false),
+                )
+                .arg(
+                    Arg::new("delimiter")
+                        .short('d')
+                        .long("delim")
+                        .value_name("character")
+                        .help("Delimiter character for segmented text")
+                        .required(false)
+                        .default_value("/"),
+                ),
+        )
+        .get_matches();
+
+    match matches.subcommand() {
+        Some(("convert", sub_matches)) => {
+            handle_convert(sub_matches)?;
+        }
+        Some(("segment", sub_matches)) => {
+            handle_segment(sub_matches)?;
+        }
+        _ => unreachable!("Clap ensures only valid subcommands are passed"),
+    }
+
+    fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+        let input_file = matches.get_one::<String>("input");
+        let output_file = matches.get_one::<String>("output");
+        let config = matches.get_one::<String>("config").unwrap().as_str();
+        if !CONFIG_LIST.contains(&config) {
+            println!("Invalid config: {}", config);
+            println!("Valid Config are: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]");
+            return Ok(());
+        }
+        let punctuation = matches
+            .get_one::<String>("punct")
+            .map_or(false, |value| value == "true");
+
+        let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
+        let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
+
+        let input_str = read_input(input_file, in_enc)?;
+        let output_str = OpenCC::new().convert(&input_str, config, punctuation);
+        write_output(output_file, out_enc, &output_str)?;
+
         println!(
-            "{BLUE}Conversion completed ({config}): {} -> {}{RESET}",
-            input_file,
+            "\x1B[1;34mConversion completed ({config}): {} -> {}\x1B[0m",
+            input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
         );
-    } else {
+
+        Ok(())
+    }
+
+    fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+        let input_file = matches.get_one::<String>("input");
+        let output_file = matches.get_one::<String>("output");
+        let delimiter = matches.get_one::<String>("delimiter").unwrap();
+        let in_enc = matches.get_one::<String>("in_enc").unwrap();
+        let out_enc = matches.get_one::<String>("out_enc").unwrap();
+
+        let input_str = read_input(input_file, in_enc)?;
+        let output_vec = OpenCC::new().jieba.cut(&input_str, true);
+        let output_str = output_vec.join(delimiter);
+        write_output(output_file, out_enc, &output_str)?;
+
         println!(
-            "{BLUE}Conversion completed ({config}): <stdin> -> {}{RESET}",
+            "\x1B[1;34mSegmentation completed ({delimiter}): {} -> {}\x1B[0m",
+            input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
         );
+
+        Ok(())
     }
 
     Ok(())
