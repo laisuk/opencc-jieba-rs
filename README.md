@@ -28,33 +28,54 @@ The CLI tool will be located at:
 target/release/opencc-jieba
 ```
 
-## Usage
+## Usage: convert
 
 ```
+opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
+
 (Windows)
-opencc-jieba.exe [OPTIONS] --config <conversion>
+Usage: opencc-jieba.exe convert [OPTIONS] --config <conversion>
 (Linux / macOS)
-opencc-jieba [OPTIONS] --config <conversion>
+Usage: opencc-jieba convert [OPTIONS] --config <conversion>
 
 Options:
   -i, --input <file>         Read original text from <file>.
+      --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -o, --output <file>        Write converted text to <file>.
+      --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]
   -p, --punct <boolean>      Punctuation conversion: [true|false] [default: false]
-      --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-      --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -h, --help                 Print help
+
+```
+
+## Usage: segment
+
+```
+opencc-jieba segment: Segment Chinese input text into words
+
+Usage: opencc-jieba segment [OPTIONS]
+
+Options:
+  -i, --input <file>        Input file to segment
+      --in-enc <encoding>   Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -o, --output <file>       Write segmented result to file
+      --out-enc <encoding>  Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -d, --delim <character>   Delimiter character for segmented text [default: /]
+  -h, --help                Print help
 ```
 
 ### Example
 
 ```bash
 # Convert Simplified Chinese to Traditional Chinese
-opencc-jieba -i input.txt -o output.txt --config s2t
+opencc-jieba convert -i input.txt -o output.txt --config s2t
 
 # Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
-opencc-jieba -i input.txt -o output.txt --config tw2s
+opencc-jieba convert -i input.txt -o output.txt --config tw2s
 
+# Segment text file contents then output to new file
+opencc-jieba segment -i input.txt -o output.txt --delim ","
 ```
 
 - Supported conversions:
