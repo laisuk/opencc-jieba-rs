@@ -86,7 +86,7 @@ impl OpenCC {
         dictionaries: &'a [&HashMap<String, String>],
     ) -> impl ParallelIterator<Item = String> + 'a
     where
-        T: AsRef<str> + 'a, // T must implement AsRef<str> to support both &str and String
+        T: AsRef<str> + Send + 'a, // T must implement AsRef<str> to support both &str and String
     {
         phrases.map(move |phrase| {
             let phrase_str = phrase.as_ref(); // Convert T to &str
@@ -94,10 +94,9 @@ impl OpenCC {
             // Attempt to find a full phrase match
             for dictionary in dictionaries {
                 if let Some(translation) = dictionary.get(phrase_str) {
-                    return translation.to_string(); // Clone the String translation
+                    return translation.clone(); // Clone the String translation
                 }
             }
-
             // If no full phrase match, perform character-by-character conversion
             Self::convert_by_char_par(phrase_str, dictionaries)
         })
@@ -107,13 +106,14 @@ impl OpenCC {
         phrase
             .par_chars()
             .map(|ch| {
-                let ch_str = ch.to_string();
+                let mut buf = [0u8; 4];
+                let ch_str = ch.encode_utf8(&mut buf); // Avoid allocation
                 for dictionary in dictionaries {
-                    if let Some(translation) = dictionary.get(&ch_str) {
+                    if let Some(translation) = dictionary.get(ch_str) {
                         return translation.clone(); // Found translation, return it
                     }
                 }
-                ch_str // No translation, return original character
+                ch_str.to_owned() // No translation, return original character
             })
             .collect() // Collect results into a String
     }
@@ -356,7 +356,7 @@ impl OpenCC {
             "hk2t" => self.hk2t(input),
             "jp2t" => self.jp2t(input),
             "t2jp" => self.t2jp(input),
-            _ => String::new(),
+            _ => format!("Invalid config: {}", config),
         }
     }
 

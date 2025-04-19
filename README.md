@@ -4,7 +4,7 @@ A Rust-based Chinese text converter that performs word segmentation using **Jieb
 
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/ci.yml/badge.svg)
 ![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)
-![License](https://img.shields.io/github/license/laisuk/opencc-jieba-rs/LICENSE)
+![License](https://img.shields.io/github/license/laisuk/opencc-jieba-rs)
 
 ## Features
 
