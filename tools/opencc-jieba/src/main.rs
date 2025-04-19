@@ -103,7 +103,7 @@ fn write_output(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let output: Box<dyn Write> = match output_file {
         Some(file_name) => Box::new(File::create(file_name)?),
-        None => Box::new(io::stdout()),
+        None => Box::new(io::stdout().lock()), // 🔒 important for proper redirection
     };
 
     let mut output_buf = BufWriter::new(output);
@@ -113,15 +113,14 @@ fn write_output(
         _ => {
             let encoding = Encoding::for_label(out_enc.as_bytes())
                 .ok_or_else(|| format!("Unsupported output encoding: {}", out_enc))?;
-            let encoded_bytes = encoding.encode(content).0;
+            let (encoded_bytes, _, _) = encoding.encode(content);
             output_buf.write_all(&encoded_bytes)?;
         }
     }
 
-    output_buf.flush()?;
+    output_buf.flush()?; // 🚿 Always flush to make sure it’s written!
     Ok(())
 }
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = Command::new("opencc-jieba")
         .about(format!(
