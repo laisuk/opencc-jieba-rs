@@ -109,12 +109,22 @@ fn write_output(
     let mut output_buf = BufWriter::new(output);
 
     match out_enc {
-        "UTF-8" => write!(output_buf, "{}", content)?,
+        "UTF-8" => {
+            write!(output_buf, "{}", content)?;
+            if output_file.is_none() && !content.ends_with('\n') {
+                write!(output_buf, "\n")?;
+            }
+        }
+
         _ => {
             let encoding = Encoding::for_label(out_enc.as_bytes())
                 .ok_or_else(|| format!("Unsupported output encoding: {}", out_enc))?;
             let (encoded_bytes, _, _) = encoding.encode(content);
             output_buf.write_all(&encoded_bytes)?;
+            if output_file.is_none() && !content.ends_with('\n') {
+                let (newline, _, _) = encoding.encode("\n");
+                output_buf.write_all(&newline)?;
+            }
         }
     }
 
