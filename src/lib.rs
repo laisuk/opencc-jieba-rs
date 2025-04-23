@@ -387,14 +387,15 @@ impl OpenCC {
         s2t_punctuation_chars.insert("‘", "『");
         s2t_punctuation_chars.insert("’", "』");
 
+        let t2s_punctuation_chars: HashMap<&str, &str> = s2t_punctuation_chars
+            .iter()
+            .map(|(&k, &v)| (v, k))
+            .collect();
+
         let mapping = if config.starts_with('s') {
             &s2t_punctuation_chars
         } else {
-            // Correctly create a new HashMap with reversed key-value pairs
-            &s2t_punctuation_chars
-                .iter()
-                .map(|(&k, &v)| (v, k))
-                .collect::<HashMap<&str, &str>>()
+            &t2s_punctuation_chars
         };
 
         let pattern = format!("[{}]", mapping.keys().cloned().collect::<String>());
