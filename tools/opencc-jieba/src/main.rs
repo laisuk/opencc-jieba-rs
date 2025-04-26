@@ -257,8 +257,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let input_str = read_input(input_file, in_enc)?;
         let output_str = OpenCC::new().convert(&input_str, config, punctuation);
         write_output(output_file, out_enc, &output_str)?;
-
-        println!(
+        
+        eprintln!(
             "{BLUE}Conversion completed ({config}): {} -> {}{RESET}",
             input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
@@ -279,7 +279,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let output_str = output_vec.join(delimiter);
         write_output(output_file, out_enc, &output_str)?;
 
-        println!(
+        eprintln!(
             "{BLUE}Segmentation completed ({delimiter}): {} -> {}{RESET}",
             input_file.unwrap_or(&"<stdin>".to_string()),
             output_file.unwrap_or(&"stdout".to_string())
