@@ -1,9 +1,8 @@
-use atty::Stream;
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
 use std::fs::File;
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, stdin, BufWriter, IsTerminal, Read, Write};
 
 use opencc_jieba_rs;
 use opencc_jieba_rs::OpenCC;
@@ -29,12 +28,12 @@ pub fn read_input(
                 File::open(file_name)?.read_to_string(&mut input_str)?;
             } else {
                 // Terminal prompt only if input is from terminal
-                if atty::is(Stream::Stdin) {
+                if stdin().is_terminal() {
                     println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
                 // Use locked and buffered stdin
-                let stdin = io::stdin();
+                let stdin = stdin();
                 let mut handle = stdin.lock();
                 let mut buffer = [0u8; 1024];
 
@@ -53,11 +52,11 @@ pub fn read_input(
             if let Some(file_name) = input_file {
                 File::open(file_name)?.read_to_end(&mut bytes)?;
             } else {
-                if atty::is(Stream::Stdin) {
+                if stdin().is_terminal() {
                     println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
-                let stdin = io::stdin();
+                let stdin = stdin();
                 let mut handle = stdin.lock();
                 let mut buffer = [0u8; 1024];
 

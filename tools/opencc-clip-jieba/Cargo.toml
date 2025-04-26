@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-copypasta = "0.10.1"
+copypasta = "0.10.2"
 
