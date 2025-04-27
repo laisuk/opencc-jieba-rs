@@ -21,6 +21,10 @@ pub fn read_input(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut input_str = String::new();
 
+    // Use locked and buffered stdin
+    let stdin = stdin();
+    let mut handle = stdin.lock();
+
     match in_enc {
         "UTF-8" => {
             if let Some(file_name) = input_file {
@@ -28,13 +32,12 @@ pub fn read_input(
                 File::open(file_name)?.read_to_string(&mut input_str)?;
             } else {
                 // Terminal prompt only if input is from terminal
-                if stdin().is_terminal() {
+                if stdin.is_terminal() {
                     println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
-                // Use locked and buffered stdin
-                let stdin = stdin();
-                let mut handle = stdin.lock();
+                // let stdin = stdin();
+                // let mut handle = stdin.lock();
                 let mut buffer = [0u8; 1024];
 
                 while let Ok(n) = handle.read(&mut buffer) {
@@ -52,12 +55,12 @@ pub fn read_input(
             if let Some(file_name) = input_file {
                 File::open(file_name)?.read_to_end(&mut bytes)?;
             } else {
-                if stdin().is_terminal() {
+                if stdin.is_terminal() {
                     println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
-                let stdin = stdin();
-                let mut handle = stdin.lock();
+                // let stdin = stdin();
+                // let mut handle = stdin.lock();
                 let mut buffer = [0u8; 1024];
 
                 while let Ok(n) = handle.read(&mut buffer) {
@@ -90,11 +93,9 @@ fn should_remove_bom(in_enc: &str, out_enc: &str) -> bool {
     in_enc.eq_ignore_ascii_case("utf-8") && !out_enc.eq_ignore_ascii_case("utf-8")
 }
 
-fn remove_utf8_bom_str(input: &str) -> String {
-    if input.starts_with('\u{FEFF}') {
-        input[1..].to_string() // Remove BOM (Unicode 0xFEFF)
-    } else {
-        input.to_string() // Keep as-is
+fn remove_utf8_bom_str_inplace(s: &mut String) {
+    if s.starts_with('\u{FEFF}') {
+        s.drain(..1); // Remove first char (BOM) without reallocation
     }
 }
 
@@ -257,14 +258,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
         let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
 
-        let input_str = read_input(input_file, in_enc)?;        
-        let input_str = if should_remove_bom(in_enc, out_enc) {
-            // Strip BOM if present
-            remove_utf8_bom_str(&input_str)
-        } else {
-            input_str
-        };
-        
+        let mut input_str = read_input(input_file, in_enc)?;
+        if should_remove_bom(in_enc, out_enc) {
+            remove_utf8_bom_str_inplace(&mut input_str)
+        }
+
         let output_str = OpenCC::new().convert(&input_str, config, punctuation);
         write_output(output_file, out_enc, &output_str)?;
 
@@ -284,14 +282,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let in_enc = matches.get_one::<String>("in_enc").unwrap();
         let out_enc = matches.get_one::<String>("out_enc").unwrap();
 
-        let input_str = read_input(input_file, in_enc)?;
-        let input_str = if should_remove_bom(in_enc, out_enc) {
-            // Strip BOM if present
-            remove_utf8_bom_str(&input_str)
-        } else {
-            input_str
-        };
-        
+        let mut input_str = read_input(input_file, in_enc)?;
+        if should_remove_bom(in_enc, out_enc) {
+            remove_utf8_bom_str_inplace(&mut input_str)
+        }
+
         let output_vec = OpenCC::new().jieba.cut(&input_str, true);
         let output_str = output_vec.join(delimiter);
         write_output(output_file, out_enc, &output_str)?;
