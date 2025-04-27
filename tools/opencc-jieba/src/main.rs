@@ -83,15 +83,18 @@ pub fn read_input(
         }
     }
 
-    // Strip BOM if present
-    remove_utf8_bom_str(&mut input_str);
-
     Ok(input_str)
 }
 
-fn remove_utf8_bom_str(input: &mut String) {
+fn should_remove_bom(in_enc: &str, out_enc: &str) -> bool {
+    in_enc.eq_ignore_ascii_case("utf-8") && !out_enc.eq_ignore_ascii_case("utf-8")
+}
+
+fn remove_utf8_bom_str(input: &str) -> String {
     if input.starts_with('\u{FEFF}') {
-        *input = input[1..].to_string(); // Remove BOM (Unicode 0xFEFF)
+        input[1..].to_string() // Remove BOM (Unicode 0xFEFF)
+    } else {
+        input.to_string() // Keep as-is
     }
 }
 
@@ -254,10 +257,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
         let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
 
-        let input_str = read_input(input_file, in_enc)?;
+        let input_str = read_input(input_file, in_enc)?;        
+        let input_str = if should_remove_bom(in_enc, out_enc) {
+            // Strip BOM if present
+            remove_utf8_bom_str(&input_str)
+        } else {
+            input_str
+        };
+        
         let output_str = OpenCC::new().convert(&input_str, config, punctuation);
         write_output(output_file, out_enc, &output_str)?;
-        
+
         eprintln!(
             "{BLUE}Conversion completed ({config}): {} -> {}{RESET}",
             input_file.unwrap_or(&"<stdin>".to_string()),
@@ -275,6 +285,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let out_enc = matches.get_one::<String>("out_enc").unwrap();
 
         let input_str = read_input(input_file, in_enc)?;
+        let input_str = if should_remove_bom(in_enc, out_enc) {
+            // Strip BOM if present
+            remove_utf8_bom_str(&input_str)
+        } else {
+            input_str
+        };
+        
         let output_vec = OpenCC::new().jieba.cut(&input_str, true);
         let output_str = output_vec.join(delimiter);
         write_output(output_file, out_enc, &output_str)?;
