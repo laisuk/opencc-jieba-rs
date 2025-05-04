@@ -3,7 +3,7 @@ use jieba_rs::{KeywordExtract, TextRank};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
@@ -11,6 +11,7 @@ use zstd::stream::read::Decoder;
 use crate::dictionary_lib::Dictionary;
 pub mod dictionary_lib;
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
+const DELIMITERS: &'static str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
 
 lazy_static! {
     static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
@@ -44,7 +45,7 @@ impl OpenCC {
     //         Self::convert_by_char(phrase, dictionaries)
     //     })
     // }
-
+    //
     // fn convert_by_string<'a>(
     //     phrases: impl Iterator<Item = String> + 'a,
     //     dictionaries: &'a [&HashMap<String, String>],
@@ -58,6 +59,24 @@ impl OpenCC {
     //         }
     //         // 逐字转换
     //         Self::convert_by_char(&phrase, dictionaries)
+    //     })
+    // }
+
+    // fn convert_by_str_like<'a, T>(
+    //     phrases: impl Iterator<Item = T> + 'a,
+    //     dictionaries: &'a [&HashMap<String, String>],
+    // ) -> impl Iterator<Item = String> + 'a
+    // where
+    //     T: AsRef<str> + Send +'a,
+    // {
+    //     phrases.map(move |phrase| {
+    //         let phrase_str = phrase.as_ref();
+    //         for dictionary in dictionaries {
+    //             if let Some(translation) = dictionary.get(phrase_str) {
+    //                 return translation.clone(); // Avoid unnecessary to_string()
+    //             }
+    //         }
+    //         Self::convert_by_char(phrase_str, dictionaries)
     //     })
     // }
 
@@ -118,82 +137,140 @@ impl OpenCC {
             .collect() // Collect results into a String
     }
 
+    fn split_string_inclusive_par(&self, text: &str) -> Vec<Vec<char>> {
+        let collected: Vec<char> = text.par_chars().collect();
+        // Collect delimiters into a HashSet for faster lookup
+        let delimiters: HashSet<char> = DELIMITERS.chars().collect();
+        // Perform the split in parallel and convert each slice to Vec<char>
+        collected
+            .par_split_inclusive(|c| delimiters.contains(c)) // Use the HashSet for fast lookup
+            .map(|slice| slice.to_vec()) // Convert each slice to Vec<char>
+            .collect()
+    }
+
+    fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item = String> + 'a {
+        // Split input into chunks using delimiters (non-allocating)
+        let char_chunks = self.split_string_inclusive_par(input);
+        char_chunks.into_par_iter().flat_map_iter(move |chunk| {
+            let chunk_str: String = chunk.iter().collect(); // Create String from Vec<char>
+            self.jieba
+                .cut(&chunk_str, true)
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<String>>() // convert Vec<&str> to Vec<String>
+        })
+    }
+
+    // pub fn s2t(&self, input: &str, punctuation: bool) -> String {
+    //     let phrases = self.jieba.cut(input, true);
+    //     let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+    //     let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+    //     if punctuation {
+    //         Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
+    //     } else {
+    //         String::from_par_iter(output)
+    //     }
+    // }
+
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
+        // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
+        // Step 4: Optionally apply punctuation conversion
+        let result = String::from_par_iter(converted);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
+            Self::convert_punctuation(&result, "s")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
+    // pub fn t2s(&self, input: &str, punctuation: bool) -> String {
+    //     let phrases = self.jieba.cut(input, true);
+    //     let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+    //     let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+    //     if punctuation {
+    //         Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
+    //     } else {
+    //         String::from_par_iter(output)
+    //     }
+    // }
+
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        // Step 1: Split input into chunks using delimiters (non-allocating)
+        // let char_chunks = self.split_string_inclusive_par(input);
+        // Step 2: Apply Jieba segmentation to each chunk, and flatten into Vec<String>
+        let phrases = self.phrases_cut(input);
+        // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
+        // Step 4: Optionally apply punctuation conversion
+        let result = String::from_par_iter(converted);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases];
         let dict_refs_round_3 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(
-                Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+                Self::convert_by_phrases_par(phrases, &dict_refs),
                 &dict_refs_round_2,
             ),
             &dict_refs_round_3,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
@@ -202,126 +279,129 @@ impl OpenCC {
         let dict_refs_round_3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_phrases_par(
             Self::convert_by_phrases_par(
-                Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+                Self::convert_by_phrases_par(phrases, &dict_refs),
                 &dict_refs_round_2,
             ),
             &dict_refs_round_3,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
+        let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(String::from_par_iter(output).as_str(), "h")
+            Self::convert_punctuation(&result, "t")
         } else {
-            String::from_par_iter(output)
+            result
         }
     }
 
     pub fn t2tw(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.tw_variants];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn t2twp(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
         String::from_par_iter(output)
     }
 
     pub fn tw2t(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn tw2tp(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs),
+            Self::convert_by_phrases_par(phrases, &dict_refs),
             &dict_refs_round_2,
         );
         String::from_par_iter(output)
     }
 
     pub fn t2hk(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.hk_variants];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn hk2t(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn t2jp(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.jp_variants];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
 
         String::from_par_iter(output)
     }
 
     pub fn jp2t(&self, input: &str) -> String {
-        let phrases = self.jieba.cut(input, true);
+        let phrases = self.phrases_cut(input);
         let dict_refs = [
             &self.dictionary.jps_phrases,
             &self.dictionary.jps_characters,
             &self.dictionary.jp_variants_rev,
         ];
-        let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
+        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
 
         String::from_par_iter(output)
     }
