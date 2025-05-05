@@ -16,7 +16,7 @@ const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
 
 pub fn read_input(
-    input_file: Option<&String>,
+    input_file: Option<&str>,
     in_enc: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut input_str = String::new();
@@ -33,7 +33,7 @@ pub fn read_input(
             } else {
                 // Terminal prompt only if input is from terminal
                 if stdin.is_terminal() {
-                    println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
+                    eprintln!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
                 // let stdin = stdin();
@@ -56,7 +56,7 @@ pub fn read_input(
                 File::open(file_name)?.read_to_end(&mut bytes)?;
             } else {
                 if stdin.is_terminal() {
-                    println!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
+                    eprintln!("{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}");
                 }
 
                 // let stdin = stdin();
@@ -100,7 +100,7 @@ fn remove_utf8_bom_str_inplace(s: &mut String) {
 }
 
 fn write_output(
-    output_file: Option<&String>,
+    output_file: Option<&str>,
     out_enc: &str,
     content: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -243,12 +243,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-        let input_file = matches.get_one::<String>("input");
-        let output_file = matches.get_one::<String>("output");
+        let input_file = matches.get_one::<String>("input").map(String::as_str);
+        let output_file = matches.get_one::<String>("output").map(String::as_str);
         let config = matches.get_one::<String>("config").unwrap().as_str();
         if !CONFIG_LIST.contains(&config) {
-            println!("Invalid config: {}", config);
-            println!("Valid Config are: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]");
+            eprintln!("Invalid config: {}", config);
+            eprintln!("Valid Config are: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]");
             return Ok(());
         }
         let punctuation = matches
@@ -276,11 +276,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-        let input_file = matches.get_one::<String>("input");
-        let output_file = matches.get_one::<String>("output");
-        let delimiter = matches.get_one::<String>("delimiter").unwrap();
-        let in_enc = matches.get_one::<String>("in_enc").unwrap();
-        let out_enc = matches.get_one::<String>("out_enc").unwrap();
+        let input_file = matches.get_one::<String>("input").map(String::as_str);
+        let output_file = matches.get_one::<String>("output").map(String::as_str);
+        let delimiter = matches.get_one::<String>("delimiter").unwrap().as_str();
+        let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
+        let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
 
         let mut input_str = read_input(input_file, in_enc)?;
         if should_remove_bom(in_enc, out_enc) {
