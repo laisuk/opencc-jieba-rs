@@ -1,4 +1,4 @@
-workspace = { members = [ "capi/opencc_jieba_capi","tools/opencc-clip-jieba", "tools/opencc-jieba"] }
+workspace = { members = [ "capi/opencc_jieba_capi", "tools/dict-generate","tools/opencc-clip-jieba", "tools/opencc-jieba"] }
 [package]
 name = "opencc-jieba-rs"
 version = "0.5.0"

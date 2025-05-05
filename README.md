@@ -162,6 +162,7 @@ Converted Code: 1
 - `dicts/` – OpenCC text lexicons which converted into JSON format.
 
 ## Dictionary compression (ZStd)
+[ZStandard](https://github.com/facebook/zstd) - `zstd`: A fast lossless compression algorithm, targeting real-time compression scenarios at zlib-level and better compression ratios.
 ```
 zstd -19 src/dictionary_lib/dicts/dictionary.json -o src/dictionary_lib/dicts/dictionary.json.zst
 zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_hans_hant.txt.zst
