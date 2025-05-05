@@ -6,6 +6,7 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::io::{Cursor, Read};
+use std::sync::Arc;
 use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::Dictionary;
@@ -137,40 +138,30 @@ impl OpenCC {
             .collect() // Collect results into a String
     }
 
-    fn split_string_inclusive_par(&self, text: &str) -> Vec<Vec<char>> {
+    fn split_string_inclusive_par(&self, text: &str) -> Vec<String> {
         let collected: Vec<char> = text.par_chars().collect();
         // Collect delimiters into a HashSet for faster lookup
         let delimiters: HashSet<char> = DELIMITERS.chars().collect();
-        // Perform the split in parallel and convert each slice to Vec<char>
+        // Perform the split in parallel and convert each slice to Vec<String>
         collected
             .par_split_inclusive(|c| delimiters.contains(c)) // Use the HashSet for fast lookup
-            .map(|slice| slice.to_vec()) // Convert each slice to Vec<char>
+            .map(|slice| slice.iter().collect())
             .collect()
     }
 
     fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item = String> + 'a {
-        // Split input into chunks using delimiters (non-allocating)
-        let char_chunks = self.split_string_inclusive_par(input);
-        char_chunks.into_par_iter().flat_map_iter(move |chunk| {
-            let chunk_str: String = chunk.iter().collect(); // Create String from Vec<char>
-            self.jieba
-                .cut(&chunk_str, true)
-                .into_iter()
-                .map(str::to_owned)
-                .collect::<Vec<String>>() // convert Vec<&str> to Vec<String>
-        })
+        let string_chunks = self.split_string_inclusive_par(input);
+        let jieba = Arc::new(self.jieba.clone());
+        string_chunks
+            .into_par_iter()
+            .flat_map_iter(move |chunk_str| {
+                jieba
+                    .cut(&chunk_str, true)
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<String>>() // convert Vec<&str> to Vec<String>
+            })
     }
-
-    // pub fn s2t(&self, input: &str, punctuation: bool) -> String {
-    //     let phrases = self.jieba.cut(input, true);
-    //     let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-    //     let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
-    //     if punctuation {
-    //         Self::convert_punctuation(String::from_par_iter(output).as_str(), "s")
-    //     } else {
-    //         String::from_par_iter(output)
-    //     }
-    // }
 
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.phrases_cut(input);
@@ -186,26 +177,10 @@ impl OpenCC {
         }
     }
 
-    // pub fn t2s(&self, input: &str, punctuation: bool) -> String {
-    //     let phrases = self.jieba.cut(input, true);
-    //     let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-    //     let output = Self::convert_by_phrases_par(phrases.into_par_iter(), &dict_refs);
-    //     if punctuation {
-    //         Self::convert_punctuation(String::from_par_iter(output).as_str(), "t")
-    //     } else {
-    //         String::from_par_iter(output)
-    //     }
-    // }
-
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
-        // Step 1: Split input into chunks using delimiters (non-allocating)
-        // let char_chunks = self.split_string_inclusive_par(input);
-        // Step 2: Apply Jieba segmentation to each chunk, and flatten into Vec<String>
         let phrases = self.phrases_cut(input);
-        // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
-        // Step 4: Optionally apply punctuation conversion
         let result = String::from_par_iter(converted);
         if punctuation {
             Self::convert_punctuation(&result, "t")
