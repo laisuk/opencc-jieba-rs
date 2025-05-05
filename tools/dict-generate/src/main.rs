@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|s| s.as_str())
         .unwrap_or(default_output);
 
-    match dict_format.as_deref() {
+    match dict_format {
         Some("zstd") => {
             let dictionary = Dictionary::from_dicts();
             save_compressed(&dictionary, output_file)?;
