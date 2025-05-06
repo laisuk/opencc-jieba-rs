@@ -4,6 +4,10 @@ gcc -o use_opencc_jieba_keyword_weight_c use_opencc_jieba_keyword_weight_c.c -I 
 
 C++ build command:
 g++ -o use_opencc_jieba_cpp use_opencc_jieba_cpp.cpp -I . -L. -lopencc_jieba_capi
+if port to windows 10:
+g++ -static-libstdc++ -static-libgcc -m32 -o use_opencc_jieba_cpp use_opencc_jieba_cpp.cpp -I . -L. -lopencc_jieba_capi
+g++ -static-libstdc++ -static-libgcc -m32 -Os -s -o use_opencc_jieba_cpp use_opencc_jieba_cpp.cpp -I . -L. -lopencc_jieba_capi
+
 g++ -o use_opencc_jieba_cut use_opencc_jieba_cut.cpp -I . -L. -lopencc_jieba_capi
 g++ -o use_opencc_jieba_keyword_extract use_opencc_jieba_keyword_extract.cpp -I . -L. -lopencc_jieba_capi
 g++ -o use_opencc_jieba_keyword_weight use_opencc_jieba_keyword_weight.cpp -I . -L. -lopencc_jieba_capi
