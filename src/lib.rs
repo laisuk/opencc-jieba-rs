@@ -199,7 +199,7 @@ impl OpenCC {
         );
         let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(&result, "s")
         } else {
             result
         }
@@ -238,7 +238,7 @@ impl OpenCC {
         );
         let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(&result, "s")
         } else {
             result
         }
@@ -277,7 +277,7 @@ impl OpenCC {
         );
         let result = String::from_par_iter(output);
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(&result, "s")
         } else {
             result
         }
