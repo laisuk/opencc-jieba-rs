@@ -102,9 +102,9 @@ impl OpenCC {
     // }
 
     fn convert_by_phrases_par<'a, T>(
-        phrases: impl ParallelIterator<Item = T> + 'a,
+        phrases: impl ParallelIterator<Item=T> + 'a,
         dictionaries: &'a [&HashMap<String, String>],
-    ) -> impl ParallelIterator<Item = String> + 'a
+    ) -> impl ParallelIterator<Item=String> + 'a
     where
         T: AsRef<str> + Send + 'a, // T must implement AsRef<str> to support both &str and String
     {
@@ -149,7 +149,7 @@ impl OpenCC {
             .collect()
     }
 
-    fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item = String> + 'a {
+    fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item=String> + 'a {
         let string_chunks = self.split_string_inclusive_par(input);
         let jieba = Arc::new(self.jieba.clone());
         string_chunks
@@ -163,7 +163,7 @@ impl OpenCC {
             })
     }
 
-    pub fn s2t(&self, input: &str, punctuation: bool) -> String {
+pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.phrases_cut(input);
         // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -176,7 +176,7 @@ impl OpenCC {
             result
         }
     }
-
+    
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.phrases_cut(input);
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
