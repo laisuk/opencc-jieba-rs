@@ -19,7 +19,7 @@ lazy_static! {
 }
 
 pub struct OpenCC {
-    pub jieba: Jieba,
+    pub jieba: Arc<Jieba>,
     dictionary: Dictionary,
 }
 
@@ -27,7 +27,7 @@ impl OpenCC {
     pub fn new() -> Self {
         let dict_hans_hant_txt = decompress_dict();
         let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
-        let jieba = Jieba::with_dict(&mut dict_hans_hant).unwrap();
+        let jieba = Arc::new(Jieba::with_dict(&mut dict_hans_hant).unwrap());
         let dictionary = Dictionary::new();
 
         OpenCC { jieba, dictionary }
@@ -151,11 +151,11 @@ impl OpenCC {
 
     fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item=String> + 'a {
         let string_chunks = self.split_string_inclusive_par(input);
-        let jieba = Arc::new(self.jieba.clone());
+        // let jieba = Arc::new(self.jieba.clone());
         string_chunks
             .into_par_iter()
             .flat_map_iter(move |chunk_str| {
-                jieba
+                self.jieba
                     .cut(&chunk_str, true)
                     .into_iter()
                     .map(str::to_owned)

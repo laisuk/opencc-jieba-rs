@@ -31,11 +31,8 @@ fn main() {
         if !config_list.contains(&config.as_str()) {
             config = "auto".to_string()
         }
-        if args.len() > 2 {
-            if args[2] == "punct" {
-                punct = true
-            }
-        }
+        punct = matches!(args.last(), Some(s) if s == "punct");
+
     } else {
         config = "auto".to_string()
     }
