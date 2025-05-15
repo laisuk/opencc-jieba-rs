@@ -102,9 +102,9 @@ impl OpenCC {
     // }
 
     fn convert_by_phrases_par<'a, T>(
-        phrases: impl ParallelIterator<Item=T> + 'a,
+        phrases: impl ParallelIterator<Item = T> + 'a,
         dictionaries: &'a [&HashMap<String, String>],
-    ) -> impl ParallelIterator<Item=String> + 'a
+    ) -> impl ParallelIterator<Item = String> + 'a
     where
         T: AsRef<str> + Send + 'a, // T must implement AsRef<str> to support both &str and String
     {
@@ -149,22 +149,32 @@ impl OpenCC {
             .collect()
     }
 
-    fn phrases_cut<'a>(&'a self, input: &str) -> impl ParallelIterator<Item=String> + 'a {
+    fn phrases_cut<'a>(
+        &'a self,
+        input: &str,
+        hmm: bool,
+    ) -> impl ParallelIterator<Item = String> + 'a {
         let string_chunks = self.split_string_inclusive_par(input);
         // let jieba = Arc::new(self.jieba.clone());
         string_chunks
             .into_par_iter()
             .flat_map_iter(move |chunk_str| {
                 self.jieba
-                    .cut(&chunk_str, true)
+                    .cut(&chunk_str, hmm)
                     .into_iter()
                     .map(str::to_owned)
                     .collect::<Vec<String>>() // convert Vec<&str> to Vec<String>
             })
     }
 
-pub fn s2t(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+    pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
+        self.phrases_cut(input, hmm)
+            .into_par_iter()
+            .collect::<Vec<String>>()
+    }
+
+    pub fn s2t(&self, input: &str, punctuation: bool) -> String {
+        let phrases = self.phrases_cut(input, true);
         // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
@@ -176,9 +186,9 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
             result
         }
     }
-    
+
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
         let result = String::from_par_iter(converted);
@@ -190,7 +200,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
@@ -206,7 +216,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
@@ -225,7 +235,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases];
         let dict_refs_round_3 = [&self.dictionary.tw_variants];
@@ -245,7 +255,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
@@ -268,7 +278,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
         let output = Self::convert_by_phrases_par(
@@ -284,7 +294,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
@@ -303,14 +313,14 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn t2tw(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn t2twp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
         let output = Self::convert_by_phrases_par(
@@ -321,7 +331,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn tw2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
@@ -331,7 +341,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn tw2tp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
@@ -345,14 +355,14 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn t2hk(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.hk_variants];
         let output = Self::convert_by_phrases_par(phrases, &dict_refs);
         String::from_par_iter(output)
     }
 
     pub fn hk2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
@@ -362,7 +372,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn t2jp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.jp_variants];
         let output = Self::convert_by_phrases_par(phrases, &dict_refs);
 
@@ -370,7 +380,7 @@ pub fn s2t(&self, input: &str, punctuation: bool) -> String {
     }
 
     pub fn jp2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input);
+        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.jps_phrases,
             &self.dictionary.jps_characters,

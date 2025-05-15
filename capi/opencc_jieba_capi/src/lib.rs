@@ -67,7 +67,8 @@ pub extern "C" fn opencc_jieba_cut(
 
     let opencc = unsafe { &(*instance) };
 
-    let result = opencc.jieba.cut(input_str, hmm);
+    // let result = opencc.jieba.cut(input_str, hmm);
+    let result = opencc.jieba_cut(input_str, hmm);
 
     // let mut result_ptrs: Vec<*mut c_char> = result
     //     .iter()
@@ -558,7 +559,7 @@ mod tests {
         let c_method_ptr = c_method.as_ptr();
         // Initialize the OpenCC instance
         let opencc = OpenCC::new(); // Assuming OpenCC has a new() method
-        // Output variables
+                                    // Output variables
         let mut keyword_count: usize = 0;
         let mut keywords: *mut *mut c_char = ptr::null_mut();
         let mut weights: *mut f64 = ptr::null_mut();
@@ -574,7 +575,7 @@ mod tests {
         );
         // Check if the function was successful
         assert_eq!(result, 0); // 0 indicates success
-        // Ensure that some keywords were extracted
+                               // Ensure that some keywords were extracted
         assert!(keyword_count > 0);
         // Convert C strings back to Rust strings and print keywords with their weights
         let keyword_vec: Vec<String> = unsafe {
@@ -587,9 +588,7 @@ mod tests {
                 .collect()
         };
         // View data without taking ownership
-        let weight_slice: &[f64] = unsafe {
-            std::slice::from_raw_parts(weights, keyword_count)
-        };
+        let weight_slice: &[f64] = unsafe { std::slice::from_raw_parts(weights, keyword_count) };
         for (i, keyword) in keyword_vec.iter().enumerate() {
             println!("Keyword: {}, Weight: {}", keyword, weight_slice[i]);
         }

@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("json") => {
             let dictionary = Dictionary::from_dicts();
             let file = File::create(output_file)?;
-            serde_json::to_writer(file, &dictionary)?;
+            serde_json::to_writer_pretty(file, &dictionary)?;
             eprintln!("{BLUE}Dictionary saved in JSON format at: {output_file}{RESET}");
         }
         other => {
