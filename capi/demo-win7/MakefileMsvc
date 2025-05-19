@@ -1,7 +1,7 @@
 # Compiler and flags
 CC = cl
 CXX = cl
-CFLAGS = /I.
+CFLAGS = /I. /source-charset:utf-8 /execution-charset:utf-8
 LDFLAGS = opencc_jieba_capi.dll.lib
 
 # Executable targets

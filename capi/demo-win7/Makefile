@@ -1,43 +1,42 @@
 # Compiler and flags
-CC = gcc
-CXX = g++
-CFLAGS = -I . -L .
-LDFLAGS = -lopencc_jieba_capi
+CC = cl
+CXX = cl
+CFLAGS = /I. /source-charset:utf-8 /execution-charset:utf-8
+LDFLAGS = opencc_jieba_capi.dll.lib
 
-# Targets and source files
-TARGETS = use_opencc_jieba_c \
-          use_opencc_jieba_keyword_weight_c \
-          use_opencc_jieba_cpp \
-          use_opencc_jieba_cut \
-          use_opencc_jieba_keyword_extract \
-          use_opencc_jieba_keyword_weight
+# Executable targets
+TARGETS = \
+    use_opencc_jieba_c.exe \
+    use_opencc_jieba_keyword_weight_c.exe \
+    use_opencc_jieba_cpp.exe \
+    use_opencc_jieba_cut.exe \
+    use_opencc_jieba_keyword_extract.exe \
+    use_opencc_jieba_keyword_weight.exe
 
-# Rules for C programs
-use_opencc_jieba_c: use_opencc_jieba_c.c
-	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-use_opencc_jieba_keyword_weight_c: use_opencc_jieba_keyword_weight_c.c
-	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-# Rules for C++ programs
-use_opencc_jieba_cpp: use_opencc_jieba_cpp.cpp
-	$(CXX) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-use_opencc_jieba_cut: use_opencc_jieba_cut.cpp
-	$(CXX) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-use_opencc_jieba_keyword_extract: use_opencc_jieba_keyword_extract.cpp
-	$(CXX) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-use_opencc_jieba_keyword_weight: use_opencc_jieba_keyword_weight.cpp
-	$(CXX) -o $@ $< $(CFLAGS) $(LDFLAGS)
-
-# Phony targets
-.PHONY: all clean
-
-# Build all targets
+# Default target
 all: $(TARGETS)
 
-# Clean up generated files
+# Rules for C programs
+use_opencc_jieba_c.exe: use_opencc_jieba_c.c
+	$(CC) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+use_opencc_jieba_keyword_weight_c.exe: use_opencc_jieba_keyword_weight_c.c
+	$(CC) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+# Rules for C++ programs
+use_opencc_jieba_cpp.exe: use_opencc_jieba_cpp.cpp
+	$(CXX) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+use_opencc_jieba_cut.exe: use_opencc_jieba_cut.cpp
+	$(CXX) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+use_opencc_jieba_keyword_extract.exe: use_opencc_jieba_keyword_extract.cpp
+	$(CXX) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+use_opencc_jieba_keyword_weight.exe: use_opencc_jieba_keyword_weight.cpp
+	$(CXX) $(CFLAGS) /Fe$@ $** $(LDFLAGS)
+
+# Clean rule
 clean:
-	rm -f $(TARGETS)
+	del /Q $(TARGETS) *.obj *.exe *.ilk *.pdb
+
