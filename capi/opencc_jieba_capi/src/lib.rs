@@ -8,6 +8,17 @@ pub extern "C" fn opencc_jieba_new() -> *mut OpenCC {
 }
 
 #[no_mangle]
+pub extern "C" fn opencc_jieba_delete(instance: *mut OpenCC) {
+    if !instance.is_null() {
+        // Convert the raw pointer back into a Box and let it drop
+        unsafe {
+            let _ = Box::from_raw(instance);
+        };
+    }
+}
+
+#[deprecated(note = "Use `opencc_jieba_delete` instead")]
+#[no_mangle]
 pub extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
     if !instance.is_null() {
         // Convert the raw pointer back into a Box and let it drop
