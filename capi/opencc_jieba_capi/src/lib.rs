@@ -54,15 +54,6 @@ pub extern "C" fn opencc_jieba_convert(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_string(ptr: *mut std::os::raw::c_char) {
-    if !ptr.is_null() {
-        unsafe {
-            let _ = CString::from_raw(ptr);
-        };
-    }
-}
-
-#[no_mangle]
 pub extern "C" fn opencc_jieba_cut(
     instance: *const OpenCC,
     input: *const c_char,
@@ -93,33 +84,6 @@ pub extern "C" fn opencc_jieba_cut(
     //
     // result_ptr
     vec_to_cstr_ptr(result)
-}
-
-#[no_mangle]
-pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
-    let mut i = 0;
-    loop {
-        let ptr = unsafe { *array.offset(i) };
-        if ptr.is_null() {
-            break;
-        }
-        unsafe {
-            let _ = CString::from_raw(ptr);
-        }
-        i += 1;
-    }
-    // Nullify the pointers (optional for safety)
-    i = 0;
-    loop {
-        let ptr = unsafe { *array.offset(i) };
-        if ptr.is_null() {
-            break; // Exit loop if null is found
-        }
-        unsafe {
-            *array.offset(i) = ptr::null_mut(); // Set each pointer to NULL
-        }
-        i += 1; // Move to the next pointer in the array
-    }
 }
 
 #[no_mangle]
@@ -180,12 +144,20 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     hmm: bool,
     delimiter: *const c_char,
 ) -> *mut c_char {
-    let result_ptr = opencc_jieba_cut(instance, input, hmm);
-    let joined_ptr = opencc_jieba_join_str(result_ptr, delimiter);
-    if !result_ptr.is_null() {
-        opencc_jieba_free_string_array(result_ptr);
+    if instance.is_null() || input.is_null() || delimiter.is_null() {
+        return ptr::null_mut();
     }
-    joined_ptr
+
+    let input_str = unsafe { CStr::from_ptr(input).to_str().unwrap_or("") };
+    let delimiter_str = unsafe { CStr::from_ptr(delimiter).to_str().unwrap_or("") };
+
+    let opencc = unsafe { &(*instance) };
+    let segments = opencc.jieba_cut(input_str, hmm);
+
+    // Join directly without creating *mut *mut c_char
+    let joined = segments.join(delimiter_str);
+
+    CString::new(joined).unwrap().into_raw()
 }
 
 #[no_mangle]
@@ -240,20 +212,6 @@ pub extern "C" fn opencc_jieba_keywords(
     //
     // result_ptr
     vec_to_cstr_ptr(result)
-}
-
-// Helper function to convert Vec<&str> or Vec<String> to *mut *mut c_char
-fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
-    let mut result_ptrs: Vec<*mut c_char> = vec
-        .iter()
-        .map(|s| CString::new(s.as_ref()).unwrap().into_raw())
-        .collect();
-
-    result_ptrs.push(ptr::null_mut()); // Add null terminator
-    let result_ptr = result_ptrs.as_mut_ptr();
-    std::mem::forget(result_ptrs); // Prevent Rust from deallocating memory
-
-    result_ptr
 }
 
 #[no_mangle]
@@ -340,6 +298,90 @@ pub extern "C" fn opencc_jieba_free_keywords_and_weights(
             libc::free(weights as *mut libc::c_void);
         }
     }
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_free_string(ptr: *mut std::os::raw::c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        };
+    }
+}
+#[no_mangle]
+pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
+    let mut i = 0;
+    loop {
+        let ptr = unsafe { *array.offset(i) };
+        if ptr.is_null() {
+            break;
+        }
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+        i += 1;
+    }
+    // Nullify the pointers (optional for safety)
+    i = 0;
+    loop {
+        let ptr = unsafe { *array.offset(i) };
+        if ptr.is_null() {
+            break; // Exit loop if null is found
+        }
+        unsafe {
+            *array.offset(i) = ptr::null_mut(); // Set each pointer to NULL
+        }
+        i += 1; // Move to the next pointer in the array
+    }
+}
+
+// Helper function to convert Vec<&str> or Vec<String> to *mut *mut c_char
+fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
+    let mut result_ptrs: Vec<*mut c_char> = vec
+        .iter()
+        .map(|s| CString::new(s.as_ref()).unwrap().into_raw())
+        .collect();
+
+    result_ptrs.push(ptr::null_mut()); // Add null terminator
+    let result_ptr = result_ptrs.as_mut_ptr();
+    std::mem::forget(result_ptrs); // Prevent Rust from deallocating memory
+
+    result_ptr
+}
+
+#[allow(dead_code)]
+fn cstr_ptr_to_vec(keyword: *mut *mut c_char) -> Vec<String> {
+    // Convert result to Vec<String>
+    let mut result_strings = Vec::new();
+    let mut i = 0;
+    loop {
+        let ptr = unsafe { *keyword.offset(i) };
+        if ptr.is_null() {
+            break;
+        }
+        let c_str = unsafe { CString::from_raw(ptr) };
+        let string = c_str.to_str().unwrap().to_owned();
+        result_strings.push(string);
+        i += 1;
+    }
+    result_strings
+}
+
+#[allow(dead_code)]
+fn cstr_ptr_to_vec_borrowed(keyword: *mut *mut c_char) -> Vec<String> {
+    let mut result_strings = Vec::new();
+    let mut i = 0;
+    loop {
+        let ptr = unsafe { *keyword.offset(i) };
+        if ptr.is_null() {
+            break;
+        }
+        let c_str = unsafe { CStr::from_ptr(ptr) };
+        let string = c_str.to_str().unwrap().to_owned();
+        result_strings.push(string);
+        i += 1;
+    }
+    result_strings
 }
 
 #[cfg(test)]
@@ -522,40 +564,6 @@ mod tests {
             opencc_jieba_free_string_array(result);
             let _ = CString::from_raw(input);
         }
-    }
-
-    #[allow(dead_code)]
-    fn cstr_ptr_to_vec(keyword: *mut *mut c_char) -> Vec<String> {
-        // Convert result to Vec<String>
-        let mut result_strings = Vec::new();
-        let mut i = 0;
-        loop {
-            let ptr = unsafe { *keyword.offset(i) };
-            if ptr.is_null() {
-                break;
-            }
-            let c_str = unsafe { CString::from_raw(ptr) };
-            let string = c_str.to_str().unwrap().to_owned();
-            result_strings.push(string);
-            i += 1;
-        }
-        result_strings
-    }
-
-    fn cstr_ptr_to_vec_borrowed(keyword: *mut *mut c_char) -> Vec<String> {
-        let mut result_strings = Vec::new();
-        let mut i = 0;
-        loop {
-            let ptr = unsafe { *keyword.offset(i) };
-            if ptr.is_null() {
-                break;
-            }
-            let c_str = unsafe { CStr::from_ptr(ptr) };
-            let string = c_str.to_str().unwrap().to_owned();
-            result_strings.push(string);
-            i += 1;
-        }
-        result_strings
     }
 
     #[test]
