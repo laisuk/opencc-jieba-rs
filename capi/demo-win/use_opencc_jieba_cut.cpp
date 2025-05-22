@@ -19,7 +19,7 @@ int main() {
         opencc_jieba_free_string(result);
     }
     // Free OpenCC instance
-    opencc_jieba_free(instance);
+    opencc_jieba_delete(instance);
 
     return 0;
 }
