@@ -56,7 +56,7 @@ int main() {
         opencc_jieba_free_string_array(result_segments);
     }
 
-    opencc_jieba_free(instance);
+    opencc_jieba_delete(instance);
 
     return 0;
 }

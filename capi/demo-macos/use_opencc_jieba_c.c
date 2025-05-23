@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
         opencc_jieba_free_string(result);
     }
     if (opencc != NULL) {
-        opencc_jieba_free(opencc);
+        opencc_jieba_delete(opencc);
     }
 
     return 0;

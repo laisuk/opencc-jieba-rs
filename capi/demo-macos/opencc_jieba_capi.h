@@ -52,6 +52,16 @@ int opencc_jieba_zho_check(const void *instance, const char *input);
  * @param instance A pointer to an instance previously returned by `opencc_jieba_new`.
  *                 Passing NULL is safe and does nothing.
  */
+void opencc_jieba_delete(const void *instance);
+
+/**
+ * @deprecated Use `opencc_jieba_delete()` instead.
+ *
+ * Frees an instance of OpenCC returned by `opencc_jieba_new`.
+ *
+ * @param instance A pointer to an instance previously returned by `opencc_jieba_new`.
+ *                 Passing NULL is safe and does nothing.
+ */
 void opencc_jieba_free(const void *instance);
 
 /**

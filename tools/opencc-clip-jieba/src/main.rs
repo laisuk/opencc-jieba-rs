@@ -1,16 +1,24 @@
 extern crate copypasta;
 
+use std::collections::HashSet;
 use std::env;
 
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
+use once_cell::sync::Lazy;
 use opencc_jieba_rs::{find_max_utf8_length, format_thousand, OpenCC};
 
-fn main() {
-    let config_list = [
+pub static CONFIG_LIST: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    [
         "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "t2twp", "t2hk",
         "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t",
-    ];
+    ]
+    .iter()
+    .cloned()
+    .collect()
+});
+
+fn main() {
     const RED: &str = "\x1B[1;31m";
     const GREEN: &str = "\x1B[1;32m";
     const YELLOW: &str = "\x1B[1;33m";
@@ -28,7 +36,7 @@ fn main() {
             println!("Usage: opencc-clip-jieba [s2t|t2s|s2tw|tw2s|s2twp|tw2sp|s2hk|hk2s|t2tw|tw2t|t2twp|tw2t|tw2tp|t2hk|hk2t|jp2t|t2jp|auto|help] [punct]\n");
             return;
         }
-        if !config_list.contains(&config.as_str()) {
+        if !CONFIG_LIST.contains(&*config) {
             config = "auto".to_string()
         }
         punct = matches!(args.last(), Some(s) if s == "punct");
@@ -75,7 +83,7 @@ fn main() {
                 display_output_code = "Traditional Chinese 繁体";
             }
 
-            if config_list.contains(&config.as_str()) {
+            if CONFIG_LIST.contains(&config.as_str()) {
                 output = opencc.convert(&contents, &config, punct);
             } else {
                 output = contents.clone();
