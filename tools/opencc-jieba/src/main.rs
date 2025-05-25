@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             remove_utf8_bom_str_inplace(&mut input_str)
         }
 
-        let output_vec = OpenCC::new().jieba.cut(&input_str, true);
+        let output_vec = OpenCC::new().jieba_cut(&input_str, true);
         let output_str = output_vec.join(delimiter);
         write_output(output_file, out_enc, &output_str)?;
 
