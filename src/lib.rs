@@ -17,6 +17,8 @@ const DELIMITERS: &'static str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、
 lazy_static! {
     static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
 }
+// Define threshold for when to use parallel processing
+const PARALLEL_THRESHOLD: usize = 500;
 
 pub struct OpenCC {
     pub jieba: Arc<Jieba>,
@@ -33,42 +35,14 @@ impl OpenCC {
         OpenCC { jieba, dictionary }
     }
 
-    // fn convert_by_slice<'a>(
-    //     phrases: impl Iterator<Item = &'a str> + 'a,
-    //     dictionaries: &'a [&HashMap<String, String>],
-    // ) -> impl Iterator<Item = String> + 'a {
-    //     phrases.map(move |phrase| {
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(phrase) {
-    //                 return translation.to_string(); // Clone the String translation
-    //             }
-    //         }
-    //         Self::convert_by_char(phrase, dictionaries)
-    //     })
-    // }
-    //
-    // fn convert_by_string<'a>(
-    //     phrases: impl Iterator<Item = String> + 'a,
-    //     dictionaries: &'a [&HashMap<String, String>],
-    // ) -> impl Iterator<Item = String> + 'a {
-    //     phrases.map(move |phrase| {
-    //         // 整个词转换
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(&phrase) {
-    //                 return translation.to_string(); // Clone the String translation
-    //             }
-    //         }
-    //         // 逐字转换
-    //         Self::convert_by_char(&phrase, dictionaries)
-    //     })
-    // }
-
-    // fn convert_by_str_like<'a, T>(
+    // Generic conversion function that works with both parallel and sequential iterators
+    // fn convert_by_phrases<'a, T>(
     //     phrases: impl Iterator<Item = T> + 'a,
     //     dictionaries: &'a [&HashMap<String, String>],
+    //     use_parallel: bool,
     // ) -> impl Iterator<Item = String> + 'a
     // where
-    //     T: AsRef<str> + Send +'a,
+    //     T: AsRef<str> + Send + 'a,
     // {
     //     phrases.map(move |phrase| {
     //         let phrase_str = phrase.as_ref();
@@ -77,28 +51,8 @@ impl OpenCC {
     //                 return translation.clone(); // Avoid unnecessary to_string()
     //             }
     //         }
-    //         Self::convert_by_char(phrase_str, dictionaries)
+    //         Self::convert_by_char(phrase_str, dictionaries, use_parallel)
     //     })
-    // }
-
-    // fn convert_by_char(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
-    //     let mut phrase_builder = String::new();
-    //     phrase_builder.reserve(phrase.len());
-    //     for ch in phrase.chars() {
-    //         let ch_str = ch.to_string();
-    //         let mut char_found = false;
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(&ch_str) {
-    //                 phrase_builder.push_str(translation);
-    //                 char_found = true;
-    //                 break;
-    //             }
-    //         }
-    //         if !char_found {
-    //             phrase_builder.push_str(&ch_str);
-    //         }
-    //     }
-    //     phrase_builder
     // }
 
     fn convert_by_phrases_par<'a, T>(
@@ -118,35 +72,68 @@ impl OpenCC {
                 }
             }
             // If no full phrase match, perform character-by-character conversion
-            Self::convert_by_char_par(phrase_str, dictionaries)
+            Self::convert_by_char(phrase_str, dictionaries, true)
         })
     }
 
-    fn convert_by_char_par(phrase: &str, dictionaries: &[&HashMap<String, String>]) -> String {
-        phrase
-            .par_chars()
-            .map(|ch| {
-                let mut buf = [0u8; 4];
-                let ch_str = ch.encode_utf8(&mut buf); // Avoid allocation
-                for dictionary in dictionaries {
-                    if let Some(translation) = dictionary.get(ch_str) {
-                        return translation.clone(); // Found translation, return it
-                    }
-                }
-                ch_str.to_owned() // No translation, return original character
-            })
-            .collect() // Collect results into a String
+    // Unified character conversion function
+    fn convert_by_char(
+        phrase: &str,
+        dictionaries: &[&HashMap<String, String>],
+        use_parallel: bool,
+    ) -> String {
+        if use_parallel {
+            phrase
+                .par_chars()
+                .map(|ch| Self::translate_char(ch, dictionaries))
+                .collect()
+        } else {
+            phrase
+                .chars()
+                .map(|ch| Self::translate_char(ch, dictionaries))
+                .collect()
+        }
     }
 
-    fn split_string_inclusive_par(&self, text: &str) -> Vec<String> {
-        let collected: Vec<char> = text.par_chars().collect();
-        // Collect delimiters into a HashSet for faster lookup
+    // Helper function for character translation logic
+    fn translate_char(ch: char, dictionaries: &[&HashMap<String, String>]) -> String {
+        let mut buf = [0u8; 4];
+        let ch_str = ch.encode_utf8(&mut buf);
+        for dictionary in dictionaries {
+            if let Some(translation) = dictionary.get(ch_str) {
+                return translation.clone();
+            }
+        }
+        ch_str.to_owned()
+    }
+    // Unified string splitting function
+    fn split_string_inclusive(&self, text: &str, use_parallel: bool) -> Vec<String> {
         let delimiters: HashSet<char> = DELIMITERS.chars().collect();
-        // Perform the split in parallel and convert each slice to Vec<String>
-        collected
-            .par_split_inclusive(|c| delimiters.contains(c)) // Use the HashSet for fast lookup
-            .map(|slice| slice.iter().collect())
-            .collect()
+
+        if use_parallel {
+            let collected: Vec<char> = text.par_chars().collect();
+            collected
+                .par_split_inclusive(|c| delimiters.contains(c))
+                .map(|slice| slice.iter().collect())
+                .collect()
+        } else {
+            let mut result = Vec::new();
+            let mut current = String::new();
+
+            for ch in text.chars() {
+                current.push(ch);
+                if delimiters.contains(&ch) {
+                    result.push(current);
+                    current = String::new();
+                }
+            }
+
+            if !current.is_empty() {
+                result.push(current);
+            }
+
+            result
+        }
     }
 
     fn phrases_cut<'a>(
@@ -154,8 +141,17 @@ impl OpenCC {
         input: &str,
         hmm: bool,
     ) -> impl ParallelIterator<Item = String> + 'a {
-        let string_chunks = self.split_string_inclusive_par(input);
+        let string_chunks = self.split_string_inclusive(input, true);
         // let jieba = Arc::new(self.jieba.clone());
+        self.cut_chunks_par(string_chunks, hmm)
+    }
+
+    // Helper function for parallel jieba cutting logic
+    fn cut_chunks_par<'a>(
+        &'a self,
+        string_chunks: Vec<String>,
+        hmm: bool,
+    ) -> impl ParallelIterator<Item = String> + 'a {
         string_chunks
             .into_par_iter()
             .flat_map_iter(move |chunk_str| {
@@ -163,14 +159,36 @@ impl OpenCC {
                     .cut(&chunk_str, hmm)
                     .into_iter()
                     .map(str::to_owned)
-                    .collect::<Vec<String>>() // convert Vec<&str> to Vec<String>
+                    .collect::<Vec<String>>()
             })
     }
+    
+    // Unified phrases cutting function
+    fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
+        let string_chunks = self.split_string_inclusive(input, use_parallel);
 
+        if use_parallel {
+            self.cut_chunks_par(string_chunks, hmm).collect()
+        } else {
+            string_chunks
+                .into_iter()
+                .flat_map(|chunk_str| {
+                    self.jieba
+                        .cut(&chunk_str, hmm)
+                        .into_iter()
+                        .map(str::to_owned)
+                        .collect::<Vec<String>>()
+                })
+                .collect()
+        }
+    }
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
-        self.phrases_cut(input, hmm)
-            .into_par_iter()
-            .collect::<Vec<String>>()
+        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        self.phrases_cut_impl(input, hmm, use_parallel)
+    }
+    
+    pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
+        self.jieba_cut(input, hmm).join(delimiter)
     }
 
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
@@ -186,6 +204,26 @@ impl OpenCC {
             result
         }
     }
+
+    // pub fn s2t(&self, input: &str, punctuation: bool) -> String {
+    //     let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+    //     let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+    //
+    //     let result = i/f use_parallel {
+    //         let phrases = self.phrases_cut(input, true);
+    //         let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
+    //         String::from_par_iter(converted)
+    //     } else {
+    //         let phrases = self.phrases_cut_impl(input, true, false);
+    //         Self::convert_by_phrases(phrases.into_iter(), &dict_refs, use_parallel).collect()
+    //     };
+    //
+    //     if punctuation {
+    //         Self::convert_punctuation(&result, "s")
+    //     } else {
+    //         result
+    //     }
+    // }
 
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let phrases = self.phrases_cut(input, true);
@@ -393,13 +431,13 @@ impl OpenCC {
 
     fn st(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.st_characters];
-        let output = Self::convert_by_char_par(input, &dict_refs);
+        let output = Self::convert_by_char(input, &dict_refs, true);
         output
     }
 
     fn ts(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.ts_characters];
-        let output = Self::convert_by_char_par(input, &dict_refs);
+        let output = Self::convert_by_char(input, &dict_refs, true);
         output
     }
 

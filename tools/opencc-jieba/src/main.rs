@@ -99,6 +99,10 @@ fn remove_utf8_bom_str_inplace(s: &mut String) {
     }
 }
 
+fn normalize_line_endings(s: &str) -> String {
+    s.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 fn write_output(
     output_file: Option<&str>,
     out_enc: &str,
@@ -283,12 +287,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
 
         let mut input_str = read_input(input_file, in_enc)?;
+        
         if should_remove_bom(in_enc, out_enc) {
             remove_utf8_bom_str_inplace(&mut input_str)
         }
-
-        let output_vec = OpenCC::new().jieba_cut(&input_str, true);
-        let output_str = output_vec.join(delimiter);
+        
+        if input_file.is_none() {
+            input_str = normalize_line_endings(&input_str);
+        }        
+        
+        let output_str = OpenCC::new().jieba_cut_and_join(&input_str, true, delimiter);
         write_output(output_file, out_enc, &output_str)?;
 
         eprintln!(
