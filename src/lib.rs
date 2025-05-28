@@ -1,6 +1,6 @@
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -13,12 +13,24 @@ use crate::dictionary_lib::Dictionary;
 pub mod dictionary_lib;
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 const DELIMITERS: &'static str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
-
-lazy_static! {
-    static ref STRIP_REGEX: Regex = Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap();
-}
+static STRIP_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_]").unwrap());
 // Define threshold for when to use parallel processing
 const PARALLEL_THRESHOLD: usize = 500;
+// Pre-compiled regexes using lazy static initialization
+static S2T_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[“”‘’]"#).unwrap());
+static T2S_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[「」『』]").unwrap());
+// Pre-built mapping tables
+static S2T_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
+    [('“', '「'), ('”', '」'), ('‘', '『'), ('’', '』')]
+        .into_iter()
+        .collect()
+});
+static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
+    [('「', '“'), ('」', '”'), ('『', '‘'), ('』', '’')]
+        .into_iter()
+        .collect()
+});
 
 pub struct OpenCC {
     pub jieba: Arc<Jieba>,
@@ -162,7 +174,7 @@ impl OpenCC {
                     .collect::<Vec<String>>()
             })
     }
-    
+
     // Unified phrases cutting function
     fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
         let string_chunks = self.split_string_inclusive(input, use_parallel);
@@ -186,7 +198,7 @@ impl OpenCC {
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
         self.phrases_cut_impl(input, hmm, use_parallel)
     }
-    
+
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
         self.jieba_cut(input, hmm).join(delimiter)
     }
@@ -483,30 +495,45 @@ impl OpenCC {
         code
     }
 
+    // fn convert_punctuation(text: &str, config: &str) -> String {
+    //     let mut s2t_punctuation_chars: HashMap<&str, &str> = HashMap::new();
+    //     s2t_punctuation_chars.insert("“", "「");
+    //     s2t_punctuation_chars.insert("”", "」");
+    //     s2t_punctuation_chars.insert("‘", "『");
+    //     s2t_punctuation_chars.insert("’", "』");
+    //
+    //     let t2s_punctuation_chars: HashMap<&str, &str> = s2t_punctuation_chars
+    //         .iter()
+    //         .map(|(&k, &v)| (v, k))
+    //         .collect();
+    //
+    //     let mapping = if config.starts_with('s') {
+    //         &s2t_punctuation_chars
+    //     } else {
+    //         &t2s_punctuation_chars
+    //     };
+    //
+    //     let pattern = format!("[{}]", mapping.keys().cloned().collect::<String>());
+    //     let regex = Regex::new(&pattern).unwrap();
+    //
+    //     regex
+    //         .replace_all(text, |caps: &regex::Captures| {
+    //             mapping[caps.get(0).unwrap().as_str()]
+    //         })
+    //         .into_owned()
+    // }
+
     fn convert_punctuation(text: &str, config: &str) -> String {
-        let mut s2t_punctuation_chars: HashMap<&str, &str> = HashMap::new();
-        s2t_punctuation_chars.insert("“", "「");
-        s2t_punctuation_chars.insert("”", "」");
-        s2t_punctuation_chars.insert("‘", "『");
-        s2t_punctuation_chars.insert("’", "』");
-
-        let t2s_punctuation_chars: HashMap<&str, &str> = s2t_punctuation_chars
-            .iter()
-            .map(|(&k, &v)| (v, k))
-            .collect();
-
-        let mapping = if config.starts_with('s') {
-            &s2t_punctuation_chars
+        let (regex, mapping) = if config.starts_with('s') {
+            (&*S2T_REGEX, &*S2T_MAP)
         } else {
-            &t2s_punctuation_chars
+            (&*T2S_REGEX, &*T2S_MAP)
         };
-
-        let pattern = format!("[{}]", mapping.keys().cloned().collect::<String>());
-        let regex = Regex::new(&pattern).unwrap();
 
         regex
             .replace_all(text, |caps: &regex::Captures| {
-                mapping[caps.get(0).unwrap().as_str()]
+                let ch = caps.get(0).unwrap().as_str().chars().next().unwrap();
+                mapping.get(&ch).unwrap().to_string()
             })
             .into_owned()
     }

@@ -8,7 +8,7 @@ use copypasta::ClipboardProvider;
 use once_cell::sync::Lazy;
 use opencc_jieba_rs::{find_max_utf8_length, format_thousand, OpenCC};
 
-pub static CONFIG_LIST: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+static CONFIG_LIST: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     [
         "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "t2twp", "t2hk",
         "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t",
