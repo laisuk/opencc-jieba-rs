@@ -33,8 +33,8 @@ class OpenCC:
         self.lib.opencc_jieba_convert.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_bool]
         self.lib.opencc_jieba_zho_check.restype = ctypes.c_int
         self.lib.opencc_jieba_zho_check.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-        self.lib.opencc_jieba_free.restype = None
-        self.lib.opencc_jieba_free.argtypes = [ctypes.c_void_p]
+        self.lib.opencc_jieba_delete.restype = None
+        self.lib.opencc_jieba_delete.argtypes = [ctypes.c_void_p]
         self.lib.opencc_jieba_cut.restype = ctypes.POINTER(ctypes.c_char_p)
         self.lib.opencc_jieba_cut.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool]
         self.lib.opencc_jieba_cut_and_join.restype = ctypes.c_void_p
@@ -56,8 +56,8 @@ class OpenCC:
     def __del__(self):
         # Free the C instance when the Python object is garbage collected
         if hasattr(self, 'opencc_instance') and self.opencc_instance:
-            if hasattr(self, 'lib') and hasattr(self.lib, 'opencc_jieba_free'):
-                self.lib.opencc_jieba_free(self.opencc_instance)
+            if hasattr(self, 'lib') and hasattr(self.lib, 'opencc_jieba_delete'):
+                self.lib.opencc_jieba_delete(self.opencc_instance)
             self.opencc_instance = None # Mark as freed
 
     def convert(self, text, punctuation=False):
