@@ -2,7 +2,7 @@
 
 A Rust-based Chinese text converter that performs word segmentation using **Jieba**, powered by **OpenCC lexicons**. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant) conversion.
 
-![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust.yml/badge.svg)
 ![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)
 ![License](https://img.shields.io/github/license/laisuk/opencc-jieba-rs)
 
