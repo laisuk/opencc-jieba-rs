@@ -1,0 +1,96 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: opencc-jieba-${{ github.ref_name }}-linux
+            bin_ext: ''
+            dll_name: libopencc_jieba_capi.so
+          - os: macos-latest
+            artifact_name: opencc-jieba-${{ github.ref_name }}-macos
+            bin_ext: ''
+            dll_name: libopencc_jieba_capi.dylib
+          - os: windows-latest
+            artifact_name: opencc-jieba-${{ github.ref_name }}-windows
+            bin_ext: '.exe'
+            dll_name: opencc_jieba_capi.dll
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Project
+        run: cargo build --release --workspace
+
+      - name: Prepare Structured Release Folder
+        run: |
+          mkdir -p dist/bin dist/lib dist/include
+
+          cp target/release/opencc-jieba${{ matrix.bin_ext }} dist/bin/
+          cp target/release/opencc-clip-jieba${{ matrix.bin_ext }} dist/bin/
+          cp target/release/dict-generate${{ matrix.bin_ext }} dist/bin/
+
+          cp capi/opencc_jieba_capi.h dist/include/
+          cp capi/OpenccJiebaHelper.hpp dist/include/
+
+          cp target/release/${{ matrix.dll_name }} dist/lib/
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/release/opencc_jieba_capi.dll.lib dist/lib/
+          fi
+        shell: bash
+
+      # Create version.txt and README.txt
+      - name: Write README.txt and version.txt
+        run: |
+          echo "Version: ${{ github.ref_name }}" > dist/version.txt
+      
+          echo "Opencc-Jieba ${{ github.ref_name }}" > dist/README.txt
+          echo "" >> dist/README.txt
+          echo "Included folders:" >> dist/README.txt
+          echo "- bin/: Command-line tools (opencc-jieba, opencc-clip-jieba, dict-generate)" >> dist/README.txt
+          echo "- lib/: C API shared library (platform-specific)" >> dist/README.txt
+          echo "- include/: C API header and C++ header-only helper" >> dist/README.txt
+          echo "" >> dist/README.txt
+          echo "Usage:" >> dist/README.txt
+          echo "- Place the shared library in your LD_LIBRARY_PATH (Linux/macOS) or alongside .exe (Windows)." >> dist/README.txt
+          echo "- Include the headers in your C/C++ project for FFI integration." >> dist/README.txt
+
+      - name: Zip Structured Artifacts
+        run: 7z a ${{ matrix.artifact_name }}.zip ./dist/*
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+
+  release:
+    name: Release Artifacts
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
