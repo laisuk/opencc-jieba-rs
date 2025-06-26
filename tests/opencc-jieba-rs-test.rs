@@ -7,7 +7,7 @@ mod tests {
 
     #[test]
     fn zho_check_test() {
-        let input = "你好，世界！龙马精神！";
+        let input = "你好，世界！龙马精神！着著";
         let expected_output = 2;
         let opencc = OpenCC::new();
         let actual_output = opencc.zho_check(input);
