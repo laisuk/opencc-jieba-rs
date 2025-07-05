@@ -1,4 +1,4 @@
-use opencc_jieba_rs::{dictionary_lib, format_thousand, OpenCC};
+use opencc_jieba_rs::{dictionary_lib, OpenCC};
 
 #[cfg(test)]
 mod tests {
@@ -75,14 +75,6 @@ mod tests {
         let expected_output = "你好，世界！「龍馬精神」！";
         let opencc = OpenCC::new();
         let actual_output = opencc.s2t(input, true);
-        assert_eq!(actual_output, expected_output);
-    }
-
-    #[test]
-    fn format_thousand_test() {
-        let input = 1234567890;
-        let expected_output = "1,234,567,890";
-        let actual_output = format_thousand(input);
         assert_eq!(actual_output, expected_output);
     }
 

@@ -6,7 +6,7 @@ use std::env;
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
 use once_cell::sync::Lazy;
-use opencc_jieba_rs::{find_max_utf8_length, format_thousand, OpenCC};
+use opencc_jieba_rs::{find_max_utf8_length, OpenCC};
 
 static CONFIG_LIST: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     [
@@ -40,7 +40,6 @@ fn main() {
             config = "auto".to_string()
         }
         punct = matches!(args.last(), Some(s) if s == "punct");
-
     } else {
         config = "auto".to_string()
     }
@@ -131,4 +130,18 @@ fn main() {
             eprintln!("{}No text in clipboard: {}{}", RED, err, RESET)
         }
     }
+}
+
+pub fn format_thousand(n: i32) -> String {
+    let mut result_str = n.to_string();
+    let mut offset = result_str.len() % 3;
+    if offset == 0 {
+        offset = 3;
+    }
+
+    while offset < result_str.len() {
+        result_str.insert(offset, ',');
+        offset += 4; // Including the added comma
+    }
+    result_str
 }

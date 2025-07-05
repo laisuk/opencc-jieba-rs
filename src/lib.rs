@@ -6,6 +6,7 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::io::{Cursor, Read};
+use std::ops::Range;
 use std::sync::Arc;
 use zstd::stream::read::Decoder;
 
@@ -76,7 +77,6 @@ impl OpenCC {
     {
         phrases.map(move |phrase| {
             let phrase_str = phrase.as_ref(); // Convert T to &str
-
             // Attempt to find a full phrase match
             for dictionary in dictionaries {
                 if let Some(translation) = dictionary.get(phrase_str) {
@@ -118,82 +118,84 @@ impl OpenCC {
         }
         ch_str.to_owned()
     }
+
     // Unified string splitting function
-    fn split_string_inclusive(&self, text: &str, use_parallel: bool) -> Vec<String> {
+    fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
         let delimiters: HashSet<char> = DELIMITERS.chars().collect();
+        let mut ranges = Vec::new();
+        let char_indices: Vec<(usize, char)> = text.char_indices().collect();
 
-        if use_parallel {
-            let collected: Vec<char> = text.par_chars().collect();
-            collected
-                .par_split_inclusive(|c| delimiters.contains(c))
-                .map(|slice| slice.iter().collect())
-                .collect()
-        } else {
-            let mut result = Vec::new();
-            let mut current = String::new();
+        let mut start = 0;
 
-            for ch in text.chars() {
-                current.push(ch);
-                if delimiters.contains(&ch) {
-                    result.push(current);
-                    current = String::new();
-                }
+        for (i, &(_, ch)) in char_indices.iter().enumerate() {
+            if delimiters.contains(&ch) {
+                let end = if i + 1 < char_indices.len() {
+                    char_indices[i + 1].0
+                } else {
+                    text.len()
+                };
+                ranges.push(start..end);
+                start = end;
             }
-
-            if !current.is_empty() {
-                result.push(current);
-            }
-
-            result
         }
+
+        if start < text.len() {
+            ranges.push(start..text.len());
+        }
+
+        ranges
     }
 
+    // Cut the input text using jieba in parallel
     fn phrases_cut<'a>(
         &'a self,
-        input: &str,
+        input: &'a str,
         hmm: bool,
     ) -> impl ParallelIterator<Item = String> + 'a {
-        let string_chunks = self.split_string_inclusive(input, true);
-        // let jieba = Arc::new(self.jieba.clone());
-        self.cut_chunks_par(string_chunks, hmm)
+        let ranges = self.split_string_ranges(input);
+        self.cut_chunks_par(input, ranges, hmm)
     }
 
-    // Helper function for parallel jieba cutting logic
+    // Process ranges of &str in parallel using jieba
     fn cut_chunks_par<'a>(
         &'a self,
-        string_chunks: Vec<String>,
+        text: &'a str,
+        ranges: Vec<Range<usize>>,
         hmm: bool,
     ) -> impl ParallelIterator<Item = String> + 'a {
-        string_chunks
-            .into_par_iter()
-            .flat_map_iter(move |chunk_str| {
-                self.jieba
-                    .cut(&chunk_str, hmm)
-                    .into_iter()
-                    .map(str::to_owned)
-                    .collect::<Vec<String>>()
-            })
+        ranges.into_par_iter().flat_map_iter(move |range| {
+            let chunk = &text[range.clone()];
+            self.jieba
+                .cut(chunk, hmm)
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<String>>()
+        })
     }
 
     // Unified phrases cutting function
     fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
-        let string_chunks = self.split_string_inclusive(input, use_parallel);
+        let ranges = self.split_string_ranges(input);
+
+        let process_range = |range: Range<usize>| {
+            let chunk = &input[range];
+            self.jieba
+                .cut(chunk, hmm)
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<String>>()
+        };
 
         if use_parallel {
-            self.cut_chunks_par(string_chunks, hmm).collect()
-        } else {
-            string_chunks
-                .into_iter()
-                .flat_map(|chunk_str| {
-                    self.jieba
-                        .cut(&chunk_str, hmm)
-                        .into_iter()
-                        .map(str::to_owned)
-                        .collect::<Vec<String>>()
-                })
+            ranges
+                .into_par_iter()
+                .flat_map_iter(process_range)
                 .collect()
+        } else {
+            ranges.into_iter().flat_map(process_range).collect()
         }
     }
+
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
         self.phrases_cut_impl(input, hmm, use_parallel)
@@ -569,20 +571,6 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
         byte_count -= 1;
     }
     byte_count
-}
-
-pub fn format_thousand(n: i32) -> String {
-    let mut result_str = n.to_string();
-    let mut offset = result_str.len() % 3;
-    if offset == 0 {
-        offset = 3;
-    }
-
-    while offset < result_str.len() {
-        result_str.insert(offset, ',');
-        offset += 4; // Including the added comma
-    }
-    result_str
 }
 
 fn decompress_dict() -> String {
