@@ -71,40 +71,50 @@ impl Dictionary {
     }
 
     pub fn from_dicts() -> Self {
-        let stc_file_str = "dicts/STCharacters.txt";
-        let stp_file_str = "dicts/STPhrases.txt";
-        let tsc_file_str = "dicts/TSCharacters.txt";
-        let tsp_file_str = "dicts/TSPhrases.txt";
-        let twp_file_str = "dicts/TWPhrases.txt";
-        let twpr_file_str = "dicts/TWPhrasesRev.txt";
-        let twv_file_str = "dicts/TWVariants.txt";
-        let twvr_file_str = "dicts/TWVariantsRev.txt";
-        let twvrp_file_str = "dicts/TWVariantsRevPhrases.txt";
-        let hkv_file_str = "dicts/HKVariants.txt";
-        let hkvr_file_str = "dicts/HKVariantsRev.txt";
-        let hkvrp_file_str = "dicts/HKVariantsRevPhrases.txt";
-        let jpsc_file_str = "dicts/JPShinjitaiCharacters.txt";
-        let jpsp_file_str = "dicts/JPShinjitaiPhrases.txt";
-        let jpv_file_str = "dicts/JPVariants.txt";
-        let jpvr_file_str = "dicts/JPVariantsRev.txt";
-        let st_characters = Dictionary::load_dictionary_from_path(stc_file_str).unwrap();
-        let st_phrases = Dictionary::load_dictionary_from_path(stp_file_str).unwrap();
-        let ts_characters = Dictionary::load_dictionary_from_path(tsc_file_str).unwrap();
-        let ts_phrases = Dictionary::load_dictionary_from_path(tsp_file_str).unwrap();
-        let tw_phrases = Dictionary::load_dictionary_from_path(twp_file_str).unwrap();
-        let tw_phrases_rev = Dictionary::load_dictionary_from_path(twpr_file_str).unwrap();
-        let tw_variants = Dictionary::load_dictionary_from_path(twv_file_str).unwrap();
-        let tw_variants_rev = Dictionary::load_dictionary_from_path(twvr_file_str).unwrap();
-        let tw_variants_rev_phrases =
-            Dictionary::load_dictionary_from_path(twvrp_file_str).unwrap();
-        let hk_variants = Dictionary::load_dictionary_from_path(hkv_file_str).unwrap();
-        let hk_variants_rev = Dictionary::load_dictionary_from_path(hkvr_file_str).unwrap();
-        let hk_variants_rev_phrases =
-            Dictionary::load_dictionary_from_path(hkvrp_file_str).unwrap();
-        let jps_characters = Dictionary::load_dictionary_from_path(jpsc_file_str).unwrap();
-        let jps_phrases = Dictionary::load_dictionary_from_path(jpsp_file_str).unwrap();
-        let jp_variants = Dictionary::load_dictionary_from_path(jpv_file_str).unwrap();
-        let jp_variants_rev = Dictionary::load_dictionary_from_path(jpvr_file_str).unwrap();
+        let load = Self::load_dictionary_from_path;
+
+        let files = [
+            "dicts/STCharacters.txt",
+            "dicts/STPhrases.txt",
+            "dicts/TSCharacters.txt",
+            "dicts/TSPhrases.txt",
+            "dicts/TWPhrases.txt",
+            "dicts/TWPhrasesRev.txt",
+            "dicts/TWVariants.txt",
+            "dicts/TWVariantsRev.txt",
+            "dicts/TWVariantsRevPhrases.txt",
+            "dicts/HKVariants.txt",
+            "dicts/HKVariantsRev.txt",
+            "dicts/HKVariantsRevPhrases.txt",
+            "dicts/JPShinjitaiCharacters.txt",
+            "dicts/JPShinjitaiPhrases.txt",
+            "dicts/JPVariants.txt",
+            "dicts/JPVariantsRev.txt",
+        ];
+
+        let [
+        st_characters,
+        st_phrases,
+        ts_characters,
+        ts_phrases,
+        tw_phrases,
+        tw_phrases_rev,
+        tw_variants,
+        tw_variants_rev,
+        tw_variants_rev_phrases,
+        hk_variants,
+        hk_variants_rev,
+        hk_variants_rev_phrases,
+        jps_characters,
+        jps_phrases,
+        jp_variants,
+        jp_variants_rev,
+        ]: [HashMap<String, String>; 16] = files
+            .into_iter()
+            .map(|f| load(f).unwrap())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         Dictionary {
             st_characters,
