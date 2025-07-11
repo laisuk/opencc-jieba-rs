@@ -13,11 +13,15 @@ use zstd::stream::read::Decoder;
 use crate::dictionary_lib::Dictionary;
 pub mod dictionary_lib;
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
-const DELIMITERS: &'static str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
+static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
+    " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；："
+        .chars()
+        .collect()
+});
 static STRIP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]").unwrap());
 // Define threshold for when to use parallel processing
-const PARALLEL_THRESHOLD: usize = 500;
+const PARALLEL_THRESHOLD: usize = 1000;
 // Pre-compiled regexes using lazy static initialization
 static S2T_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[“”‘’]"#).unwrap());
 static T2S_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[「」『』]").unwrap());
@@ -48,87 +52,55 @@ impl OpenCC {
         OpenCC { jieba, dictionary }
     }
 
-    // Generic conversion function that works with both parallel and sequential iterators
-    // fn convert_by_phrases<'a, T>(
-    //     phrases: impl Iterator<Item = T> + 'a,
-    //     dictionaries: &'a [&HashMap<String, String>],
-    //     use_parallel: bool,
-    // ) -> impl Iterator<Item = String> + 'a
-    // where
-    //     T: AsRef<str> + Send + 'a,
-    // {
-    //     phrases.map(move |phrase| {
-    //         let phrase_str = phrase.as_ref();
-    //         for dictionary in dictionaries {
-    //             if let Some(translation) = dictionary.get(phrase_str) {
-    //                 return translation.clone(); // Avoid unnecessary to_string()
-    //             }
-    //         }
-    //         Self::convert_by_char(phrase_str, dictionaries, use_parallel)
-    //     })
-    // }
-
-    fn convert_by_phrases_par<'a, T>(
-        phrases: impl ParallelIterator<Item = T> + 'a,
+    fn phrases_cut_convert<'a>(
+        &'a self,
+        input: &'a str,
         dictionaries: &'a [&HashMap<String, String>],
-    ) -> impl ParallelIterator<Item = String> + 'a
-    where
-        T: AsRef<str> + Send + 'a, // T must implement AsRef<str> to support both &str and String
-    {
-        phrases.map(move |phrase| {
-            let phrase_str = phrase.as_ref(); // Convert T to &str
-            // Attempt to find a full phrase match
-            for dictionary in dictionaries {
-                if let Some(translation) = dictionary.get(phrase_str) {
-                    return translation.clone(); // Clone the String translation
-                }
-            }
-            // If no full phrase match, perform character-by-character conversion
-            Self::convert_by_char(phrase_str, dictionaries, true)
-        })
-    }
-
-    // Unified character conversion function
-    fn convert_by_char(
-        phrase: &str,
-        dictionaries: &[&HashMap<String, String>],
-        use_parallel: bool,
+        hmm: bool,
     ) -> String {
-        if use_parallel {
-            phrase
-                .par_chars()
-                .map(|ch| Self::translate_char(ch, dictionaries))
-                .collect()
-        } else {
-            phrase
-                .chars()
-                .map(|ch| Self::translate_char(ch, dictionaries))
-                .collect()
-        }
-    }
+        let ranges = self.split_string_ranges(input);
+        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
 
-    // Helper function for character translation logic
-    fn translate_char(ch: char, dictionaries: &[&HashMap<String, String>]) -> String {
-        let mut buf = [0u8; 4];
-        let ch_str = ch.encode_utf8(&mut buf);
-        for dictionary in dictionaries {
-            if let Some(translation) = dictionary.get(ch_str) {
-                return translation.clone();
-            }
+        let process_range = |range: Range<usize>| {
+            let chunk = &input[range];
+            self.jieba
+                .cut(chunk, hmm)
+                .into_iter()
+                .map(|phrase| {
+                    let mut chars = phrase.chars();
+                    if let (Some(c), None) = (chars.next(), chars.next()) {
+                        if DELIMITER_SET.contains(&c) {
+                            return phrase.to_string();
+                        }
+                    }
+
+                    for dict in dictionaries {
+                        if let Some(translated) = dict.get(phrase) {
+                            return translated.clone();
+                        }
+                    }
+
+                    Self::convert_by_char(phrase, dictionaries, false)
+                })
+                .collect::<Vec<String>>()
+        };
+
+        if use_parallel {
+            String::from_par_iter(ranges.into_par_iter().flat_map_iter(process_range))
+        } else {
+            String::from_iter(ranges.into_iter().flat_map(process_range))
         }
-        ch_str.to_owned()
     }
 
     // Unified string splitting function
     fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
-        let delimiters: HashSet<char> = DELIMITERS.chars().collect();
         let mut ranges = Vec::new();
         let char_indices: Vec<(usize, char)> = text.char_indices().collect();
 
         let mut start = 0;
 
         for (i, &(_, ch)) in char_indices.iter().enumerate() {
-            if delimiters.contains(&ch) {
+            if DELIMITER_SET.contains(&ch) {
                 let end = if i + 1 < char_indices.len() {
                     char_indices[i + 1].0
                 } else {
@@ -146,31 +118,34 @@ impl OpenCC {
         ranges
     }
 
-    // Cut the input text using jieba in parallel
-    fn phrases_cut<'a>(
-        &'a self,
-        input: &'a str,
-        hmm: bool,
-    ) -> impl ParallelIterator<Item = String> + 'a {
-        let ranges = self.split_string_ranges(input);
-        self.cut_chunks_par(input, ranges, hmm)
-    }
+    // Unified character conversion function
+    fn convert_by_char(
+        phrase: &str,
+        dictionaries: &[&HashMap<String, String>],
+        use_parallel: bool,
+    ) -> String {
+        let process = |ch: char| {
+            let mut buf = [0u8; 4];
+            let ch_str = ch.encode_utf8(&mut buf);
 
-    // Process ranges of &str in parallel using jieba
-    fn cut_chunks_par<'a>(
-        &'a self,
-        text: &'a str,
-        ranges: Vec<Range<usize>>,
-        hmm: bool,
-    ) -> impl ParallelIterator<Item = String> + 'a {
-        ranges.into_par_iter().flat_map_iter(move |range| {
-            let chunk = &text[range.clone()];
-            self.jieba
-                .cut(chunk, hmm)
-                .into_iter()
-                .map(str::to_owned)
-                .collect::<Vec<String>>()
-        })
+            for dict in dictionaries {
+                if let Some(t) = dict.get(ch_str) {
+                    return t.clone(); // May be multi-char
+                }
+            }
+
+            ch_str.to_owned()
+        };
+
+        if use_parallel {
+            phrase.par_chars().map(&process).collect::<String>()
+        } else {
+            let mut result = String::with_capacity(phrase.len() * 4); // Estimate
+            for ch in phrase.chars() {
+                result.push_str(&process(ch));
+            }
+            result
+        }
     }
 
     // Unified phrases cutting function
@@ -206,12 +181,8 @@ impl OpenCC {
     }
 
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
-        // Step 3: Apply phrase and character dictionary conversion in parallel
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
-        // Step 4: Optionally apply punctuation conversion
-        let result = String::from_par_iter(converted);
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -219,31 +190,9 @@ impl OpenCC {
         }
     }
 
-    // pub fn s2t(&self, input: &str, punctuation: bool) -> String {
-    //     let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-    //     let use_parallel = input.len() >= PARALLEL_THRESHOLD;
-    //
-    //     let result = i/f use_parallel {
-    //         let phrases = self.phrases_cut(input, true);
-    //         let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
-    //         String::from_par_iter(converted)
-    //     } else {
-    //         let phrases = self.phrases_cut_impl(input, true, false);
-    //         Self::convert_by_phrases(phrases.into_iter(), &dict_refs, use_parallel).collect()
-    //     };
-    //
-    //     if punctuation {
-    //         Self::convert_punctuation(&result, "s")
-    //     } else {
-    //         result
-    //     }
-    // }
-
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let converted = Self::convert_by_phrases_par(phrases, &dict_refs);
-        let result = String::from_par_iter(converted);
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -252,14 +201,13 @@ impl OpenCC {
     }
 
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -268,17 +216,16 @@ impl OpenCC {
     }
 
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -287,18 +234,18 @@ impl OpenCC {
     }
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases];
         let dict_refs_round_3 = [&self.dictionary.tw_variants];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(
-                Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(
+                &self.phrases_cut_convert(input, &dict_refs, true),
                 &dict_refs_round_2,
+                true,
             ),
             &dict_refs_round_3,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -307,21 +254,21 @@ impl OpenCC {
     }
 
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
         let dict_refs_round_3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(
-                Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(
+                &self.phrases_cut_convert(input, &dict_refs, true),
                 &dict_refs_round_2,
+                true,
             ),
             &dict_refs_round_3,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -330,14 +277,13 @@ impl OpenCC {
     }
 
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -346,17 +292,16 @@ impl OpenCC {
     }
 
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
         let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        let result = self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
+            true,
         );
-        let result = String::from_par_iter(output);
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -365,82 +310,66 @@ impl OpenCC {
     }
 
     pub fn t2tw(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.tw_variants];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     pub fn t2twp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
-        );
-        String::from_par_iter(output)
+            true,
+        )
     }
 
     pub fn tw2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     pub fn tw2tp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
         let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
-        let output = Self::convert_by_phrases_par(
-            Self::convert_by_phrases_par(phrases, &dict_refs),
+        self.phrases_cut_convert(
+            &self.phrases_cut_convert(input, &dict_refs, true),
             &dict_refs_round_2,
-        );
-        String::from_par_iter(output)
+            true,
+        )
     }
 
     pub fn t2hk(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.hk_variants];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     pub fn hk2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     pub fn t2jp(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [&self.dictionary.jp_variants];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     pub fn jp2t(&self, input: &str) -> String {
-        let phrases = self.phrases_cut(input, true);
         let dict_refs = [
             &self.dictionary.jps_phrases,
             &self.dictionary.jps_characters,
             &self.dictionary.jp_variants_rev,
         ];
-        let output = Self::convert_by_phrases_par(phrases, &dict_refs);
-
-        String::from_par_iter(output)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     fn st(&self, input: &str) -> String {
@@ -507,7 +436,8 @@ impl OpenCC {
         regex
             .replace_all(text, |caps: &regex::Captures| {
                 let ch = caps.get(0).unwrap().as_str().chars().next().unwrap();
-                mapping.get(&ch).unwrap().to_string()
+                // mapping.get(&ch).unwrap().to_string()
+                mapping.get(&ch).copied().unwrap_or(ch).to_string()
             })
             .into_owned()
     }

@@ -2,10 +2,10 @@ name: Rust build + test
 
 on:
   workflow_dispatch:  # Allows manual triggering
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+#  push:
+#    branches: [ "master" ]
+#  pull_request:
+#    branches: [ "master" ]
 
 env:
   CARGO_TERM_COLOR: always
