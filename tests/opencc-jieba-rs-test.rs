@@ -1,8 +1,9 @@
-use opencc_jieba_rs::{dictionary_lib, OpenCC};
+use opencc_jieba_rs::OpenCC;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opencc_jieba_rs::dictionary_lib::Dictionary;
     use std::fs;
 
     #[test]
@@ -94,20 +95,34 @@ mod tests {
     fn test_serialize_to_json() {
         // Define the filename for testing
         let filename = "dictionary.json";
-        // let opencc = OpenCC::new();
-        let dictionary = dictionary_lib::Dictionary::from_dicts();
+        let dictionary = Dictionary::from_dicts();
         // Serialize to JSON and write to file
         dictionary.serialize_to_json(filename).unwrap();
-
         // Read the contents of the file
         let file_contents = fs::read_to_string(filename).unwrap();
-
         // Verify that the JSON contains the expected data
-        let expected_json = 1351418;
+        let expected_json = 1352420;
         assert_eq!(file_contents.trim().len(), expected_json);
 
         // Clean up: Delete the test file
         // fs::remove_file(filename).unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn test_save_compressed_to_zstd() {
+        use std::path::Path;
+        // Define the filename for testing
+        let filename = "dictionary.json.zst";
+        let dictionary = Dictionary::from_dicts();
+
+        Dictionary::save_compressed(&dictionary, filename).unwrap();
+
+        // Verify that the compressed file is created
+        assert_eq!(Path::new(filename).exists(), true);
+
+        // Clean up: Delete the test file
+        // std::fs::remove_file(filename).unwrap();
     }
 
     #[test]

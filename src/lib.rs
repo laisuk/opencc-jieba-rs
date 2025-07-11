@@ -12,6 +12,7 @@ use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::Dictionary;
 pub mod dictionary_lib;
+
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
     " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；："
@@ -20,8 +21,6 @@ static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
 });
 static STRIP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]").unwrap());
-// Define threshold for when to use parallel processing
-const PARALLEL_THRESHOLD: usize = 1000;
 // Pre-compiled regexes using lazy static initialization
 static S2T_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[“”‘’]"#).unwrap());
 static T2S_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[「」『』]").unwrap());
@@ -36,6 +35,9 @@ static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
         .into_iter()
         .collect()
 });
+// Define threshold for when to use parallel processing
+const PARALLEL_THRESHOLD: usize = 1000;
+
 
 pub struct OpenCC {
     pub jieba: Arc<Jieba>,
@@ -44,7 +46,7 @@ pub struct OpenCC {
 
 impl OpenCC {
     pub fn new() -> Self {
-        let dict_hans_hant_txt = decompress_dict();
+        let dict_hans_hant_txt = decompress_jieba_dict();
         let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
         let jieba = Arc::new(Jieba::with_dict(&mut dict_hans_hant).unwrap());
         let dictionary = Dictionary::new();
@@ -92,32 +94,6 @@ impl OpenCC {
         }
     }
 
-    // Unified string splitting function
-    fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
-        let mut ranges = Vec::new();
-        let char_indices: Vec<(usize, char)> = text.char_indices().collect();
-
-        let mut start = 0;
-
-        for (i, &(_, ch)) in char_indices.iter().enumerate() {
-            if DELIMITER_SET.contains(&ch) {
-                let end = if i + 1 < char_indices.len() {
-                    char_indices[i + 1].0
-                } else {
-                    text.len()
-                };
-                ranges.push(start..end);
-                start = end;
-            }
-        }
-
-        if start < text.len() {
-            ranges.push(start..text.len());
-        }
-
-        ranges
-    }
-
     // Unified character conversion function
     fn convert_by_char(
         phrase: &str,
@@ -146,6 +122,32 @@ impl OpenCC {
             }
             result
         }
+    }
+
+    // Unified string splitting function
+    fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
+        let mut ranges = Vec::new();
+        let char_indices: Vec<(usize, char)> = text.char_indices().collect();
+
+        let mut start = 0;
+
+        for (i, &(_, ch)) in char_indices.iter().enumerate() {
+            if DELIMITER_SET.contains(&ch) {
+                let end = if i + 1 < char_indices.len() {
+                    char_indices[i + 1].0
+                } else {
+                    text.len()
+                };
+                ranges.push(start..end);
+                start = end;
+            }
+        }
+
+        if start < text.len() {
+            ranges.push(start..text.len());
+        }
+
+        ranges
     }
 
     // Unified phrases cutting function
@@ -503,7 +505,7 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     byte_count
 }
 
-fn decompress_dict() -> String {
+fn decompress_jieba_dict() -> String {
     let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
     let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
     let mut decompressed = String::new();

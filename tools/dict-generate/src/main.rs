@@ -1,21 +1,6 @@
 use clap::{Arg, Command};
 use opencc_jieba_rs::dictionary_lib::Dictionary;
 use std::fs::File;
-use std::io;
-use std::io::BufWriter;
-use zstd::Encoder;
-
-pub fn save_compressed(
-    dictionary: &Dictionary,
-    path: &str,
-) -> Result<(), io::Error> {
-    let file = File::create(path)?;
-    let writer = BufWriter::new(file);
-    let mut encoder = Encoder::new(writer, 19)?;
-    serde_json::to_writer(&mut encoder, dictionary)?;
-    encoder.finish()?;
-    Ok(())
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     const BLUE: &str = "\x1B[1;34m"; // Bold Blue
@@ -58,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match dict_format {
         Some("zstd") => {
             let dictionary = Dictionary::from_dicts();
-            save_compressed(&dictionary, output_file)?;
+            Dictionary::save_compressed(&dictionary, output_file)?;
             eprintln!("{BLUE}Dictionary saved in ZSTD format at: {output_file}{RESET}");
         }
         Some("json") => {

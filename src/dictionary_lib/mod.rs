@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
-use std::io::{BufRead, BufReader};
+use std::io;
+use std::io::BufWriter;
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
+use zstd::Encoder;
 
 #[derive(Serialize, Deserialize)]
 pub struct Dictionary {
@@ -124,15 +125,6 @@ impl Dictionary {
             jp_variants_rev,
         }
     }
-    #[allow(dead_code)]
-    pub fn from_json_file(filename: &str) -> io::Result<Self> {
-        // Read the contents of the JSON file
-        let json_string = fs::read_to_string(filename)?;
-        // Deserialize the JSON string into a Dictionary struct
-        let dictionary: Dictionary = serde_json::from_str(&json_string)?;
-
-        Ok(dictionary)
-    }
 
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<HashMap<String, String>>
     where
@@ -157,25 +149,15 @@ impl Dictionary {
         Ok(dictionary)
     }
 
-    #[allow(dead_code)]
-    fn load_dictionary_from_str(dictionary_content: &str) -> io::Result<HashMap<String, String>> {
-        let mut dictionary = HashMap::new();
-
-        for line in dictionary_content.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let phrase = parts[0].to_string();
-                let translation = parts[1].to_string();
-                dictionary.insert(phrase, translation);
-            } else {
-                eprintln!("Invalid line format: {}", line);
-            }
-        }
-
-        Ok(dictionary)
+    pub fn save_compressed(dictionary: &Dictionary, path: &str) -> Result<(), io::Error> {
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+        let mut encoder = Encoder::new(writer, 19)?;
+        serde_json::to_writer(&mut encoder, dictionary)?;
+        encoder.finish()?;
+        Ok(())
     }
 
-    #[allow(dead_code)]
     // Function to serialize Dictionary to JSON and write it to a file
     pub fn serialize_to_json(&self, filename: &str) -> io::Result<()> {
         let json_string = serde_json::to_string(&self)?;
