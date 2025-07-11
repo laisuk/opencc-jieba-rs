@@ -8,9 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.6.0] -2025-07-12
 
-### CHANGED
-- Improved performance by redesign `OpenCC-Jieba` **segmentation and conversion logic**.
-- Improved **parallelism** design.
+### Changed
+- Improved performance with redesign `OpenCC-Jieba` **segmentation and conversion logic**.
+- Improved **parallelism** implementation.
 
 ---
 
