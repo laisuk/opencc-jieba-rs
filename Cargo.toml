@@ -26,6 +26,9 @@ include = [
     "README.md",
     "LICENSE"
 ]
+exclude = [
+    "Cargo.toml.orig"
+]
 
 [dependencies]
 jieba-rs = { version = "0.7.3", features = ["tfidf", "textrank"] }
