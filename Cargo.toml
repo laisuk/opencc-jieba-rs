@@ -20,9 +20,8 @@ readme = "README.md"
 keywords = ["chinese", "jieba", "opencc", "nlp", "text-processing"]
 categories = ["text-processing", "internationalization", "command-line-utilities"]
 include = [
-    "src/**/*",
+    "src/**/*.rs",
     "src/dictionary_lib/dicts/*.zst",
-    "dicts/**/*",
     "Cargo.toml",
     "README.md",
     "LICENSE"
