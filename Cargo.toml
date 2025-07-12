@@ -19,21 +19,7 @@ documentation = "https://docs.rs/opencc-jieba-rs"
 readme = "README.md"
 keywords = ["chinese", "jieba", "opencc", "nlp", "text-processing"]
 categories = ["text-processing", "internationalization", "command-line-utilities"]
-exclude = [
-    "/.github",
-    "/tools/",
-    "/capi/",
-    "/target/",
-    "/benches/",
-    "/examples/",
-    "/tests/",
-    "/python/",
-    "*.md",
-    "*.yml",
-    "*.bak",
-    "*.bka",
-    "*.orig"
-]
+include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
 
 [dependencies]
 jieba-rs = { version = "0.7.3", features = ["tfidf", "textrank"] }
