@@ -76,8 +76,7 @@ impl Default for Dictionary {
 impl Dictionary {
     /// Loads the dictionary from a compressed JSON file embedded in the binary.
     ///
-    /// # Panics
-    /// Panics if decompression or deserialization fails.
+    /// # Panics    ///  if decompression or deserialization fails.
     pub fn new() -> Self {
         const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
 
