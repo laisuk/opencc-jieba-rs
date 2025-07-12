@@ -18,7 +18,7 @@ conversion.
 - 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
 - 🔍 Lexicon-driven segmentation using OpenCC dictionaries.
 - ⚡ Utilizes Jieba's probabilistic models for more accurate word segmentation, improving the quality of Simplified ↔
-  Traditional Chinese conversion.
+  Traditional Chinese conversion (With large dictionary model to support both Traditional and Simplified Chinese segmentation).
 - 🛠️ Designed to be easily embedded as a Rust library or used standalone.
 
 ### 🔽 Downloads
