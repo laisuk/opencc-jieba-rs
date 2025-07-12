@@ -38,7 +38,6 @@ static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
 // Define threshold for when to use parallel processing
 const PARALLEL_THRESHOLD: usize = 1000;
 
-
 pub struct OpenCC {
     pub jieba: Arc<Jieba>,
     dictionary: Dictionary,
