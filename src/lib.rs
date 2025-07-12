@@ -19,7 +19,7 @@
 //!
 //! let opencc = OpenCC::new();
 //! let s = opencc.s2t("外国的程序员", true);
-//! println!("{}", s); // -> "外國的程式員"
+//! println!("{}", s); // -> "外國的程序員"
 //! ```
 //!
 //! ## Use Cases
@@ -419,7 +419,7 @@ impl OpenCC {
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let tw = opencc.s2tw("面条和程序员", true);
-    /// println!("{}", tw); // "麵條和程式設計師"
+    /// println!("{}", tw); // "麵條和程序設計師"
     /// ```
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -568,7 +568,7 @@ impl OpenCC {
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let hk = opencc.s2hk("发票和程序员", true);
-    /// println!("{}", hk); // "發票和程式員"
+    /// println!("{}", hk); // "發票和程序員"
     /// ```
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];

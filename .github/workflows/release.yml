@@ -38,7 +38,7 @@ jobs:
 
       - name: Prepare Structured Release Folder
         run: |
-          mkdir -p dist/bin dist/lib dist/include
+          mkdir -p dist/bin dist/lib dist/include dist/dicts
 
           cp target/release/opencc-jieba${{ matrix.bin_ext }} dist/bin/
           cp target/release/opencc-clip-jieba${{ matrix.bin_ext }} dist/bin/
@@ -51,23 +51,28 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/release/opencc_jieba_capi.dll.lib dist/lib/
           fi
+          
+          cp dicts/*.txt dist/dicts/
         shell: bash
 
       # Create version.txt and README.txt
       - name: Write README.txt and version.txt
         run: |
           echo "Version: ${{ github.ref_name }}" > dist/version.txt
-      
+          
           echo "Opencc-Jieba ${{ github.ref_name }}" > dist/README.txt
           echo "" >> dist/README.txt
           echo "Included folders:" >> dist/README.txt
           echo "- bin/: Command-line tools (opencc-jieba, opencc-clip-jieba, dict-generate)" >> dist/README.txt
           echo "- lib/: C API shared library (platform-specific)" >> dist/README.txt
           echo "- include/: C API header and C++ header-only helper" >> dist/README.txt
+          echo "- dicts/: Dictionary TXT files for dict-generate" >> dist/README.txt
           echo "" >> dist/README.txt
           echo "Usage:" >> dist/README.txt
           echo "- Place the shared library in your LD_LIBRARY_PATH (Linux/macOS) or alongside .exe (Windows)." >> dist/README.txt
           echo "- Include the headers in your C/C++ project for FFI integration." >> dist/README.txt
+          echo "- Use the TXT files in dicts/ as input to the 'dict-generate' tool." >> dist/README.txt
+      
 
       - name: Zip Structured Artifacts
         run: 7z a ${{ matrix.artifact_name }}.zip ./dist/*
