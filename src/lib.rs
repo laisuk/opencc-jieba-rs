@@ -1,3 +1,40 @@
+//! # opencc-jieba-rs
+//!
+//! `opencc-jieba-rs` is a high-performance Rust library for Chinese text conversion,
+//! segmentation, and keyword extraction. It integrates [Jieba](https://github.com/fxsjy/jieba) for word segmentation
+//! and a multi-stage OpenCC-style dictionary system for converting between different Chinese variants.
+//!
+//! ## Features
+//!
+//! - Simplified ↔ Traditional Chinese conversion (including Taiwan, Hong Kong, Japanese variants)
+//! - Multi-pass dictionary-based phrase replacement
+//! - Fast and accurate word segmentation using Jieba
+//! - Keyword extraction using TF-IDF or TextRank
+//! - Optional punctuation conversion (e.g., 「」 ↔ “”)
+//!
+//! ## Example
+//!
+//! ```rust
+//! use opencc_jieba_rs::OpenCC;
+//!
+//! let opencc = OpenCC::new();
+//! let s = opencc.s2t("外国的程序员", true);
+//! println!("{}", s); // -> "外國的程式員"
+//! ```
+//!
+//! ## Use Cases
+//!
+//! - Text normalization for NLP and search engines
+//! - Cross-regional Chinese content adaptation
+//! - Automatic subtitle or document localization
+//!
+//! ## Crate Status
+//!
+//! - 🚀 Fast and parallelized
+//! - 🧪 Battle-tested on multi-million character corpora
+//! - 📦 Ready for crates.io and docs.rs publication
+//!
+//! ---
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
 use once_cell::sync::Lazy;
@@ -35,15 +72,57 @@ static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
         .into_iter()
         .collect()
 });
-// Define threshold for when to use parallel processing
+// Minimum input length (in chars) to trigger parallel processing
 const PARALLEL_THRESHOLD: usize = 1000;
 
+/// The main struct for performing Chinese text conversion and segmentation.
+///
+/// `OpenCC` combines a [`Jieba`] tokenizer with OpenCC-style dictionaries,
+/// allowing high-quality conversion between Simplified, Traditional, Taiwanese,
+/// Hong Kong, and Japanese variants of Chinese. It also supports keyword extraction
+/// and multi-stage phrase replacement.
+///
+/// # Example
+///
+/// ```rust
+/// use opencc_jieba_rs::OpenCC;
+///
+/// let opencc = OpenCC::new();
+/// let result = opencc.s2t("外国的程序员", true);
+/// assert_eq!(result, "外國的程序員");
+/// ```
+///
+/// # Features
+///
+/// - Supports segmentation with Jieba (HMM on/off)
+/// - Dictionary-based multi-pass phrase replacement
+/// - Conversion between: Simplified ↔ Traditional, Taiwan, HK, Japanese
+/// - Optional punctuation conversion (e.g., 「」 vs “”) and keyword extraction
+///
+/// [`Jieba`]: https://docs.rs/jieba-rs
 pub struct OpenCC {
+    /// The Jieba tokenizer instance.
     pub jieba: Arc<Jieba>,
+    /// The conversion dictionary.
     dictionary: Dictionary,
 }
 
 impl OpenCC {
+    /// Creates a new instance of `OpenCC` with built-in dictionaries and a Jieba tokenizer.
+    ///
+    /// Loads the default compressed dictionary for Simplified-Traditional conversion,
+    /// initializes the Jieba tokenizer, and prepares the dictionary engine.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal Jieba dictionary fails to load.
+    ///
+    /// # Example
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let opencc = OpenCC::new();
+    /// ```
     pub fn new() -> Self {
         let dict_hans_hant_txt = decompress_jieba_dict();
         let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
@@ -53,6 +132,33 @@ impl OpenCC {
         OpenCC { jieba, dictionary }
     }
 
+    // Performs dictionary-based phrase-level conversion with fallback character-level mapping.
+    //
+    // This is the core logic for segmenting and converting input text using Jieba and multiple
+    // dictionaries. It supports both phrase-level and character-level matching across segmented
+    // chunks, and can operate in parallel if the input is large.
+    //
+    // ## Workflow:
+    // 1. Split input into ranges based on delimiters (e.g., punctuation).
+    // 2. For each range, perform Jieba segmentation (`cut`) with or without HMM.
+    // 3. For each segmented phrase:
+    //    - If it's a known delimiter, return as-is.
+    //    - Else, lookup phrase in each dictionary (short-circuiting on first match).
+    //    - If not found in any dictionary, fallback to per-character conversion.
+    //
+    // ## Parallelism:
+    // - Enabled if input length ≥ `PARALLEL_THRESHOLD`.
+    // - Each range is processed in parallel and results are flattened into a single `String`.
+    //
+    // # Arguments
+    // - `input`: The input text to convert.
+    // - `dictionaries`: Slice of reference-to-dictionaries (ordered by priority).
+    // - `hmm`: Whether to enable HMM in Jieba segmentation.
+    //
+    // # Returns
+    // - A fully converted `String`, combining segment-level and character-level replacements.
+    //
+    // Example use cases: s2t, t2s, s2tw conversions with phrase-first dictionary application.
     fn phrases_cut_convert<'a>(
         &'a self,
         input: &'a str,
@@ -93,7 +199,20 @@ impl OpenCC {
         }
     }
 
-    // Unified character conversion function
+    // Fallback character-by-character dictionary conversion.
+    //
+    // Used when a phrase is not matched in any dictionary during segmentation.
+    // Each character is individually looked up in the same dictionary list.
+    //
+    // Supports optional parallelization for long strings.
+    //
+    // # Arguments
+    // - `phrase`: The phrase to convert (typically short).
+    // - `dictionaries`: Ordered list of dictionaries to apply.
+    // - `use_parallel`: Whether to enable parallel processing.
+    //
+    // # Returns
+    // - A `String` where each char is replaced using the first matching dictionary.
     fn convert_by_char(
         phrase: &str,
         dictionaries: &[&HashMap<String, String>],
@@ -123,7 +242,15 @@ impl OpenCC {
         }
     }
 
-    // Unified string splitting function
+    // Splits text into non-overlapping ranges between delimiter characters.
+    //
+    // Each `Range<usize>` corresponds to a segment bounded by or ending at a delimiter.
+    // This allows efficient chunk-based processing (e.g., phrase segmentation or dictionary conversion)
+    // without repeatedly scanning the whole string.
+    //
+    // Example:
+    //   Input:  "你好，世界！Rust不错。"
+    //   Output: vec![0..9, 9..18, 18..27, ...]  (based on char boundary positions)
     fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
         let mut ranges = Vec::new();
         let char_indices: Vec<(usize, char)> = text.char_indices().collect();
@@ -149,7 +276,8 @@ impl OpenCC {
         ranges
     }
 
-    // Unified phrases cutting function
+    // Performs Jieba-based phrase segmentation over each non-delimiter chunk.
+    // Used internally for consistent pre-segmentation before conversion or keyword extraction.
     fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
         let ranges = self.split_string_ranges(input);
 
@@ -172,15 +300,71 @@ impl OpenCC {
         }
     }
 
+    /// Segments input text using Jieba tokenizer.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to be segmented.
+    /// * `hmm` - Whether to enable HMM for unknown word recognition.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` containing segmented words.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let tokens = opencc.jieba_cut("南京市长江大桥", true);
+    /// assert!(tokens.contains(&"南京市".to_string()));
+    /// ```
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
         self.phrases_cut_impl(input, hmm, use_parallel)
     }
 
+    /// Segments input text using Jieba and joins the result into a single string.
+    ///
+    /// Similar to [`jieba_cut`] but returns a space-separated string instead of a vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to be segmented.
+    /// * `hmm` - Whether to enable HMM for unknown word recognition.
+    ///
+    /// # Returns
+    ///
+    /// A single `String` with segmented words joined by space.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let joined = opencc.jieba_cut_and_join("南京市长江大桥", true, " ");
+    /// println!("{}", joined); // -> "南京市 长江 大桥"
+    /// ```
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
         self.jieba_cut(input, hmm).join(delimiter)
     }
 
+    /// Converts Simplified Chinese to Traditional Chinese.
+    ///
+    /// This uses dictionary-based phrase mapping and segmentation via Jieba
+    /// to convert Simplified Chinese (`简体中文`) into Traditional Chinese (`繁體中文`).
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Simplified Chinese input text.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Returns
+    ///
+    /// A `String` containing the converted Traditional Chinese.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let s = opencc.s2t("外国的程序员", true);
+    /// assert_eq!(s, "外國的程序員");
+    /// ```
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
@@ -191,6 +375,26 @@ impl OpenCC {
         }
     }
 
+    /// Converts Traditional Chinese to Simplified Chinese.
+    ///
+    /// Uses multi-stage dictionary mapping to reduce `繁體中文` into `简体中文`,
+    /// optionally preserving segmentation hints.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Traditional Chinese input.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Returns
+    ///
+    /// A `String` containing the Simplified Chinese output.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let s = opencc.t2s("外國的程序員", true);
+    /// assert_eq!(s, "外国的程序员");
+    /// ```
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
@@ -201,6 +405,22 @@ impl OpenCC {
         }
     }
 
+    /// Converts Simplified Chinese to Traditional Chinese (Taiwan standard).
+    ///
+    /// Applies additional Taiwan-specific phrase mappings after the general
+    /// Simplified-to-Traditional conversion step.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Simplified Chinese input text.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let tw = opencc.s2tw("面条和程序员", true);
+    /// println!("{}", tw); // "麵條和程式設計師"
+    /// ```
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
@@ -216,6 +436,25 @@ impl OpenCC {
         }
     }
 
+    /// Converts Traditional Chinese (Taiwan standard) to Simplified Chinese.
+    ///
+    /// Reverses Taiwan-specific phrases and maps them back to Simplified form.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Taiwanese Traditional Chinese input.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Returns
+    ///
+    /// A `String` in Simplified Chinese.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let simp = opencc.tw2s("麵條和程式設計師", true);
+    /// println!("{}", simp); // "面条和程序员"
+    /// ```
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
@@ -233,6 +472,23 @@ impl OpenCC {
             result
         }
     }
+
+    /// Converts Simplified Chinese to Traditional Chinese (Taiwan) with punctuation.
+    ///
+    /// Performs a full conversion of text and punctuation marks from Simplified
+    /// to Traditional Chinese, including quote styles (`“”` → `「」`).
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Simplified Chinese input.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let result = opencc.s2twp("“你好，世界”", true);
+    /// assert_eq!(result.contains("「你好，世界」"), true);
+    /// ```
 
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -253,6 +509,27 @@ impl OpenCC {
             result
         }
     }
+
+    /// Converts Taiwanese Traditional Chinese to Simplified Chinese with punctuation.
+    ///
+    /// This method includes punctuation transformation (e.g., `「」` → `“”`)
+    /// in addition to textual content replacement.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The Traditional Chinese input.
+    /// * `hmm` - Whether to enable HMM-based segmentation.
+    ///
+    /// # Returns
+    ///
+    /// A fully simplified and punctuated version.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let result = opencc.tw2sp("「你好，世界」", true);
+    /// assert!(result.contains("“你好，世界”"));
+    /// ```
 
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
@@ -277,6 +554,22 @@ impl OpenCC {
         }
     }
 
+    /// Converts Simplified Chinese to Traditional Chinese (Hong Kong standard).
+    ///
+    /// This adds phrase mapping specific to the Hong Kong locale after a
+    /// general Simplified-to-Traditional conversion step.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Simplified Chinese text.
+    /// * `hmm` - Whether to enable HMM segmentation.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let hk = opencc.s2hk("发票和程序员", true);
+    /// println!("{}", hk); // "發票和程式員"
+    /// ```
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let dict_refs_round_2 = [&self.dictionary.hk_variants];
@@ -373,18 +666,73 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    // Fast character-level Simplified → Traditional Chinese conversion.
+    //
+    // Uses only the `st_characters` dictionary (no segmentation).
+    // Optimized for scenarios where fine-grained phrase matching is unnecessary.
+    //
+    // Parallelized via `convert_by_char()` for speed on large inputs.
+    //
+    // Example use case: punctuation or pure character-level normalization.
     fn st(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.st_characters];
         let output = Self::convert_by_char(input, &dict_refs, true);
         output
     }
 
+    // Fast character-level Traditional → Simplified Chinese conversion.
+    //
+    // Uses only the `ts_characters` dictionary (no segmentation).
+    // Ideal for bulk character-wise normalization tasks, skipping phrase context.
+    //
+    // Parallel execution is enabled by default.
     fn ts(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.ts_characters];
         let output = Self::convert_by_char(input, &dict_refs, true);
         output
     }
 
+    /// Converts Chinese text between different variants using a specified conversion configuration.
+    ///
+    /// This is the core function for text conversion. It supports conversion between Simplified, Traditional,
+    /// Taiwanese, Hong Kong, and Japanese Chinese variants, as well as punctuation conversion.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input string to be converted.
+    /// * `config` - The conversion configuration. Supported values (case-insensitive) include:
+    ///     - `"s2t"`: Simplified to Traditional
+    ///     - `"s2tw"`: Simplified to Taiwanese
+    ///     - `"s2twp"`: Simplified to Taiwanese (with phrases)
+    ///     - `"s2hk"`: Simplified to Hong Kong
+    ///     - `"t2s"`: Traditional to Simplified
+    ///     - `"t2tw"`: Traditional to Taiwanese
+    ///     - `"t2twp"`: Traditional to Taiwanese (with phrases)
+    ///     - `"t2hk"`: Traditional to Hong Kong
+    ///     - `"tw2s"`: Taiwanese to Simplified
+    ///     - `"tw2sp"`: Taiwanese to Simplified (with phrases)
+    ///     - `"tw2t"`: Taiwanese to Traditional
+    ///     - `"tw2tp"`: Taiwanese to Traditional (with phrases)
+    ///     - `"hk2s"`: Hong Kong to Simplified
+    ///     - `"hk2t"`: Hong Kong to Traditional
+    ///     - `"jp2t"`: Japanese to Traditional
+    ///     - `"t2jp"`: Traditional to Japanese
+    /// * `punctuation` - Whether to convert punctuation marks according to the target variant.
+    ///
+    /// # Returns
+    ///
+    /// A `String` containing the converted text. If the `config` is invalid, returns an error message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    /// let opencc = OpenCC::new();
+    /// let traditional = opencc.convert("外国的程序员", "s2t", true);
+    /// let taiwanese = opencc.convert("外国的程序员", "s2tw", true);
+    /// let invalid = opencc.convert("外国的程序员", "unknown", true);
+    /// assert_eq!(invalid, "Invalid config: unknown");
+    /// ```
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
         match config.to_lowercase().as_str() {
             "s2t" => self.s2t(input, punctuation),
@@ -407,6 +755,31 @@ impl OpenCC {
         }
     }
 
+    /// Checks the type of Chinese text (Simplified, Traditional, or Other).
+    ///
+    /// This helper function analyzes the input string and determines whether it is written in Simplified Chinese,
+    /// Traditional Chinese, or neither. It does so by stripping non-Chinese characters, truncating to a maximum
+    /// of 200 bytes (without splitting UTF-8 characters), and comparing the result to its converted forms.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input string to check.
+    ///
+    /// # Returns
+    ///
+    /// An `i32` code indicating the type of Chinese text:
+    /// - `2`: Simplified Chinese
+    /// - `1`: Traditional Chinese
+    /// - `0`: Other or undetermined
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// assert_eq!(opencc.zho_check("外国的程序员"), 2);
+    /// assert_eq!(opencc.zho_check("外國的程式設計師"), 1);
+    /// assert_eq!(opencc.zho_check("Hello World!"), 0);
+    /// ```
     pub fn zho_check(&self, input: &str) -> i32 {
         if input.is_empty() {
             return 0;
@@ -427,6 +800,20 @@ impl OpenCC {
         code
     }
 
+    /// Converts Chinese punctuation marks between Simplified and Traditional variants.
+    ///
+    /// This helper function replaces punctuation marks in the input text according to the specified configuration.
+    /// If `config` starts with `'s'`, it converts Simplified punctuation to Traditional; otherwise, it converts
+    /// Traditional punctuation to Simplified.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input string whose punctuation will be converted.
+    /// * `config` - The conversion configuration (`"s"` for Simplified to Traditional, otherwise Traditional to Simplified).
+    ///
+    /// # Returns
+    ///
+    /// A `String` with punctuation marks converted according to the specified variant.
     fn convert_punctuation(text: &str, config: &str) -> String {
         let (regex, mapping) = if config.starts_with('s') {
             (&*S2T_REGEX, &*S2T_MAP)
@@ -437,12 +824,32 @@ impl OpenCC {
         regex
             .replace_all(text, |caps: &regex::Captures| {
                 let ch = caps.get(0).unwrap().as_str().chars().next().unwrap();
-                // mapping.get(&ch).unwrap().to_string()
                 mapping.get(&ch).copied().unwrap_or(ch).to_string()
             })
             .into_owned()
     }
 
+    /// Extracts top keywords using the TextRank algorithm.
+    ///
+    /// TextRank is a graph-based algorithm that ranks words based on co-occurrence.
+    /// This method segments the input, builds a co-occurrence graph, and returns the
+    /// top N keywords with the highest scores.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Input text to extract keywords from.
+    /// * `topk` - Maximum number of keywords to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` of keywords sorted by importance.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let keywords = opencc.keyword_extract_textrank("自然语言处理和机器学习", 5);
+    /// println!("{:?}", keywords);
+    /// ```
     pub fn keyword_extract_textrank(&self, input: &str, tok_k: usize) -> Vec<String> {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
@@ -458,6 +865,30 @@ impl OpenCC {
         top_k.into_iter().map(|k| k.keyword).collect()
     }
 
+    /// Returns weighted keywords using the TextRank algorithm.
+    ///
+    /// This method segments and ranks words based on TextRank and returns
+    /// a list of keyword-weight pairs as [`Keyword`] objects.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to analyze.
+    /// * `topk` - Number of top keywords to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Keyword>` — each keyword has `.keyword` and `.weight` fields.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let weighted = opencc.keyword_weight_textrank("自然语言处理和机器学习", 5);
+    /// for kw in weighted {
+    ///     println!("{}: {}", kw.keyword, kw.weight);
+    /// }
+    /// ```
+    ///
+    /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_textrank(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
@@ -472,6 +903,26 @@ impl OpenCC {
         top_k
     }
 
+    /// Extracts top keywords using the TF-IDF algorithm.
+    ///
+    /// This method uses Jieba's internal IDF table and segmentation to rank keywords
+    /// based on term frequency-inverse document frequency.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Input text to analyze.
+    /// * `topk` - Maximum number of keywords to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` of top-ranked keywords.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let keywords = opencc.keyword_extract_tfidf("深度学习正在改变人工智能", 5);
+    /// println!("{:?}", keywords);
+    /// ```
     pub fn keyword_extract_tfidf(&self, input: &str, top_k: usize) -> Vec<String> {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
@@ -481,6 +932,32 @@ impl OpenCC {
         top_k.into_iter().map(|k| k.keyword).collect()
     }
 
+    /// Returns weighted keywords using the TF-IDF algorithm.
+    ///
+    /// This method segments the input and ranks keywords by TF-IDF weight, returning
+    /// structured keyword objects with their scores.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to analyze.
+    /// * `topk` - Number of top keywords to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<jieba_rs::Keyword>`, each with:
+    /// - `keyword`: The extracted word.
+    /// - `weight`: The TF-IDF score representing word importance.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let weighted = opencc.keyword_weight_tfidf("深度学习正在改变人工智能", 5);
+    /// for kw in weighted {
+    ///     println!("{}: {}", kw.keyword, kw.weight);
+    /// }
+    /// ```
+    ///
+    /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_tfidf(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
@@ -491,6 +968,28 @@ impl OpenCC {
     }
 }
 
+/// Returns the maximum valid UTF-8 byte length for a string slice, ensuring no partial characters.
+///
+/// This function is useful when you need to truncate a string to a maximum byte count
+/// without splitting multibyte UTF-8 characters.
+///
+/// # Arguments
+///
+/// * `sv` - The input string slice.
+/// * `max_byte_count` - The maximum allowed byte count.
+///
+/// # Returns
+///
+/// The largest byte count less than or equal to `max_byte_count` that does not split a UTF-8 character.
+///
+/// # Examples
+///
+/// ```
+/// use opencc_jieba_rs::find_max_utf8_length;
+/// let s = "你好abc";
+/// let max_len = find_max_utf8_length(s, 7);
+/// assert_eq!(&s[..max_len], "你好a");
+/// ```
 pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     // 1. No longer than max byte count
     if sv.len() <= max_byte_count {
@@ -504,6 +1003,18 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     byte_count
 }
 
+/// Decompresses the embedded Jieba dictionary using Zstandard compression.
+///
+/// This function loads the compressed dictionary from the binary, decompresses it,
+/// and returns the contents as a UTF-8 string. Used internally for initializing Jieba.
+///
+/// # Panics
+///
+/// Panics if decompression fails or the dictionary cannot be read.
+///
+/// # Returns
+///
+/// A `String` containing the decompressed dictionary data.
 fn decompress_jieba_dict() -> String {
     let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
     let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");

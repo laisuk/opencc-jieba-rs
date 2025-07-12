@@ -23,24 +23,6 @@ A Rust-based Chinese text converter that performs word segmentation using **Jieb
 
 ---
 
-### 🔐 SHA256 Checksums
-
-| Platform | File Name                           | SHA256                                                             |
-|----------|-------------------------------------|--------------------------------------------------------------------|
-| Windows  | `opencc-jieba-v0.5.0-win-x64.zip`   | `10ef6ff21e1b93b85364345f84ab582b4ea3798eb884f00ce7d13358b4bfdbf9` |
-| macOS    | `opencc-jieba-v0.5.0-osx-x64.zip`   | `757c7d409180a761337883cbce7787dd57cfd4bf7afd4a9e1b5036d0a33ae5f5` |
-| Linux    | `opencc-jieba-v0.5.0-linux-x64.zip` | `601ba59c132c2e0a69f1e3c2f160742a892c4249693871cd026dc2b1e2cf2bde` |
-
----
-
-To verify the integrity of a downloaded file:
-
-```bash
-sha256sum opencc-jieba-v0.5.0-win-x64.zip
-```
-
-Compare the output with the SHA256 checksums listed above
-
 ## Installation
 
 ```bash

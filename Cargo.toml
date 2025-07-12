@@ -1,10 +1,39 @@
-workspace = { members = [ "capi/opencc_jieba_capi", "tools/dict-generate","tools/opencc-clip-jieba", "tools/opencc-jieba"] }
+[workspace]
+members = [
+    "capi/opencc_jieba_capi",
+    "tools/dict-generate",
+    "tools/opencc-clip-jieba",
+    "tools/opencc-jieba"
+]
+
 [package]
 name = "opencc-jieba-rs"
 version = "0.6.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Laisuk Lai <laisuk@yahoo.com>"]
+description = "High-performance Chinese text conversion and segmentation using Jieba and OpenCC-style dictionaries."
+license = "MIT"
+repository = "https://github.com/laisuk/opencc-jieba-rs"
+homepage = "https://github.com/laisuk/opencc-jieba-rs"
+documentation = "https://docs.rs/opencc-jieba-rs"
+readme = "README.md"
+keywords = ["chinese", "jieba", "opencc", "nlp", "text-processing"]
+categories = ["text-processing", "internationalization", "command-line-utilities"]
+exclude = [
+    "/.github",
+    "/tools/",
+    "/capi/",
+    "/target/",
+    "/benches/",
+    "/examples/",
+    "/tests/",
+    "/python/",
+    "*.md",
+    "*.yml",
+    "*.bak",
+    "*.bka",
+    "*.orig"
+]
 
 [dependencies]
 jieba-rs = { version = "0.7.3", features = ["tfidf", "textrank"] }
@@ -16,11 +45,13 @@ zstd = "0.13.3"
 once_cell = "1.21.3"
 
 [profile.release]
-opt-level = 3            # Maximize speed (better suited for C API performance)
-codegen-units = 1          # Optimize across the entire codebase for better performance
-lto = "fat"                # Full Link Time Optimization for improved binary performance
-panic = "abort"            # Prevents Rust panics from unwinding, reducing binary size
-#incremental = false        # Disable incremental builds to fully optimize the release binary
-strip = "symbols"          # Strips debug symbols while retaining export symbols needed for the C API
-debug = 0                  # No debug info in the final binary to reduce size
-#crt-static = false         # Ensures the C runtime is linked dynamically (important for shared libraries)
+opt-level = 3              # Maximize speed (better suited for C API performance)
+codegen-units = 1          # Optimize across the entire codebase
+lto = "fat"                # Full Link Time Optimization
+panic = "abort"            # Reduces binary size and prevents unwinding
+strip = "symbols"          # Strips debug symbols, retains exportable C symbols
+debug = 0                  # No debug info to minimize size
+# crt-static = false       # Uncomment to link dynamically to C runtime if needed
+
+[badges]
+maintenance = { status = "actively-developed" }

@@ -10,27 +10,47 @@ use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
 use zstd::Encoder;
 
+/// Represents a collection of various Chinese character and phrase mappings
+/// used for conversion between Simplified, Traditional, Taiwanese, Hong Kong,
+/// and Japanese variants.
 #[derive(Serialize, Deserialize)]
 pub struct Dictionary {
+    /// Simplified to Traditional character mappings.
     pub st_characters: HashMap<String, String>,
+    /// Simplified to Traditional phrase mappings.
     pub st_phrases: HashMap<String, String>,
+    /// Traditional to Simplified character mappings.
     pub ts_characters: HashMap<String, String>,
+    /// Traditional to Simplified phrase mappings.
     pub ts_phrases: HashMap<String, String>,
+    /// Taiwanese phrase mappings.
     pub tw_phrases: HashMap<String, String>,
+    /// Reverse Taiwanese phrase mappings.
     pub tw_phrases_rev: HashMap<String, String>,
+    /// Taiwanese variant mappings.
     pub tw_variants: HashMap<String, String>,
+    /// Reverse Taiwanese variant mappings.
     pub tw_variants_rev: HashMap<String, String>,
+    /// Reverse Taiwanese variant phrase mappings.
     pub tw_variants_rev_phrases: HashMap<String, String>,
+    /// Hong Kong variant mappings.
     pub hk_variants: HashMap<String, String>,
+    /// Reverse Hong Kong variant mappings.
     pub hk_variants_rev: HashMap<String, String>,
+    /// Reverse Hong Kong variant phrase mappings.
     pub hk_variants_rev_phrases: HashMap<String, String>,
+    /// Japanese Shinjitai character mappings.
     pub jps_characters: HashMap<String, String>,
+    /// Japanese Shinjitai phrase mappings.
     pub jps_phrases: HashMap<String, String>,
+    /// Japanese variant mappings.
     pub jp_variants: HashMap<String, String>,
+    /// Reverse Japanese variant mappings.
     pub jp_variants_rev: HashMap<String, String>,
 }
 
 impl Default for Dictionary {
+    /// Creates a new, empty `Dictionary` with all mappings initialized.
     fn default() -> Self {
         Dictionary {
             st_characters: HashMap::new(),
@@ -54,6 +74,10 @@ impl Default for Dictionary {
 }
 
 impl Dictionary {
+    /// Loads the dictionary from a compressed JSON file embedded in the binary.
+    ///
+    /// # Panics
+    /// Panics if decompression or deserialization fails.
     pub fn new() -> Self {
         const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
 
@@ -70,6 +94,10 @@ impl Dictionary {
         })
     }
 
+    /// Loads the dictionary from individual text files in the `dicts` directory.
+    ///
+    /// # Errors
+    /// Returns the default dictionary if any file fails to load or parse.
     pub fn from_dicts() -> Self {
         let load = Self::load_dictionary_from_path;
 
@@ -136,6 +164,12 @@ impl Dictionary {
         }
     }
 
+    /// Loads a dictionary mapping from a file at the given path.
+    ///
+    /// Each line should contain a phrase and its translation separated by whitespace.
+    ///
+    /// # Errors
+    /// Returns an `io::Error` if the file cannot be read.
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<HashMap<String, String>>
     where
         P: AsRef<Path>,
@@ -159,6 +193,14 @@ impl Dictionary {
         Ok(dictionary)
     }
 
+    /// Saves the dictionary to a file in compressed JSON format using Zstandard.
+    ///
+    /// # Arguments
+    /// * `dictionary` - The dictionary to save.
+    /// * `path` - The file path to write to.
+    ///
+    /// # Errors
+    /// Returns an `io::Error` if writing fails.
     pub fn save_compressed(dictionary: &Dictionary, path: &str) -> Result<(), io::Error> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
@@ -168,7 +210,13 @@ impl Dictionary {
         Ok(())
     }
 
-    // Function to serialize Dictionary to JSON and write it to a file
+    /// Serializes the dictionary to a JSON file.
+    ///
+    /// # Arguments
+    /// * `filename` - The file path to write to.
+    ///
+    /// # Errors
+    /// Returns an `io::Error` if writing fails.
     pub fn serialize_to_json(&self, filename: &str) -> io::Result<()> {
         let json_string = serde_json::to_string(&self)?;
         let mut file = File::create(filename)?;
