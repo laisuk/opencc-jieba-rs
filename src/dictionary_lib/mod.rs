@@ -93,10 +93,31 @@ impl Dictionary {
         })
     }
 
-    /// Loads the dictionary from individual text files in the `dicts` directory.
+    /// Loads all conversion dictionaries from raw `.txt` files in the `dicts/` directory.
+    ///
+    /// This method is intended for **power users** who want to build the full [`Dictionary`]
+    /// structure from source text files rather than using the precompiled `.zst` versions.
+    ///
+    /// The following files must exist under the `dicts/` directory:
+    /// - STCharacters.txt, STPhrases.txt, TSCharacters.txt, TSPhrases.txt
+    /// - TWPhrases.txt, TWPhrasesRev.txt, TWVariants.txt, TWVariantsRev.txt, TWVariantsRevPhrases.txt
+    /// - HKVariants.txt, HKVariantsRev.txt, HKVariantsRevPhrases.txt
+    /// - JPShinjitaiCharacters.txt, JPShinjitaiPhrases.txt, JPVariants.txt, JPVariantsRev.txt
+    ///
+    /// # Note
+    /// - These `.txt` files are **not included** in the published crate on crates.io.
+    /// - To use this function, clone the repository from GitHub and ensure the `dicts/` folder is present.
     ///
     /// # Errors
-    /// Returns the default dictionary if any file fails to load or parse.
+    /// Panics if any file is missing or fails to load.
+    /// Returns the default [`Dictionary`] instance only if `.unwrap()` is replaced by fallible handling.
+    ///
+    /// # Intended Use
+    /// - Testing custom dictionary edits.
+    /// - Regenerating runtime `.zst` dictionary packages.
+    /// - Debugging dictionary mapping issues.
+    ///
+    /// [`Dictionary`]: Dictionary
     pub fn from_dicts() -> Self {
         let load = Self::load_dictionary_from_path;
 
