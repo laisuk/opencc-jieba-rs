@@ -22,7 +22,7 @@ categories = ["text-processing", "internationalization", "command-line-utilities
 include = [
     "src/**/*.rs",
     "src/dictionary_lib/dicts/*.zst",
-    "./Cargo.toml",
+    "Cargo.toml",
     "README.md",
     "LICENSE"
 ]
