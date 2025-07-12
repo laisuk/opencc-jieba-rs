@@ -24,9 +24,9 @@ conversion.
 
 ### 🔽 Downloads
 
-- [Windows (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.5.0-win-x64.zip)
-- [macOS (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.5.0-osx-x64.zip)
-- [Linux (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.5.0-linux-x64.zip)
+- [Windows (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-win-x64.zip)
+- [macOS (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-osx-x64.zip)
+- [Linux (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-linux-x64.zip)
 
 ---
 
