@@ -18,8 +18,8 @@
 //! use opencc_jieba_rs::OpenCC;
 //!
 //! let opencc = OpenCC::new();
-//! let s = opencc.s2t("外国的程序员", true);
-//! println!("{}", s); // -> "外國的程序員"
+//! let s = opencc.s2t("“春眠不觉晓，处处闻啼鸟。”", true);
+//! println!("{}", s); // -> "「春眠不覺曉，處處聞啼鳥。」"
 //! ```
 //!
 //! ## Use Cases
@@ -88,8 +88,8 @@ const PARALLEL_THRESHOLD: usize = 1000;
 /// use opencc_jieba_rs::OpenCC;
 ///
 /// let opencc = OpenCC::new();
-/// let result = opencc.s2t("外国的程序员", true);
-/// assert_eq!(result, "外國的程序員");
+/// let result = opencc.s2t("“春眠不觉晓，处处闻啼鸟。”", true);
+/// assert_eq!(result, "「春眠不覺曉，處處聞啼鳥。」");
 /// ```
 ///
 /// # Features
@@ -124,8 +124,8 @@ impl OpenCC {
     /// let opencc = OpenCC::new();
     /// ```
     pub fn new() -> Self {
-        let dict_hans_hant_txt = decompress_jieba_dict();
-        let mut dict_hans_hant = BufReader::new(dict_hans_hant_txt.as_bytes());
+        let dict_hans_hant_bytes = decompress_jieba_dict();
+        let mut dict_hans_hant = BufReader::new(Cursor::new(dict_hans_hant_bytes));
         let jieba = Arc::new(Jieba::with_dict(&mut dict_hans_hant).unwrap());
         let dictionary = Dictionary::new();
 
@@ -315,7 +315,7 @@ impl OpenCC {
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let tokens = opencc.jieba_cut("南京市长江大桥", true);
-    /// assert!(tokens.contains(&"南京市".to_string()));
+    /// assert!(tokens.contains(&"南京市".to_string()));  // "南京市/长江大桥"
     /// ```
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
@@ -339,7 +339,7 @@ impl OpenCC {
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let joined = opencc.jieba_cut_and_join("南京市长江大桥", true, " ");
-    /// println!("{}", joined); // -> "南京市 长江 大桥"
+    /// println!("{}", joined); // -> "南京市 长江大桥"
     /// ```
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
         self.jieba_cut(input, hmm).join(delimiter)
@@ -362,8 +362,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let s = opencc.s2t("外国的程序员", true);
-    /// assert_eq!(s, "外國的程序員");
+    /// let s = opencc.s2t("“春眠不觉晓，处处闻啼鸟。”", true);
+    /// assert_eq!(s, "「春眠不覺曉，處處聞啼鳥。」");
     /// ```
     pub fn s2t(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -392,8 +392,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let s = opencc.t2s("外國的程序員", true);
-    /// assert_eq!(s, "外国的程序员");
+    /// let s = opencc.t2s("「春眠不覺曉，處處聞啼鳥。」", true);
+    /// assert_eq!(s, "“春眠不觉晓，处处闻啼鸟。”");
     /// ```
     pub fn t2s(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
@@ -418,8 +418,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let tw = opencc.s2tw("面条和程序员", true);
-    /// println!("{}", tw); // "麵條和程序設計師"
+    /// let tw = opencc.s2tw("“春眠不觉晓，处处闻啼鸟。”", true);
+    /// println!("{}", tw); // "「春眠不覺曉，處處聞啼鳥。」"
     /// ```
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -452,8 +452,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let simp = opencc.tw2s("麵條和程式設計師", true);
-    /// println!("{}", simp); // "面条和程序员"
+    /// let simp = opencc.tw2s("「春眠不覺曉，處處聞啼鳥。」", true);
+    /// println!("{}", simp); // "“春眠不觉晓，处处闻啼鸟。”"
     /// ```
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
@@ -527,8 +527,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let result = opencc.tw2sp("「你好，世界」", true);
-    /// assert!(result.contains("“你好，世界”"));
+    /// let result = opencc.tw2sp("「春眠不覺曉，處處聞啼鳥。」", true);
+    /// assert!(result.contains("“春眠不觉晓，处处闻啼鸟。”"));
     /// ```
 
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
@@ -567,8 +567,8 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let hk = opencc.s2hk("发票和程序员", true);
-    /// println!("{}", hk); // "發票和程序員"
+    /// let hk = opencc.s2hk("“春眠不觉晓，处处闻啼鸟。”", true);
+    /// println!("{}", hk); // "「春眠不覺曉，處處聞啼鳥。」"
     /// ```
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
@@ -728,9 +728,9 @@ impl OpenCC {
     /// ```
     /// use opencc_jieba_rs::OpenCC;
     /// let opencc = OpenCC::new();
-    /// let traditional = opencc.convert("外国的程序员", "s2t", true);
-    /// let taiwanese = opencc.convert("外国的程序员", "s2tw", true);
-    /// let invalid = opencc.convert("外国的程序员", "unknown", true);
+    /// let traditional = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "s2t", true);
+    /// let taiwanese = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "s2tw", true);
+    /// let invalid = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "unknown", true);
     /// assert_eq!(invalid, "Invalid config: unknown");
     /// ```
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
@@ -776,8 +776,8 @@ impl OpenCC {
     ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.zho_check("外国的程序员"), 2);
-    /// assert_eq!(opencc.zho_check("外國的程式設計師"), 1);
+    /// assert_eq!(opencc.zho_check("“春眠不觉晓，处处闻啼鸟。”"), 2);
+    /// assert_eq!(opencc.zho_check("「春眠不覺曉，處處聞啼鳥。」"), 1);
     /// assert_eq!(opencc.zho_check("Hello World!"), 0);
     /// ```
     pub fn zho_check(&self, input: &str) -> i32 {
@@ -1005,22 +1005,25 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
 
 /// Decompresses the embedded Jieba dictionary using Zstandard compression.
 ///
-/// This function loads the compressed dictionary from the binary, decompresses it,
-/// and returns the contents as a UTF-8 string. Used internally for initializing Jieba.
+/// This function loads the compressed dictionary from the binary (`DICT_HANS_HANT_ZSTD`),
+/// decompresses it using the `zstd` crate, and returns the raw bytes of the dictionary
+/// data without performing UTF-8 validation or conversion.
+///
+/// This is used internally for initializing Jieba with a dictionary reader.
 ///
 /// # Panics
 ///
-/// Panics if decompression fails or the dictionary cannot be read.
+/// Panics if decompression fails or the dictionary cannot be read into memory.
 ///
 /// # Returns
 ///
-/// A `String` containing the decompressed dictionary data.
-fn decompress_jieba_dict() -> String {
+/// A `Vec<u8>` containing the decompressed dictionary data as raw bytes.
+fn decompress_jieba_dict() -> Vec<u8> {
     let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
     let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
-    let mut decompressed = String::new();
+    let mut decompressed = Vec::new();
     decoder
-        .read_to_string(&mut decompressed)
+        .read_to_end(&mut decompressed)
         .expect("Failed to decompress dictionary");
     decompressed
 }
