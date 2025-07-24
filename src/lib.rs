@@ -244,45 +244,43 @@ impl OpenCC {
 
     /// Splits text into non-overlapping ranges between delimiter characters.
     ///
-    /// Each `Range<usize>` corresponds to a segment bounded by or ending at a delimiter,
-    /// depending on the `inclusive` parameter.
+    /// Each `Range<usize>` corresponds to a segment bounded by or ending at a delimiter.
     ///
-    /// - If `inclusive` is true, the delimiter is included at the end of each range.
-    /// - If `inclusive` is false, the delimiter starts the next range (excluded from current).
+    /// - If `inclusive` is true, the delimiter is included at the end of each content range.
+    /// - If `inclusive` is false, content segments and delimiter segments are separate ranges.
     ///
-    /// Example:
-    ///   Input:  "你好，世界！Rust不错。"
-    ///   Output (inclusive=true):  vec![0..9, 9..18, 18..27, ...]
-    ///   Output (inclusive=false): vec![0..6, 6..15, 15..24, ...]
-    fn split_string_ranges(&self, text: &str, inclusive: bool) -> Vec<Range<usize>> {
+    /// Example: "Hello,World!"
+    ///   Output (inclusive=true):  vec![0..6, 6..12] ("Hello,", "World!")
+    ///   Output (inclusive=false): vec![0..5, 5..6, 6..11, 11..12] ("Hello", ",", "World", "!")
+    pub fn split_string_ranges(&self, text: &str, inclusive: bool) -> Vec<Range<usize>> {
         let mut ranges = Vec::new();
-        let char_indices: Vec<(usize, char)> = text.char_indices().collect();
-        let mut start = 0;
+        let mut current_segment_start = 0;
 
-        for (i, &(_, ch)) in char_indices.iter().enumerate() {
+        // Iterate directly over char_indices for efficiency
+        for (byte_idx, ch) in text.char_indices() {
             if DELIMITER_SET.contains(&ch) {
-                let ch_start = char_indices[i].0;
-                let ch_end = if i + 1 < char_indices.len() {
-                    char_indices[i + 1].0
-                } else {
-                    text.len()
-                };
+                // Get the end byte index of the current character (delimiter)
+                let ch_len = ch.len_utf8();
+                let ch_end = byte_idx + ch_len;
 
                 if inclusive {
-                    ranges.push(start..ch_end);
+                    // Include the delimiter at the end of the current content segment
+                    ranges.push(current_segment_start..ch_end);
                 } else {
-                    if start < ch_start {
-                        ranges.push(start..ch_start);
+                    // Exclusive: Content segment (if any)
+                    if current_segment_start < byte_idx {
+                        ranges.push(current_segment_start..byte_idx); // Content before delimiter
                     }
-                    ranges.push(ch_start..ch_end);
+                    // Exclusive: Delimiter itself as a separate range
+                    ranges.push(byte_idx..ch_end);
                 }
-
-                start = ch_end; // Moved out safely
+                current_segment_start = ch_end; // Advance start for the next segment
             }
         }
 
-        if start < text.len() {
-            ranges.push(start..text.len());
+        // Add the last segment if it's not empty and the string didn't end with a delimiter
+        if current_segment_start < text.len() {
+            ranges.push(current_segment_start..text.len());
         }
 
         ranges
