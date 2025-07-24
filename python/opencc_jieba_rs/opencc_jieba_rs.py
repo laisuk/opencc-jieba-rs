@@ -16,12 +16,12 @@ else:
 
 
 class OpenCC:
+    config_list = [
+        "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "tw2t", "t2twp", "tw2t", "tw2tp",
+        "t2hk", "hk2t", "t2jp", "jp2t"
+    ]
     def __init__(self, config=None):
-        config_list = [
-            "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "tw2t", "t2twp", "tw2t", "tw2tp",
-            "t2hk", "hk2t", "t2jp", "jp2t"
-        ]
-        self.config = config if config in config_list else "s2t"
+        self.config = config if config in self.config_list else "s2t"
         # Load the DLL
         dll_path = os.path.join(os.path.dirname(__file__), DLL_FILE)
         self.lib = ctypes.CDLL(dll_path)
@@ -59,6 +59,12 @@ class OpenCC:
             if hasattr(self, 'lib') and hasattr(self.lib, 'opencc_jieba_delete'):
                 self.lib.opencc_jieba_delete(self.opencc_instance)
             self.opencc_instance = None # Mark as freed
+
+    def set_config(self, config):
+        self.config = config if config in self.config_list else "s2t"
+
+    def get_config(self):
+        return self.config
 
     def convert(self, text, punctuation=False):
         if self.opencc_instance is None:

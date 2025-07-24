@@ -165,7 +165,7 @@ impl OpenCC {
         dictionaries: &'a [&HashMap<String, String>],
         hmm: bool,
     ) -> String {
-        let ranges = self.split_string_ranges(input);
+        let ranges = self.split_string_ranges(input, true);
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
 
         let process_range = |range: Range<usize>| {
@@ -242,30 +242,42 @@ impl OpenCC {
         }
     }
 
-    // Splits text into non-overlapping ranges between delimiter characters.
-    //
-    // Each `Range<usize>` corresponds to a segment bounded by or ending at a delimiter.
-    // This allows efficient chunk-based processing (e.g., phrase segmentation or dictionary conversion)
-    // without repeatedly scanning the whole string.
-    //
-    // Example:
-    //   Input:  "你好，世界！Rust不错。"
-    //   Output: vec![0..9, 9..18, 18..27, ...]  (based on char boundary positions)
-    fn split_string_ranges(&self, text: &str) -> Vec<Range<usize>> {
+    /// Splits text into non-overlapping ranges between delimiter characters.
+    ///
+    /// Each `Range<usize>` corresponds to a segment bounded by or ending at a delimiter,
+    /// depending on the `inclusive` parameter.
+    ///
+    /// - If `inclusive` is true, the delimiter is included at the end of each range.
+    /// - If `inclusive` is false, the delimiter starts the next range (excluded from current).
+    ///
+    /// Example:
+    ///   Input:  "你好，世界！Rust不错。"
+    ///   Output (inclusive=true):  vec![0..9, 9..18, 18..27, ...]
+    ///   Output (inclusive=false): vec![0..6, 6..15, 15..24, ...]
+    fn split_string_ranges(&self, text: &str, inclusive: bool) -> Vec<Range<usize>> {
         let mut ranges = Vec::new();
         let char_indices: Vec<(usize, char)> = text.char_indices().collect();
-
         let mut start = 0;
 
         for (i, &(_, ch)) in char_indices.iter().enumerate() {
             if DELIMITER_SET.contains(&ch) {
-                let end = if i + 1 < char_indices.len() {
+                let ch_start = char_indices[i].0;
+                let ch_end = if i + 1 < char_indices.len() {
                     char_indices[i + 1].0
                 } else {
                     text.len()
                 };
-                ranges.push(start..end);
-                start = end;
+
+                if inclusive {
+                    ranges.push(start..ch_end);
+                } else {
+                    if start < ch_start {
+                        ranges.push(start..ch_start);
+                    }
+                    ranges.push(ch_start..ch_end);
+                }
+
+                start = ch_end; // Moved out safely
             }
         }
 
@@ -279,7 +291,7 @@ impl OpenCC {
     // Performs Jieba-based phrase segmentation over each non-delimiter chunk.
     // Used internally for consistent pre-segmentation before conversion or keyword extraction.
     fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
-        let ranges = self.split_string_ranges(input);
+        let ranges = self.split_string_ranges(input, true);
 
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
