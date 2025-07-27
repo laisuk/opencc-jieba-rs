@@ -44,7 +44,7 @@ The CLI tool will be located at:
 target/release/opencc-jieba
 ```
 
-## Usage: convert
+## Usage: `opencc-jieba convert`
 
 ```
 opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
@@ -65,7 +65,7 @@ Options:
 
 ```
 
-## Usage: segment
+## Usage: `opencc-jieba segment`
 
 ```
 opencc-jieba segment: Segment Chinese input text into words
@@ -81,6 +81,26 @@ Options:
   -h, --help                Print help
 ```
 
+## Usage: `opencc-jieba office`
+
+Supported Office formats: `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods`, `.odp`, `.epub`
+
+```
+opencc-jieba office: Convert Office or EPUB documents using OpenCC
+
+Usage: opencc-jieba.exe office [OPTIONS] --config <config>
+
+Options:
+  -i, --input <file>     Input <file> (use stdin if omitted for non-office documents)
+  -o, --output <file>    Output <file> (use stdout if omitted for non-office documents)
+  -c, --config <config>  Conversion configuration <config> [possible values: s2t, t2s, s2tw, tw2s, s2twp, tw2sp, s2hk, hk2s, t2tw, t2twp, t2hk, tw2t, tw2tp, hk2t, t2jp, jp2t]
+  -p, --punct            Enable punctuation conversion
+  -f, --format <ext>     Force office document format <ext>: docx, xlsx, pptx odt, ods, odp, epub
+      --keep-font        Preserve original font styles
+      --auto-ext         Infer format from file extension
+  -h, --help             Print help
+```
+
 ### Example
 
 ```bash
@@ -89,6 +109,9 @@ opencc-jieba convert -i input.txt -o output.txt --config s2t
 
 # Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
 opencc-jieba convert -i input.txt -o output.txt --config tw2s
+
+# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese with idioms
+opencc-jieba office -i input.docx -o output.docx --config tw2sp --punct --format docx --keep-font
 
 # Segment text file contents then output to new file
 opencc-jieba segment -i input.txt -o output.txt --delim ","
@@ -107,6 +130,8 @@ opencc-jieba segment -i input.txt -o output.txt --delim ","
 
 By default, it uses OpenCC's built-in lexicon paths. You can also provide your own lexicon folder as the fourth
 argument.
+
+---
 
 ## Library Usage
 
@@ -128,6 +153,8 @@ fn main() {
     println!("{}", output); // -> "這是一個測試"
 }
 ```
+
+---
 
 ## C API Usage (`opencc_jieba_capi`)
 
@@ -178,12 +205,16 @@ Converted Code: 1
 - `opencc_jieba_delete(...)` must be called to free OpenCC instance.
 - `opencc_jieba_zho_check(...)` to detect zh-Hant (1), zh-Hans (2), others (0).
 
+---
+
 ## Project Structure
 
 - `src/lib.rs` – Main library with segmentation logic.
 - `capi/opencc-jieba-capi` C API source and demo.
 - `tools/opencc-jieba/src/main.rs` – CLI tool (`opencc-cs`) implementation.
 - `dicts/` – OpenCC text lexicons which converted into JSON format.
+
+---
 
 ## Dictionary compression (ZStd)
 
@@ -199,9 +230,7 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 > The runtime uses .zst files generated with zstd.  
 > These are included in the crate, but the .txt source files are not.
 
-## Feature Flags
-
-- `build-dict`: Enable dictionary building from raw `.txt` files via `from_dicts()`.
+---
 
 ## Credits
 
