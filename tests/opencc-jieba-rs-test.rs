@@ -154,6 +154,6 @@ mod tests {
         let input = include_str!("../src/OneDay.txt");
         let opencc = OpenCC::new();
         let output = opencc.keyword_weight_tfidf(input, 10);
-        println!("TextRank: {:?}", output);
+        println!("TF-IDF: {:?}", output);
     }
 }

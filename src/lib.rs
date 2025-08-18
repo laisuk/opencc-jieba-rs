@@ -132,33 +132,44 @@ impl OpenCC {
         OpenCC { jieba, dictionary }
     }
 
-    // Performs dictionary-based phrase-level conversion with fallback character-level mapping.
-    //
-    // This is the core logic for segmenting and converting input text using Jieba and multiple
-    // dictionaries. It supports both phrase-level and character-level matching across segmented
-    // chunks, and can operate in parallel if the input is large.
-    //
-    // ## Workflow:
-    // 1. Split input into ranges based on delimiters (e.g., punctuation).
-    // 2. For each range, perform Jieba segmentation (`cut`) with or without HMM.
-    // 3. For each segmented phrase:
-    //    - If it's a known delimiter, return as-is.
-    //    - Else, lookup phrase in each dictionary (short-circuiting on first match).
-    //    - If not found in any dictionary, fallback to per-character conversion.
-    //
-    // ## Parallelism:
-    // - Enabled if input length ≥ `PARALLEL_THRESHOLD`.
-    // - Each range is processed in parallel and results are flattened into a single `String`.
-    //
-    // # Arguments
-    // - `input`: The input text to convert.
-    // - `dictionaries`: Slice of reference-to-dictionaries (ordered by priority).
-    // - `hmm`: Whether to enable HMM in Jieba segmentation.
-    //
-    // # Returns
-    // - A fully converted `String`, combining segment-level and character-level replacements.
-    //
-    // Example use cases: s2t, t2s, s2tw conversions with phrase-first dictionary application.
+    /// Performs dictionary-based phrase-level conversion with character-level fallback.
+    ///
+    /// This is the core logic for converting text using Jieba segmentation and one or more
+    /// dictionaries. Tokens are matched against phrase dictionaries in priority order, with
+    /// a per-character fallback when no phrase match exists.
+    ///
+    /// ## Workflow
+    /// 1. Split the input into ranges based on delimiters (punctuation, whitespace, etc.).
+    /// 2. For each range, segment with Jieba (`cut`) with or without HMM.
+    /// 3. For each token:
+    ///    - If it is a known delimiter, return it unchanged.
+    ///    - Otherwise, look it up in each dictionary (short-circuiting on the first match).
+    ///    - If no match is found, fall back to character-by-character conversion (in-place).
+    ///
+    /// ## Parallelism
+    /// - If the input length ≥ `PARALLEL_THRESHOLD`, ranges are processed in parallel
+    ///   and concatenated into the output.
+    /// - For shorter inputs, ranges are processed serially to avoid overhead.
+    ///
+    /// # Arguments
+    /// * `input` - The input text to convert.
+    /// * `dictionaries` - Slice of dictionary references, ordered by priority.
+    /// * `hmm` - Whether to enable HMM mode in Jieba segmentation.
+    ///
+    /// # Returns
+    /// A fully converted `String`, combining phrase-level and character-level replacements.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// // Simplified → Traditional with phrase-first matching
+    /// let opencc = OpenCC::new();
+    /// let out = opencc.phrases_cut_convert(
+    ///     "汉字转换示例",
+    ///     &[&dict_phrases, &dict_chars],
+    ///     false,
+    /// );
+    /// assert!(out.contains("漢字"));
+    /// ```
     fn phrases_cut_convert<'a>(
         &'a self,
         input: &'a str,
@@ -170,75 +181,108 @@ impl OpenCC {
 
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
-            self.jieba
-                .cut(chunk, hmm)
-                .into_iter()
-                .map(|phrase| {
-                    let mut chars = phrase.chars();
-                    if let (Some(c), None) = (chars.next(), chars.next()) {
-                        if DELIMITER_SET.contains(&c) {
-                            return phrase.to_string();
-                        }
-                    }
+            let tokens = self.jieba.cut(chunk, hmm);
 
-                    for dict in dictionaries {
-                        if let Some(translated) = dict.get(phrase) {
-                            return translated.clone();
-                        }
-                    }
+            // Heuristic: output ~= input in length
+            let mut out = String::with_capacity(chunk.len());
 
-                    Self::convert_by_char(phrase, dictionaries, false)
-                })
-                .collect::<Vec<String>>()
+            'tok: for phrase in tokens {
+                // guard (jieba shouldn't yield empty, but just in case)
+                if phrase.is_empty() {
+                    continue 'tok;
+                }
+
+                // fast delimiter path: exactly one Unicode scalar and in set
+                let mut it = phrase.chars();
+                if let (Some(c), None) = (it.next(), it.next()) {
+                    if DELIMITER_SET.contains(&c) {
+                        out.push_str(phrase);
+                        continue 'tok;
+                    }
+                }
+
+                // precedence lookup across dicts (no runtime merging)
+                for dict in dictionaries {
+                    if let Some(t) = dict.get(phrase) {
+                        out.push_str(t);
+                        continue 'tok;
+                    }
+                }
+
+                // fallback: char-by-char conversion, in-place
+                Self::convert_by_char(phrase, dictionaries, &mut out);
+            }
+
+            out
         };
 
         if use_parallel {
-            String::from_par_iter(ranges.into_par_iter().flat_map_iter(process_range))
+            ranges
+                .into_par_iter()
+                .map(process_range)
+                .reduce(String::new, |mut a, b| {
+                    a.push_str(&b);
+                    a
+                })
         } else {
-            String::from_iter(ranges.into_iter().flat_map(process_range))
+            let mut out = String::with_capacity(input.len());
+            for r in ranges {
+                out.push_str(&process_range(r));
+            }
+            out
         }
     }
 
-    // Fallback character-by-character dictionary conversion.
-    //
-    // Used when a phrase is not matched in any dictionary during segmentation.
-    // Each character is individually looked up in the same dictionary list.
-    //
-    // Supports optional parallelization for long strings.
-    //
-    // # Arguments
-    // - `phrase`: The phrase to convert (typically short).
-    // - `dictionaries`: Ordered list of dictionaries to apply.
-    // - `use_parallel`: Whether to enable parallel processing.
-    //
-    // # Returns
-    // - A `String` where each char is replaced using the first matching dictionary.
-    fn convert_by_char(
-        phrase: &str,
-        dictionaries: &[&HashMap<String, String>],
-        use_parallel: bool,
-    ) -> String {
-        let process = |ch: char| {
-            let mut buf = [0u8; 4];
-            let ch_str = ch.encode_utf8(&mut buf);
+    /// Fallback character-by-character conversion (in-place).
+    ///
+    /// Used when a token (phrase) is not matched in any dictionary during segmentation.
+    /// Each Unicode scalar is looked up across the provided dictionaries (in priority order),
+    /// and the first match wins. Output is written directly into `out` to avoid extra
+    /// allocations and cloning.
+    ///
+    /// ## Behavior
+    /// - Iterates `s.chars()` and encodes each `char` into a small stack buffer to form a `&str` key.
+    /// - For each character key, searches dictionaries in order and appends the first mapped value.
+    /// - If no mapping is found, appends the original character.
+    ///
+    /// # Arguments
+    /// * `s` — Source slice to convert (typically short tokens from jieba).
+    /// * `dictionaries` — Slice of dictionary references, ordered by precedence.
+    /// * `out` — Output buffer to write converted text into.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// // Internal helper; shown here for illustration.
+    /// // In production, this is called from phrase-level conversion or st()/ts().
+    /// let mut out = String::new();
+    /// convert_by_char("測試", &[&dict_chars], &mut out);
+    /// assert!(!out.is_empty());
+    /// ```
+    ///
+    /// # Notes
+    /// - This function is intentionally non-allocating for per-character keys (uses a stack buffer).
+    /// - Keep it non-public if it is only an internal helper.
+    #[inline]
+    fn convert_by_char(s: &str, dictionaries: &[&HashMap<String, String>], out: &mut String) {
+        // tiny stack buffer to avoid alloc for 1-char string creation
+        // we’ll build a &str temporarily via encode_utf8
+        let mut buf = [0u8; 4];
+
+        for ch in s.chars() {
+            let key = ch.encode_utf8(&mut buf); // &str for this char, no heap alloc
+            let mut replaced = None;
 
             for dict in dictionaries {
-                if let Some(t) = dict.get(ch_str) {
-                    return t.clone(); // May be multi-char
+                if let Some(v) = dict.get(key) {
+                    replaced = Some(v);
+                    break;
                 }
             }
 
-            ch_str.to_owned()
-        };
-
-        if use_parallel {
-            phrase.par_chars().map(&process).collect::<String>()
-        } else {
-            let mut result = String::with_capacity(phrase.len() * 4); // Estimate
-            for ch in phrase.chars() {
-                result.push_str(&process(ch));
+            match replaced {
+                Some(v) => out.push_str(v),
+                None => out.push(ch),
             }
-            result
         }
     }
 
@@ -681,12 +725,11 @@ impl OpenCC {
     // Uses only the `st_characters` dictionary (no segmentation).
     // Optimized for scenarios where fine-grained phrase matching is unnecessary.
     //
-    // Parallelized via `convert_by_char()` for speed on large inputs.
-    //
     // Example use case: punctuation or pure character-level normalization.
     fn st(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.st_characters];
-        let output = Self::convert_by_char(input, &dict_refs, true);
+        let mut output = String::with_capacity(input.len());
+        Self::convert_by_char(input, &dict_refs, &mut output);
         output
     }
 
@@ -694,11 +737,10 @@ impl OpenCC {
     //
     // Uses only the `ts_characters` dictionary (no segmentation).
     // Ideal for bulk character-wise normalization tasks, skipping phrase context.
-    //
-    // Parallel execution is enabled by default.
     fn ts(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.ts_characters];
-        let output = Self::convert_by_char(input, &dict_refs, true);
+        let mut output = String::with_capacity(input.len());
+        Self::convert_by_char(input, &dict_refs, &mut output);
         output
     }
 
