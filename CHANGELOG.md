@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Update STPhrases.txt
+- Optimized token cut and conversion string heap allocations
 
 ---
 
