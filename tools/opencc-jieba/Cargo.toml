@@ -10,5 +10,5 @@ encoding_rs = "0.8.35"
 encoding_rs_io = "0.1.7"
 regex = "1.11.1"
 tempfile = "3.20.0"
-zip = "3.0.0" # use 3.0.0 for Windows 7 (ructc 1.75.0)
+zip = "=3.0.0" # use 3.0.0 for Windows 7 (ructc 1.75.0)
 walkdir = "2.5.0"
