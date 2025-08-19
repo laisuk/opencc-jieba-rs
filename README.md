@@ -128,8 +128,7 @@ opencc-jieba segment -i input.txt -o output.txt --delim ","
 
 ### Lexicons
 
-By default, it uses OpenCC's built-in lexicon paths. You can also provide your own lexicon folder as the fourth
-argument.
+By default, it uses OpenCC's built-in lexicon paths.  
 
 ---
 
@@ -216,9 +215,9 @@ Converted Code: 1
 
 ---
 
-## Dictionary compression (ZStd)
+## Dictionary compression (Zstd)
 
-[ZStandard](https://github.com/facebook/zstd) - `zstd`: A fast lossless compression algorithm, targeting real-time
+[Zstandard](https://github.com/facebook/zstd) - `zstd`: A fast lossless compression algorithm, targeting real-time
 compression scenarios at zlib-level and better compression ratios.
 
 ```
