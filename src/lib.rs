@@ -262,7 +262,7 @@ impl OpenCC {
     /// # Notes
     /// - This function is intentionally non-allocating for per-character keys (uses a stack buffer).
     /// - Keep it non-public if it is only an internal helper.
-    #[inline]
+    #[inline(always)]
     fn convert_by_char(s: &str, dictionaries: &[&HashMap<String, String>], out: &mut String) {
         // tiny stack buffer to avoid alloc for 1-char string creation
         // we’ll build a &str temporarily via encode_utf8
@@ -338,13 +338,15 @@ impl OpenCC {
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
             self.jieba
-                .cut(chunk, hmm)
+                .cut(chunk, hmm) // Vec<&str>
                 .into_iter()
-                .map(str::to_owned)
-                .collect::<Vec<String>>()
+                .map(str::to_owned) // Iterator<Item=String>, ExactSizeIterator
+                                    // .collect::<Vec<String>>()
         };
 
         if use_parallel {
+            // Because `ranges.into_par_iter()` is an IndexedParallelIterator and each inner
+            // iterator is ExactSizeIterator, Rayon preserves global order when collecting.
             ranges
                 .into_par_iter()
                 .flat_map_iter(process_range)
