@@ -19,14 +19,15 @@ conversion.
 - 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
 - 🔍 Lexicon-driven segmentation using OpenCC dictionaries.
 - ⚡ Utilizes Jieba's probabilistic models for more accurate word segmentation, improving the quality of Simplified ↔
-  Traditional Chinese conversion (With large dictionary model to support both Traditional and Simplified Chinese segmentation).
+  Traditional Chinese conversion (With large dictionary model to support both Traditional and Simplified Chinese
+  segmentation).
 - 🛠️ Designed to be easily embedded as a Rust library or used standalone.
 
 ### 🔽 Downloads
 
-- [Windows (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-win-x64.zip)
-- [macOS (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-osx-x64.zip)
-- [Linux (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/download/latest/opencc-jieba-v0.6.0-linux-x64.zip)
+- [Windows (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
+- [macOS (arm64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
+- [Linux (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
 
 ---
 
@@ -128,7 +129,7 @@ opencc-jieba segment -i input.txt -o output.txt --delim ","
 
 ### Lexicons
 
-By default, it uses OpenCC's built-in lexicon paths.  
+By default, it uses OpenCC's built-in lexicon paths.
 
 ---
 
@@ -243,5 +244,3 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 ## Contributing
 
 Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
-
-
