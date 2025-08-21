@@ -10,7 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Add Add OpenOffice document and Epub conversion to CLI opencc-jieba.
+- Add OpenOffice document and Epub conversion to CLI opencc-jieba.
 
 ### Changed
 
