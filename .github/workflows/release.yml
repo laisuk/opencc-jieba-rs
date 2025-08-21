@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write  # 👈 REQUIRED for creating GitHub releases
+  contents: write  # required for creating GitHub releases
 
 jobs:
   build:
@@ -15,17 +15,23 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: opencc-jieba-${{ github.ref_name }}-linux
+            platform: linux
+            arch: x64
             bin_ext: ''
             dll_name: libopencc_jieba_capi.so
+            archive_ext: tar.gz
           - os: macos-latest
-            artifact_name: opencc-jieba-${{ github.ref_name }}-macos
+            platform: macos
+            arch: arm64
             bin_ext: ''
             dll_name: libopencc_jieba_capi.dylib
+            archive_ext: tar.gz
           - os: windows-latest
-            artifact_name: opencc-jieba-${{ github.ref_name }}-windows
+            platform: windows
+            arch: x64
             bin_ext: '.exe'
             dll_name: opencc_jieba_capi.dll
+            archive_ext: zip
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +43,7 @@ jobs:
         run: cargo build --release --workspace
 
       - name: Prepare Structured Release Folder
+        shell: bash
         run: |
           mkdir -p dist/bin/dicts dist/lib dist/include
 
@@ -48,40 +55,47 @@ jobs:
           cp capi/OpenccJiebaHelper.hpp dist/include/
 
           cp target/release/${{ matrix.dll_name }} dist/lib/
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          if [ "${{ matrix.platform }}" = "windows" ]; then
             cp target/release/opencc_jieba_capi.dll.lib dist/lib/
           fi
-          
-          cp dicts/*.txt dist/bin/dicts/
-        shell: bash
 
-      # Create version.txt and README.txt
+          cp dicts/*.txt dist/bin/dicts/
+
       - name: Write README.txt and version.txt
+        shell: bash
         run: |
           echo "Version: ${{ github.ref_name }}" > dist/version.txt
-          
-          echo "Opencc-Jieba ${{ github.ref_name }}" > dist/README.txt
-          echo "" >> dist/README.txt
-          echo "Included folders:" >> dist/README.txt
-          echo "- bin/: Command-line tools (opencc-jieba, opencc-clip-jieba, dict-generate) and dicts/ folder used at runtime" >> dist/README.txt
-          echo "- lib/: C API shared library (platform-specific)" >> dist/README.txt
-          echo "- include/: C API header and C++ header-only helper" >> dist/README.txt
-          echo "- dicts/: Dictionary TXT files for dict-generate" >> dist/README.txt
-          echo "" >> dist/README.txt
-          echo "Usage:" >> dist/README.txt
-          echo "- Place the shared library in your LD_LIBRARY_PATH (Linux/macOS) or alongside .exe (Windows)." >> dist/README.txt
-          echo "- Include the headers in your C/C++ project for FFI integration." >> dist/README.txt
-          echo "- Use the TXT files in dicts/ as input to the 'dict-generate' tool." >> dist/README.txt
-      
 
-      - name: Zip Structured Artifacts
-        run: 7z a ${{ matrix.artifact_name }}.zip ./dist/*
+          {
+            echo "Opencc-Jieba ${{ github.ref_name }}"
+            echo ""
+            echo "Included folders:"
+            echo "- bin/: Command-line tools (opencc-jieba, opencc-clip-jieba, dict-generate) and dicts/ folder used at runtime"
+            echo "- lib/: C API shared library (platform-specific)"
+            echo "- include/: C API header and C++ header-only helper"
+            echo "- dicts/: Dictionary TXT files for dict-generate"
+            echo ""
+            echo "Usage:"
+            echo "- Place the shared library in your LD_LIBRARY_PATH (Linux/macOS) or alongside .exe (Windows)."
+            echo "- Include the headers in your C/C++ project for FFI integration."
+            echo "- Use the TXT files in dicts/ as input to the 'dict-generate' tool."
+          } > dist/README.txt
+
+      - name: Package Structured Artifacts
+        shell: bash
+        run: |
+          ARTIFACT_NAME="opencc-jieba-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}"
+          if [ "${{ matrix.archive_ext }}" = "tar.gz" ]; then
+            tar -czf "${ARTIFACT_NAME}.tar.gz" -C dist .
+          else
+            7z a "${ARTIFACT_NAME}.zip" ./dist/*
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}.zip
+          name: opencc-jieba-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
+          path: opencc-jieba-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.${{ matrix.archive_ext }}
 
   release:
     name: Release Artifacts
@@ -99,6 +113,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.zip
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
