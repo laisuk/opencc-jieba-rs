@@ -8,5 +8,4 @@ edition = "2021"
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
 copypasta = "0.10.2"
-once_cell = "1.21.3"
-
+clap = "4.5.45"

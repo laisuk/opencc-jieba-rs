@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.0] - 2025-08-18
+## [0.7.0] - 2025-08-23
 
 ### Added
 
@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Update STPhrases.txt
 - Optimized token cut and conversion string heap allocations.
 - Optimized general token cut with reduced string heap allocations
+- Changed opencc-clip-jieba to use clap format as command arguments.
 
 ---
 
