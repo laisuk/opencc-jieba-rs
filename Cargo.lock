@@ -1078,6 +1078,7 @@ dependencies = [
  "jieba-rs",
  "once_cell",
  "rayon",
+ "rayon-core",
  "regex",
  "serde",
  "serde_json",
