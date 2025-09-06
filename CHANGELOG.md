@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0.1] - 2025-09-06
+
+### Fixed
+
+- Fixed CLI tool opencc-jieba office pptx (temp file/directory creation error) and epub (Windows file/directory access denied error).
+
+---
+
 ## [0.7.0] - 2025-08-23
 
 ### Added
