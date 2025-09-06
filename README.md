@@ -154,6 +154,9 @@ fn main() {
 }
 ```
 
+> 📦 Crate: [opencc-jieba-rs on crates.io](https://crates.io/crates/opencc-jieba-rs)  
+> 📄 Docs: [docs.rs/opencc-jieba-rs](https://docs.rs/opencc-jieba-rs/0.7.0/opencc_jieba_rs/)
+
 ---
 
 ## C API Usage (`opencc_jieba_capi`)
