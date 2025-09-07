@@ -394,9 +394,9 @@ fn remove_existing_file(path: &Path) -> io::Result<()> {
     }
 
     // Handle read-only files on Windows
+    #[cfg(windows)]
     if let Ok(meta) = fs::metadata(path) {
         let mut perms = meta.permissions();
-        #[cfg(windows)]
         if perms.readonly() {
             perms.set_readonly(false);
             fs::set_permissions(path, perms)?;
