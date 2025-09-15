@@ -838,7 +838,8 @@ impl OpenCC {
         if input.is_empty() {
             return 0;
         }
-        let _strip_text = STRIP_REGEX.replace_all(input, "");
+        let check_length = find_max_utf8_length(input, 1000);
+        let _strip_text = STRIP_REGEX.replace_all(&input[..check_length], "");
         let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
         let strip_text = &_strip_text[..max_bytes];
         let code;
