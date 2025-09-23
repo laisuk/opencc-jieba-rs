@@ -6,12 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.0.1] - 2025-09-15
+## [0.7.1-beta1] - 2025-09-24
 
 ### Changed
 
 - Optimized zho_check() to scan only first 1000 bytes of input string.
 - Optimized and add more wrapper methods in OpenccJiebaHelper.hpp
+- Update dictionaries
 
 ### Fixed
 
