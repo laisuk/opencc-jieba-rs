@@ -40,7 +40,7 @@ use jieba_rs::{KeywordExtract, TextRank};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::BufReader;
 use std::io::{Cursor, Read};
 use std::ops::Range;
@@ -51,14 +51,87 @@ use crate::dictionary_lib::Dictionary;
 pub mod dictionary_lib;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
-static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
-    " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；："
-        .chars()
-        .collect()
+
+// static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
+//     " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；："
+//         .chars()
+//         .collect()
+// });
+
+/// Master delimiter string containing all punctuation and whitespace
+/// considered as token boundaries by OpenCC-Jieba.
+///
+/// This includes:
+/// - ASCII whitespace (`' '`, `\t`, `\n`, `\r`) and symbols (`! " # $ …`).
+/// - Common CJK punctuation (、 。 「 」 『 』 《 》 【 】, etc.).
+/// - Fullwidth variants of Latin punctuation (e.g., `，；：？！～`).
+///
+/// It is used at build/initialization time to precompute the delimiter bitmap.
+///
+/// You generally should not use this constant directly—prefer
+/// [`is_delimiter()`](fn.is_delimiter.html) for fast lookup.
+const DELIMITER_STR: &str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
+/// 65,536 bits for the BMP (U+0000..=U+FFFF) → 1024 * u64
+static DELIM_BMP: Lazy<[u64; 1024]> = Lazy::new(|| {
+    let mut bm = [0u64; 1024];
+    for ch in DELIMITER_STR.chars() {
+        let u = ch as u32;
+        if u <= 0x_FFFF {
+            let idx = (u >> 6) as usize; // which u64
+            let bit = u & 63; // which bit
+            bm[idx] |= 1u64 << bit;
+        }
+    }
+    bm
 });
+
+/// Tests whether a character is a delimiter.
+///
+/// This function performs a **constant-time bitmap lookup** for any BMP
+/// character (`U+0000..=U+FFFF`), using the precomputed [`DELIM_BMP`] table.
+/// For non-BMP code points, it currently always returns `false`
+/// (extend this if you need astral punctuation).
+///
+/// # Arguments
+///
+/// * `c` – A [`char`] to test.
+///
+/// # Returns
+///
+/// * `true` if `c` is considered a delimiter (whitespace, punctuation, etc.).
+/// * `false` otherwise.
+///
+/// # Performance
+///
+/// - Single array access + bit test (branch-free in the hot path).
+/// - Much faster than [`HashSet<char>`](std::collections::HashSet) lookup.
+/// - Table fits in L1 cache (~8 KB).
+///
+/// # Examples
+///
+/// ```
+/// use opencc_jieba_rs::is_delimiter;
+///
+/// assert!(is_delimiter('。')); // ideographic full stop
+/// assert!(is_delimiter(' '));  // ASCII space
+/// assert!(!is_delimiter('你')); // normal character
+/// ```
+#[inline(always)]
+pub fn is_delimiter(c: char) -> bool {
+    let u = c as u32;
+    if u <= 0x_FFFF {
+        // SAFETY: array is fixed-size, index is 0..1023 for BMP
+        let word = unsafe { *DELIM_BMP.get_unchecked((u >> 6) as usize) };
+        ((word >> (u & 63)) & 1) != 0
+    } else {
+        // Most CJK punctuation is BMP; add astral checks if needed them later.
+        false
+    }
+}
+
+// Pre-compiled regexes using lazy static initialization
 static STRIP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]").unwrap());
-// Pre-compiled regexes using lazy static initialization
 static S2T_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[“”‘’]"#).unwrap());
 static T2S_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[「」『』]").unwrap());
 // Pre-built mapping tables
@@ -195,7 +268,7 @@ impl OpenCC {
                 // fast delimiter path: exactly one Unicode scalar and in set
                 let mut it = phrase.chars();
                 if let (Some(c), None) = (it.next(), it.next()) {
-                    if DELIMITER_SET.contains(&c) {
+                    if is_delimiter(c) {
                         out.push_str(phrase);
                         continue 'tok;
                     }
@@ -302,7 +375,7 @@ impl OpenCC {
 
         // Iterate directly over char_indices for efficiency
         for (byte_idx, ch) in text.char_indices() {
-            if DELIMITER_SET.contains(&ch) {
+            if is_delimiter(ch) {
                 // Get the end byte index of the current character (delimiter)
                 let ch_len = ch.len_utf8();
                 let ch_end = byte_idx + ch_len;
