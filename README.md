@@ -242,7 +242,8 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+- This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+- See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled OpenCC lexicons (_Apache License 2.0_).
 
 ## Contributing
 
