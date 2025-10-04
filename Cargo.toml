@@ -32,9 +32,10 @@ jieba-rs = { version = "=0.7.4", features = ["tfidf", "textrank"] }
 regex = "1.11.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-# Lock rayon at 1.10.0 rayon-core at 1.12.1 for rustc >= 1.75.0
+# Lock rayon at 1.10.0 rayon-core at 1.12.1 include-flate at 0.3.0 for rustc >= 1.75.0
 rayon = "=1.10.0"
 rayon-core = "=1.12.1"
+include-flate = "=0.3.0"
 zstd = "0.13.3"
 once_cell = "1.21.3"
 
