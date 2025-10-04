@@ -36,8 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      # ✅ Pin toolchain to Rust 1.82.0
+      - name: Set Rust 1.82.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.82.0
+          components: clippy,rustfmt
 
       - name: Build Project
         run: cargo build --release --workspace
