@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-libc = "0.2.174"
+libc = "0.2.177"
 
 [lib]
 crate-type = ["cdylib"]
