@@ -1076,13 +1076,11 @@ name = "opencc-jieba"
 version = "0.7.1"
 dependencies = [
  "clap",
- "deranged",
  "encoding_rs",
  "encoding_rs_io",
  "opencc-jieba-rs",
  "regex",
  "tempfile",
- "time",
  "walkdir",
  "zip",
 ]
