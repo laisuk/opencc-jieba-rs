@@ -298,7 +298,7 @@ impl OpenCC {
                     a
                 })
         } else {
-            let mut out = String::with_capacity(input.len());
+            let mut out = String::with_capacity(input.len() + (input.len() >> 6));
             for r in ranges {
                 out.push_str(&process_range(r));
             }
