@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match dict_format {
         Some("zstd") => {
             let dictionary = Dictionary::from_dicts();
-            Dictionary::save_compressed(&dictionary, output_file)?;
+            Dictionary::save_json_compressed(&dictionary, output_file)?;
             eprintln!(
                 "{BLUE}Dictionary saved in ZSTD format at: {}{RESET}",
                 output_path.display()

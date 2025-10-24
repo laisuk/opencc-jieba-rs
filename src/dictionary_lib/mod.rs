@@ -208,28 +208,6 @@ impl Dictionary {
     ///
     /// # Errors
     /// Returns an `io::Error` if the file cannot be read.
-    // fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
-    // where
-    //     P: AsRef<Path>,
-    // {
-    //     let file = File::open(filename)?;
-    //     let mut dictionary = HashMap::new();
-    //
-    //     for line in BufReader::new(file).lines() {
-    //         let line = line?;
-    //         // let parts: Vec<&str> = line.split('\t').collect();
-    //         let parts: Vec<&str> = line.split_whitespace().collect();
-    //         if parts.len() > 1 {
-    //             let phrase = parts[0].to_string();
-    //             let translation = parts[1].to_string();
-    //             dictionary.insert(phrase, translation);
-    //         } else {
-    //             eprintln!("Invalid line format: {}", line);
-    //         }
-    //     }
-    //
-    //     Ok(dictionary)
-    // }
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
     where
         P: AsRef<Path>,
@@ -266,7 +244,7 @@ impl Dictionary {
     ///
     /// # Errors
     /// Returns an `io::Error` if writing fails.
-    pub fn save_compressed(dictionary: &Dictionary, path: &str) -> Result<(), io::Error> {
+    pub fn save_json_compressed(dictionary: &Dictionary, path: &str) -> Result<(), io::Error> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
         let mut encoder = Encoder::new(writer, 19)?;

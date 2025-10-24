@@ -34,6 +34,15 @@ mod tests {
     }
 
     #[test]
+    fn s2twp_test() {
+        let input = "意大利项目";
+        let expected_output = "義大利專案";
+        let opencc = OpenCC::new();
+        let actual_output = opencc.s2twp(input, false);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
     fn t2s_test() {
         let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
         let expected_output = "“数大”便是美，碧绿的山坡前几千只绵羊，挨成一片的雪绒，是美；";
@@ -116,7 +125,7 @@ mod tests {
         let filename = "dictionary.json.zst";
         let dictionary = Dictionary::from_dicts();
 
-        Dictionary::save_compressed(&dictionary, filename).unwrap();
+        Dictionary::save_json_compressed(&dictionary, filename).unwrap();
 
         // Verify that the compressed file is created
         assert_eq!(Path::new(filename).exists(), true);

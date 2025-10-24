@@ -252,6 +252,16 @@ impl OpenCC {
         let ranges = self.split_string_ranges(input, true);
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
 
+        #[inline(always)]
+        fn single_and_len(s: &str) -> (bool, Option<char>, u16) {
+            let mut it = s.chars();
+            match (it.next(), it.next()) {
+                (None, _) => (true, None, 0),          // empty
+                (Some(c), None) => (true, Some(c), 1), // exactly 1 char
+                (Some(_), Some(_)) => (false, None, 2 + it.count() as u16),
+            }
+        }
+
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
             let tokens = self.jieba.cut(chunk, hmm);
@@ -260,29 +270,35 @@ impl OpenCC {
             let mut out = String::with_capacity(chunk.len());
 
             'tok: for phrase in tokens {
-                // guard (jieba shouldn't yield empty, but just in case)
                 if phrase.is_empty() {
                     continue 'tok;
                 }
 
-                // fast delimiter path: exactly one Unicode scalar and in set
-                let mut it = phrase.chars();
-                if let (Some(c), None) = (it.next(), it.next()) {
-                    if is_delimiter(c) {
-                        out.push_str(phrase);
-                        continue 'tok;
+                // Get (is_single, optional_char, total_length)
+                let (is_single, single_char_opt, phrase_len) = single_and_len(phrase);
+
+                // Fast delimiter path
+                if is_single {
+                    if let Some(c) = single_char_opt {
+                        if is_delimiter(c) {
+                            out.push_str(phrase);
+                            continue 'tok;
+                        }
                     }
                 }
 
-                // precedence lookup across dicts (no runtime merging)
+                // Precedence lookup across dicts
                 for dict in dictionaries {
+                    if !dict.has_key_len(phrase_len) {
+                        continue;
+                    }
                     if let Some(t) = dict.get(phrase) {
                         out.push_str(t);
                         continue 'tok;
                     }
                 }
 
-                // fallback: char-by-char conversion, in-place
+                // Fallback: char-by-char conversion, in-place
                 Self::convert_by_char(phrase, dictionaries, &mut out);
             }
 
@@ -294,6 +310,7 @@ impl OpenCC {
                 .into_par_iter()
                 .map(process_range)
                 .reduce(String::new, |mut a, b| {
+                    a.reserve(b.len());
                     a.push_str(&b);
                     a
                 })
@@ -346,6 +363,10 @@ impl OpenCC {
             let mut replaced = None;
 
             for dict in dictionaries {
+                if !dict.has_key_len(1) {
+                    continue;
+                }
+
                 if let Some(v) = dict.get(key) {
                     replaced = Some(v);
                     break;
