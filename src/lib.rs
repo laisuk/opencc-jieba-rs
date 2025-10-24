@@ -47,7 +47,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use zstd::stream::read::Decoder;
 
-use crate::dictionary_lib::Dictionary;
+use crate::dictionary_lib::{DictMap, Dictionary};
 pub mod dictionary_lib;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
@@ -246,7 +246,7 @@ impl OpenCC {
     fn phrases_cut_convert<'a>(
         &'a self,
         input: &'a str,
-        dictionaries: &'a [&HashMap<String, String>],
+        dictionaries: &'a [&DictMap],
         hmm: bool,
     ) -> String {
         let ranges = self.split_string_ranges(input, true);
@@ -336,7 +336,7 @@ impl OpenCC {
     /// - This function is intentionally non-allocating for per-character keys (uses a stack buffer).
     /// - Keep it non-public if it is only an internal helper.
     #[inline(always)]
-    fn convert_by_char(s: &str, dictionaries: &[&HashMap<String, String>], out: &mut String) {
+    fn convert_by_char(s: &str, dictionaries: &[&DictMap], out: &mut String) {
         // tiny stack buffer to avoid alloc for 1-char string creation
         // we’ll build a &str temporarily via encode_utf8
         let mut buf = [0u8; 4];

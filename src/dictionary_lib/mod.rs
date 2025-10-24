@@ -1,74 +1,81 @@
-use std::collections::HashMap;
+mod dict_map;
+
 use std::fs::File;
 use std::io;
 use std::io::BufWriter;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
+pub use crate::dictionary_lib::dict_map::DictMap;
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
 use zstd::Encoder;
 
+pub const SCHEMA_VERSION: u16 = 2;
+
 /// Represents a collection of various Chinese character and phrase mappings
 /// used for conversion between Simplified, Traditional, Taiwanese, Hong Kong,
 /// and Japanese variants.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Dictionary {
+    pub schema_version: u16,
     /// Simplified to Traditional character mappings.
-    pub st_characters: HashMap<String, String>,
+    pub st_characters: DictMap,
     /// Simplified to Traditional phrase mappings.
-    pub st_phrases: HashMap<String, String>,
+    pub st_phrases: DictMap,
     /// Traditional to Simplified character mappings.
-    pub ts_characters: HashMap<String, String>,
+    pub ts_characters: DictMap,
     /// Traditional to Simplified phrase mappings.
-    pub ts_phrases: HashMap<String, String>,
+    pub ts_phrases: DictMap,
     /// Taiwanese phrase mappings.
-    pub tw_phrases: HashMap<String, String>,
+    pub tw_phrases: DictMap,
     /// Reverse Taiwanese phrase mappings.
-    pub tw_phrases_rev: HashMap<String, String>,
+    pub tw_phrases_rev: DictMap,
     /// Taiwanese variant mappings.
-    pub tw_variants: HashMap<String, String>,
+    pub tw_variants: DictMap,
     /// Reverse Taiwanese variant mappings.
-    pub tw_variants_rev: HashMap<String, String>,
+    pub tw_variants_rev: DictMap,
     /// Reverse Taiwanese variant phrase mappings.
-    pub tw_variants_rev_phrases: HashMap<String, String>,
+    pub tw_variants_rev_phrases: DictMap,
     /// Hong Kong variant mappings.
-    pub hk_variants: HashMap<String, String>,
+    pub hk_variants: DictMap,
     /// Reverse Hong Kong variant mappings.
-    pub hk_variants_rev: HashMap<String, String>,
+    pub hk_variants_rev: DictMap,
     /// Reverse Hong Kong variant phrase mappings.
-    pub hk_variants_rev_phrases: HashMap<String, String>,
+    pub hk_variants_rev_phrases: DictMap,
     /// Japanese Shinjitai character mappings.
-    pub jps_characters: HashMap<String, String>,
+    pub jps_characters: DictMap,
     /// Japanese Shinjitai phrase mappings.
-    pub jps_phrases: HashMap<String, String>,
+    pub jps_phrases: DictMap,
     /// Japanese variant mappings.
-    pub jp_variants: HashMap<String, String>,
+    pub jp_variants: DictMap,
     /// Reverse Japanese variant mappings.
-    pub jp_variants_rev: HashMap<String, String>,
+    pub jp_variants_rev: DictMap,
 }
 
 impl Default for Dictionary {
     /// Creates a new, empty `Dictionary` with all mappings initialized.
     fn default() -> Self {
         Dictionary {
-            st_characters: HashMap::new(),
-            st_phrases: HashMap::new(),
-            ts_characters: HashMap::new(),
-            ts_phrases: HashMap::new(),
-            tw_phrases: HashMap::new(),
-            tw_phrases_rev: HashMap::new(),
-            tw_variants: HashMap::new(),
-            tw_variants_rev: HashMap::new(),
-            tw_variants_rev_phrases: HashMap::new(),
-            hk_variants: HashMap::new(),
-            hk_variants_rev: HashMap::new(),
-            hk_variants_rev_phrases: HashMap::new(),
-            jps_characters: HashMap::new(),
-            jps_phrases: HashMap::new(),
-            jp_variants: HashMap::new(),
-            jp_variants_rev: HashMap::new(),
+            schema_version: 0,
+            st_characters: DictMap::default(),
+            st_phrases: DictMap::default(),
+            ts_characters: DictMap::default(),
+            ts_phrases: DictMap::default(),
+            tw_phrases: DictMap::default(),
+            tw_phrases_rev: DictMap::default(),
+            tw_variants: DictMap::default(),
+            tw_variants_rev: DictMap::default(),
+            tw_variants_rev_phrases: DictMap::default(),
+            hk_variants: DictMap::default(),
+            hk_variants_rev: DictMap::default(),
+            hk_variants_rev_phrases: DictMap::default(),
+            jps_characters: DictMap::default(),
+            jps_phrases: DictMap::default(),
+            jp_variants: DictMap::default(),
+            jp_variants_rev: DictMap::default(),
         }
     }
 }
@@ -87,10 +94,20 @@ impl Dictionary {
             .read_to_string(&mut json_data)
             .expect("Failed to decompress dictionary.json");
 
-        serde_json::from_str(&json_data).unwrap_or_else(|_| {
-            eprintln!("Error: Failed to deserialize JSON data.");
+        let dict = serde_json::from_str(&json_data).unwrap_or_else(|_| {
+            eprintln!(
+                "Error: Failed to deserialize JSON data. (missing fields or wrong schema version)"
+            );
             Dictionary::default()
-        })
+        });
+
+        // Optional sanity check
+        assert_eq!(
+            dict.schema_version, SCHEMA_VERSION,
+            "Unsupported dictionary schema_version"
+        );
+
+        dict
     }
 
     /// Loads all conversion dictionaries from raw `.txt` files in the `dicts/` directory.
@@ -157,7 +174,7 @@ impl Dictionary {
         jps_phrases,
         jp_variants,
         jp_variants_rev,
-        ]: [HashMap<String, String>; 16] = files
+        ]: [DictMap; 16] = files
             .into_iter()
             .map(|f| load(f).unwrap())
             .collect::<Vec<_>>()
@@ -165,6 +182,7 @@ impl Dictionary {
             .unwrap();
 
         Dictionary {
+            schema_version: SCHEMA_VERSION,
             st_characters,
             st_phrases,
             ts_characters,
@@ -190,27 +208,54 @@ impl Dictionary {
     ///
     /// # Errors
     /// Returns an `io::Error` if the file cannot be read.
-    fn load_dictionary_from_path<P>(filename: P) -> io::Result<HashMap<String, String>>
+    // fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
+    // where
+    //     P: AsRef<Path>,
+    // {
+    //     let file = File::open(filename)?;
+    //     let mut dictionary = HashMap::new();
+    //
+    //     for line in BufReader::new(file).lines() {
+    //         let line = line?;
+    //         // let parts: Vec<&str> = line.split('\t').collect();
+    //         let parts: Vec<&str> = line.split_whitespace().collect();
+    //         if parts.len() > 1 {
+    //             let phrase = parts[0].to_string();
+    //             let translation = parts[1].to_string();
+    //             dictionary.insert(phrase, translation);
+    //         } else {
+    //             eprintln!("Invalid line format: {}", line);
+    //         }
+    //     }
+    //
+    //     Ok(dictionary)
+    // }
+    fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
     where
         P: AsRef<Path>,
     {
         let file = File::open(filename)?;
-        let mut dictionary = HashMap::new();
+        let mut dict = DictMap::default();
 
         for line in BufReader::new(file).lines() {
             let line = line?;
-            // let parts: Vec<&str> = line.split('\t').collect();
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() > 1 {
-                let phrase = parts[0].to_string();
-                let translation = parts[1].to_string();
-                dictionary.insert(phrase, translation);
-            } else {
+                let key = parts[0].to_string();
+                let val = parts[1].to_string();
+
+                // Unicode scalar count; keep consistent with the rest of your pipeline.
+                let len_chars = key.chars().count() as u16;
+
+                // Incremental stats update (no rebuild later)
+                dict.insert_with_len(key, val, len_chars);
+            } else if !line.trim().is_empty() {
                 eprintln!("Invalid line format: {}", line);
             }
         }
 
-        Ok(dictionary)
+        // If empty file, stats remain zeros; nothing to fix up.
+        Ok(dict)
     }
 
     /// Saves the dictionary to a file in compressed JSON format using Zstandard.

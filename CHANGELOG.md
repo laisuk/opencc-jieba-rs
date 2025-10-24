@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.2] – 2025-10-24
+
+### Changed
+
+- **Dictionary migration:** all `HashMap<String, String>` fields are now refactored into the new **`DictMap`** structure.  
+  Each `DictMap` includes:
+  - `min_len` — shortest key length (in Unicode scalars)
+  - `max_len` — longest key length
+  - `key_len_mask` — bitmask for fast length gating (1 → 64)
+  - `long_lengths` — explicit set for keys > 64
+
+- **Serialization:**
+  - Dropped legacy/custom Serde fallback.
+  - Enforced strict JSON schema with `#[serde(deny_unknown_fields)]`.
+  - Introduced **schema version 2** for dictionary consistency.
+
+- **Embedded artifact:**
+  - `dictionary_lib` now embeds a rebuilt `dictionary.json.zst` (strict v2 schema).
+  - Verified with **44 / 44 passing tests** across all dictionary and conversion cases.
+
+--
+
 ## [0.7.1] - 2025-10-05
 
 ### Changed

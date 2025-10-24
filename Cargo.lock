@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "dict-generate"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "clap",
  "opencc-jieba-rs",
@@ -1064,7 +1064,7 @@ checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
 name = "opencc-clip-jieba"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "clap",
  "copypasta",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "opencc-jieba"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "clap",
  "encoding_rs",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "opencc-jieba-rs"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "include-flate",
  "jieba-rs",
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "opencc_jieba_capi"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "libc",
  "opencc-jieba-rs",
