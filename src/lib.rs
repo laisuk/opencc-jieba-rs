@@ -424,8 +424,35 @@ impl OpenCC {
         ranges
     }
 
-    // Performs Jieba-based phrase segmentation over each non-delimiter chunk.
-    // Used internally for consistent pre-segmentation before conversion or keyword extraction.
+    /// Performs Jieba-based phrase segmentation over each non-delimiter chunk.
+    ///
+    /// This method is used internally to pre-segment input text into a vector of phrases
+    /// before dictionary-based conversion or keyword extraction. It ensures consistent
+    /// segmentation behavior across single-threaded and parallel execution modes.
+    ///
+    /// The segmentation respects delimiters (such as punctuation or whitespace) by first
+    /// splitting the text into non-delimiter ranges using [`split_string_ranges()`]. Each
+    /// range is then processed by Jieba’s `cut()` function, producing an ordered sequence
+    /// of token strings.
+    ///
+    /// When `use_parallel` is enabled, segmentation is parallelized using Rayon’s
+    /// [`IndexedParallelIterator`], which preserves the global order of tokens while
+    /// distributing work across CPU cores. This improves throughput on large texts
+    /// without affecting deterministic output ordering.
+    ///
+    /// # Arguments
+    /// - `input` — The input text to segment.
+    /// - `hmm` — Whether to enable Jieba’s Hidden Markov Model (HMM) for unknown word detection.
+    /// - `use_parallel` — Whether to perform segmentation in parallel using Rayon.
+    ///
+    /// # Returns
+    /// A vector of segmented phrase strings (`Vec<String>`), preserving the order
+    /// of appearance in the input.
+    ///
+    /// # Notes
+    /// - Each phrase corresponds to a Jieba token.
+    /// - Global order of phrases is guaranteed even in parallel mode.
+    /// - Delimiters are handled separately by [`split_string_ranges()`].
     fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
         let ranges = self.split_string_ranges(input, true);
 
@@ -434,8 +461,7 @@ impl OpenCC {
             self.jieba
                 .cut(chunk, hmm) // Vec<&str>
                 .into_iter()
-                .map(str::to_owned) // Iterator<Item=String>, ExactSizeIterator
-                                    // .collect::<Vec<String>>()
+                .map(str::to_owned)
         };
 
         if use_parallel {
@@ -735,6 +761,22 @@ impl OpenCC {
         }
     }
 
+    /// Converts Traditional Chinese to Simplified Chinese (Hong Kong standard).
+    ///
+    /// This adds phrase mapping specific to the Hong Kong locale after a
+    /// general Simplified-to-Traditional conversion step.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Simplified Chinese text.
+    /// * `hmm` - Whether to enable HMM segmentation.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let hk = opencc.hk2s("「春眠不覺曉，處處聞啼鳥。」", true);
+    /// println!("{}", hk); // "「春眠不覺曉，處處聞啼鳥。」"
+    /// ```
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
