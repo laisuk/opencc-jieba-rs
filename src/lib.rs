@@ -363,7 +363,7 @@ impl OpenCC {
             let mut replaced = None;
 
             for dict in dictionaries {
-                if !dict.has_key_len(1) {
+                if dict.min_len > 1 {
                     continue;
                 }
 
