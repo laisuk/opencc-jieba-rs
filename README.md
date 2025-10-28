@@ -141,6 +141,12 @@ To add this crate to your project:
 cargo add opencc-jieba-rs
 ````
 
+Or add the following line to your `Cargo.toml`:
+
+```toml
+opencc-jieba-rs = "0.7.2"
+```
+
 Use `opencc-jieba-rs` as a library:
 
 ```rust
@@ -155,7 +161,7 @@ fn main() {
 ```
 
 > 📦 Crate: [opencc-jieba-rs on crates.io](https://crates.io/crates/opencc-jieba-rs)  
-> 📄 Docs: [docs.rs/opencc-jieba-rs](https://docs.rs/opencc-jieba-rs/0.7.0/opencc_jieba_rs/)
+> 📄 Docs: [docs.rs/opencc-jieba-rs](https://docs.rs/opencc-jieba-rs/)
 
 ---
 
