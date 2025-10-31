@@ -285,6 +285,8 @@ impl OpenCC {
                             continue 'tok;
                         }
                     }
+                    Self::convert_by_char(phrase, dictionaries, &mut out);
+                    continue 'tok;
                 }
 
                 // Precedence lookup across dicts
