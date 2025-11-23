@@ -6,6 +6,7 @@ High-performance Rust-based Chinese text converter using Jieba segmentation and 
 [![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)](https://crates.io/crates/opencc-jieba-rs)
 [![Docs.rs](https://docs.rs/opencc-jieba-rs/badge.svg)](https://docs.rs/opencc-jieba-rs)
 ![Crates.io](https://img.shields.io/crates/d/opencc-jieba-rs)
+[![Latest Downloads](https://img.shields.io/github/downloads/laisuk/opencc-jieba-rs/latest/total.svg)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
 ![License](https://img.shields.io/github/license/laisuk/opencc-jieba-rs)
 [![Build and Release](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml/badge.svg)](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml)
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust.yml/badge.svg)
