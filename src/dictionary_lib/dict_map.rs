@@ -73,6 +73,21 @@ pub struct DictMap {
     pub long_lengths: HashSet<u16>,
 }
 
+/// Provides a zero-initialized, empty `DictMap`.
+///
+/// This creates a dictionary map with:
+/// - an empty `map`
+/// - `min_len = 0`
+/// - `max_len = 0`
+/// - `key_len_mask = 0`
+/// - an empty `long_lengths` set
+///
+/// This default state is used before any dictionary data is loaded.
+/// All length-related metadata (min/max length, bitmasks, long key lengths)
+/// is populated later by the dictionary builder during initialization.
+///
+/// In this state, the `DictMap` performs no matching and serves only as a
+/// placeholder or initial container.
 impl Default for DictMap {
     fn default() -> Self {
         Self {

@@ -35,6 +35,134 @@
 //! - 📦 Ready for crates.io and docs.rs publication
 //!
 //! ---
+//! # Conversion Overview (OpenCC + Jieba)
+//!
+//! `opencc_jieba_rs::OpenCC` provides a set of high-level helpers that mirror
+//! common OpenCC configurations, built on top of:
+//!
+//! - **OpenCC dictionaries** (character / phrase mappings)
+//! - **Jieba segmentation** for phrase-level matching
+//! - Optional **punctuation conversion**
+//!
+//! All methods take `&self` and `&str` input and return a newly allocated
+//! `String`.
+//!
+//! ## Quick Start
+//!
+//! ```rust
+//! let opencc = opencc_jieba_rs::OpenCC::new();
+//!
+//! let s = "这里进行着“汉字转换”测试。";
+//! let t = opencc.s2t(s, false);       // Simplified → Traditional (phrase-level)
+//! let tw = opencc.t2tw(&t);    // Traditional → Taiwan Traditional
+//! ```
+//!
+//! ## Phrase-Level vs Character-Level
+//!
+//! There are two main categories of conversion:
+//!
+//! 1. **Phrase-level conversions**
+//!    Use Jieba segmentation and multiple dictionaries to correctly handle
+//!    idioms, multi-character words, and regional preferences.
+//!
+//! 2. **Character-level conversions**
+//!    Use only character variant dictionaries (no segmentation), ideal for
+//!    high-speed normalization where phrase context is unimportant.
+//!
+//! ## Core Simplified ↔ Traditional
+//!
+//! | Direction | Method         | Level      | Notes                                     |
+//! |----------|----------------|-----------|-------------------------------------------|
+//! | S → T    | [`OpenCC::s2t`] | Phrase    | Standard Simplified → Traditional.        |
+//! | T → S    | [`OpenCC::t2s`] | Phrase    | Standard Traditional → Simplified.        |
+//! | S → T    | [`OpenCC::st`]  | Character | Fast char-only S→T (no segmentation).     |
+//! | T → S    | [`OpenCC::ts`]  | Character | Fast char-only T→S (no segmentation).     |
+//!
+//! ### `s2t` / `t2s`
+//!
+//! - Use phrase dictionaries + Jieba segmentation.
+//! - Preserve idioms and phrase-level semantics where possible.
+//! - Recommended for user-facing text conversion.
+//!
+//! ### `st` / `ts`
+//!
+//! - Use only `st_characters` / `ts_characters` dictionaries.
+//! - Do **not** segment or match phrases.
+//! - Ideal for:
+//!   - bulk normalization
+//!   - preprocessing before heavier conversions
+//!
+//! ## Taiwan Traditional (Tw)
+//!
+//! | Direction      | Method             | Description                                               |
+//! |----------------|--------------------|-----------------------------------------------------------|
+//! | T → Tw         | [`OpenCC::t2tw`]   | Standard Traditional → Taiwan variants.                  |
+//! | T → Tw (phr.)  | [`OpenCC::t2twp`]  | T→Tw with an extra phrase refinement round.              |
+//! | Tw → T         | [`OpenCC::tw2t`]   | Taiwan variants → Standard Traditional.                  |
+//! | Tw → T (phr.)  | [`OpenCC::tw2tp`]  | Tw→T with additional reverse phrase normalization.       |
+//!
+//! - `t2tw` uses `tw_variants` for Taiwan-specific character/word forms.
+//! - `t2twp` performs **two rounds**: phrases first (`tw_phrases`), then
+//!   variants (`tw_variants`).
+//! - `tw2t` and `tw2tp` are reverse directions, using `*_rev` dictionaries
+//!   to normalize back to standard Traditional.
+//!
+//! ## Hong Kong Traditional (HK)
+//!
+//! | Direction | Method             | Description                                       |
+//! |-----------|--------------------|---------------------------------------------------|
+//! | T → HK    | [`OpenCC::t2hk`]   | Standard Traditional → Hong Kong Traditional.    |
+//! | HK → T    | [`OpenCC::hk2t`]   | Hong Kong Traditional → Standard Traditional.    |
+//!
+//! - `t2hk` applies `hk_variants` (HK-specific variants and preferences).
+//! - `hk2t` uses `hk_variants_rev_phrases` + `hk_variants_rev` to normalize
+//!   back to standard Traditional.
+//!
+//! ## Japanese Kanji (Shinjitai / Kyūjitai)
+//!
+//! | Direction | Method             | Description                                                  |
+//! |-----------|--------------------|--------------------------------------------------------------|
+//! | T → JP    | [`OpenCC::t2jp`]   | Traditional → Japanese Shinjitai-like variants (Kanji).     |
+//! | JP → T    | [`OpenCC::jp2t`]   | Japanese Shinjitai → Traditional (Kyūjitai-style) mapping.  |
+//!
+//! - `t2jp` uses `jp_variants` to map Traditional forms to standard Japanese
+//!   Shinjitai (e.g. 體 → 体, 圖 → 図 where applicable).
+//! - `jp2t` combines `jps_phrases`, `jps_characters`, and `jp_variants_rev`
+//!   to reverse these mappings back to Traditional Chinese.
+//!
+//! ## Punctuation and Symbols
+//!
+//! Most high-level methods enable **punctuation conversion** by default,
+//! using OpenCC’s punctuation dictionaries to normalize:
+//!
+//! - Chinese-style quotes / brackets
+//! - Full-width / half-width punctuation
+//!
+//! Lower-level helpers inside this crate may expose more granular control if
+//! you need to:
+//!
+//! - disable punctuation conversion
+//! - run custom dictionary pipelines
+//! - integrate with your own segmentation logic
+//!
+//! ## When to Use What?
+//!
+//! - Use **`s2t` / `t2s`** for general purpose Simplified/Traditional
+//!   conversion.
+//! - Use **`t2tw` / `t2twp` / `tw2t` / `tw2tp`** when targeting **Taiwan**
+//!   content or normalizing it.
+//! - Use **`t2hk` / `hk2t`** for **Hong Kong–specific** localized text.
+//! - Use **`t2jp` / `jp2t`** for interoperability with **Japanese Kanji** forms,
+//!   when only character-shape conversion is desired (not full translation).
+//! - Use **`st` / `ts`** when you need **fast, character-only** normalization
+//!   with minimal overhead.
+//!
+//! For segmentation-only or keyword extraction APIs, see:
+//! - [`OpenCC::jieba_cut`] — Jieba-based segmentation
+//! - [`OpenCC::keyword_extract_textrank`] — keyword extraction utilities
+//! - [`OpenCC::keyword_extract_tfidf`] — keyword extraction utilities
+//!
+//! These can be combined with conversion results for downstream NLP tasks.
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
 use once_cell::sync::Lazy;
@@ -797,11 +925,58 @@ impl OpenCC {
         }
     }
 
+    /// Converts Traditional Chinese (T) text to **Taiwan Traditional Chinese (T→Tw)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`t2tw`**, applying
+    /// Taiwan-specific character variants.
+    ///
+    /// The conversion performs:
+    /// - Phrase-level segmentation via Jieba
+    /// - Dictionary-based replacements using **`tw_variants`**
+    /// - Optional punctuation conversion (enabled)
+    ///
+    /// # Arguments
+    /// - `input` — UTF-8 Traditional Chinese text.
+    ///
+    /// # Returns
+    /// A `String` containing the converted Taiwan Traditional Chinese output.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let out = opencc.t2tw("繁體字");
+    /// ```
     pub fn t2tw(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.tw_variants];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts Traditional Chinese (T) text to **Taiwan Traditional Chinese with
+    /// phrase-level idioms (T→Twp)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`t2twp`**, which requires
+    /// **two-round dictionary application**:
+    ///
+    /// 1. **Round 1** — apply Taiwan phrase dictionary (`tw_phrases`)
+    /// 2. **Round 2** — apply Taiwan variant dictionary (`tw_variants`)
+    ///
+    /// Phrase-level Jieba segmentation is applied before each round to ensure
+    /// correct multi-character phrase matching.
+    ///
+    /// Punctuation conversion is enabled by default.
+    ///
+    /// # Arguments
+    /// - `input` — UTF-8 Traditional Chinese text.
+    ///
+    /// # Returns
+    /// A `String` containing the fully converted Taiwan Traditional Chinese result
+    /// with Taiwan-specific idioms and variants.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let out = opencc.t2twp("後臺資訊");
+    /// ```
     pub fn t2twp(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.tw_phrases];
         let dict_refs_round_2 = [&self.dictionary.tw_variants];
@@ -812,6 +987,33 @@ impl OpenCC {
         )
     }
 
+    /// Converts **Taiwan Traditional Chinese (Tw)** text to **Standard Traditional
+    /// Chinese (T)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`tw2t`**.
+    /// It removes Taiwan-specific character variants and idioms, normalizing the
+    /// text back to standard Traditional Chinese.
+    ///
+    /// This function performs:
+    /// - Phrase-level segmentation using Jieba
+    /// - A single-round dictionary replacement using:
+    ///   - `tw_variants_rev` (reverse character variants)
+    ///   - `tw_variants_rev_phrases` (reverse phrase-level variants)
+    /// - Punctuation conversion is enabled
+    ///
+    /// # Arguments
+    /// - `input` — UTF-8 Taiwan Traditional Chinese text.
+    ///
+    /// # Returns
+    /// A `String` containing the normalized Traditional Chinese output.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let text = "裡面"; // Taiwan variant
+    /// let out = opencc.tw2t(text);
+    /// assert_eq!(out, "裏面"); // Standard Traditional
+    /// ```
     pub fn tw2t(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
@@ -820,6 +1022,41 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts **Taiwan Traditional Chinese (Tw)** to **Standard Traditional Chinese
+    /// with phrase refinement (Tw→Tp)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`tw2tp`**, which requires
+    /// **two rounds** of dictionary application:
+    ///
+    /// 1. **Round 1**
+    ///    Normalize Taiwan-specific variants and idioms using:
+    ///    - `tw_variants_rev`
+    ///    - `tw_variants_rev_phrases`
+    ///
+    /// 2. **Round 2**
+    ///    Apply additional phrase-level normalization via:
+    ///    - `tw_phrases_rev`
+    ///
+    /// Jieba phrase segmentation is performed at each round to ensure correct
+    /// multi-character matching.
+    ///
+    /// Punctuation conversion is enabled.
+    ///
+    /// # Arguments
+    /// - `input` — UTF-8 Taiwan Traditional Chinese text.
+    ///
+    /// # Returns
+    /// A `String` containing fully normalized Traditional Chinese with enhanced
+    /// phrase-level corrections.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let text = "裡頭"; // Taiwan variant + phrase
+    /// let out = opencc.tw2tp(text);
+    /// // Depending on dictionary, may normalize to "裏頭"
+    /// println!("{}", out);
+    /// ```
     pub fn tw2tp(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
@@ -833,11 +1070,29 @@ impl OpenCC {
         )
     }
 
+    /// Converts Standard Traditional Chinese (T) text to **Hong Kong Traditional
+    /// Chinese (T→HK)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`t2hk`**, applying
+    /// Hong-Kong–specific character variants and phrase preferences.
+    ///
+    /// Phrase-level segmentation is used internally, and punctuation conversion is
+    /// enabled.
     pub fn t2hk(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.hk_variants];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts Hong Kong Traditional Chinese text back to **Standard Traditional
+    /// Chinese (HK→T)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`hk2t`**, applying the reverse
+    /// transformation using:
+    /// - Hong-Kong–specific reverse phrase mappings (`hk_variants_rev_phrases`)
+    /// - Reverse character-level mappings (`hk_variants_rev`)
+    ///
+    /// Phrase segmentation is applied before replacement, with punctuation
+    /// conversion enabled.
     pub fn hk2t(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
@@ -846,11 +1101,47 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts Traditional Chinese (T) text to **Japanese Shinjitai (T→JP)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`t2jp`**, applying the
+    /// Japanese character-variant set (“Shinjitai”).
+    ///
+    /// Phrase-level segmentation is performed, and punctuation conversion is
+    /// enabled.
+    /// Note that this is **not a Japanese translation**—only character forms are
+    /// converted.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let out = opencc.t2jp("體育");    // 體 → 体
+    /// assert_eq!(out, "体育");         // Standard Japanese Shinjitai form
+    /// ```
     pub fn t2jp(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.jp_variants];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts **Japanese Shinjitai (JP)** text back to **Traditional Chinese (T)**.
+    ///
+    /// This corresponds to the OpenCC configuration **`jp2t`**, performing a
+    /// reverse transformation of:
+    ///
+    /// - Japanese phrase-level variants (`jps_phrases`)
+    /// - Japanese character simplifications (`jps_characters`)
+    /// - Reversal of Japanese-only Shinjitai (`jp_variants_rev`)
+    ///
+    /// Phrase-level segmentation is applied, and punctuation conversion is enabled.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    ///
+    /// // Common Shinjitai → Traditional:
+    /// assert_eq!(opencc.jp2t("教育"), "教育");       // unchanged (identical)
+    /// assert_eq!(opencc.jp2t("体力"), "體力");       // 体 → 體
+    /// assert_eq!(opencc.jp2t("図書"), "圖書");       // 図 → 圖
+    /// ```
     pub fn jp2t(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.jps_phrases,
@@ -860,12 +1151,26 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
-    // Fast character-level Simplified → Traditional Chinese conversion.
-    //
-    // Uses only the `st_characters` dictionary (no segmentation).
-    // Optimized for scenarios where fine-grained phrase matching is unnecessary.
-    //
-    // Example use case: punctuation or pure character-level normalization.
+    /// Performs **fast character-level Simplified → Traditional** Chinese conversion.
+    ///
+    /// This corresponds to OpenCC’s **`st`** character-variant mapping and uses
+    /// **only** the `st_characters` dictionary.
+    ///
+    /// Unlike phrase-level conversions (e.g., `s2t`, `s2tw`), this function:
+    /// - **does not** use Jieba segmentation
+    /// - **does not** perform phrase matching
+    /// - applies **single-character substitutions only**
+    ///
+    /// This makes it ideal for:
+    /// - punctuation or symbol normalization
+    /// - environments requiring minimal overhead
+    /// - preprocessing before higher-level conversion
+    ///
+    /// # Example
+    /// ```ignore
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// assert_eq!(opencc.st("后"), "後"); // Character-level only
+    /// ```
     fn st(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.st_characters];
         let mut output = String::with_capacity(input.len());
