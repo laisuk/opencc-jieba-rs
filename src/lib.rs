@@ -1178,10 +1178,26 @@ impl OpenCC {
         output
     }
 
-    // Fast character-level Traditional → Simplified Chinese conversion.
-    //
-    // Uses only the `ts_characters` dictionary (no segmentation).
-    // Ideal for bulk character-wise normalization tasks, skipping phrase context.
+    /// Performs **fast character-level Traditional → Simplified** Chinese conversion.
+    ///
+    /// This corresponds to OpenCC’s **`ts`** character-variant mapping and uses
+    /// **only** the `ts_characters` dictionary.
+    ///
+    /// Unlike phrase-level conversions (e.g., `t2s`, `tw2s`), this function:
+    /// - **does not** use Jieba segmentation
+    /// - **does not** perform phrase matching
+    /// - applies **single-character substitutions only**
+    ///
+    /// This makes it ideal for:
+    /// - punctuation or symbol normalization
+    /// - environments requiring minimal overhead
+    /// - preprocessing before higher-level conversion
+    ///
+    /// # Example
+    /// ```ignore
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// assert_eq!(opencc.ts("後"), "后"); // Character-level only
+    /// ```
     fn ts(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.ts_characters];
         let mut output = String::with_capacity(input.len());

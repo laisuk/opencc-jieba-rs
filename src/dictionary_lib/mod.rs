@@ -81,9 +81,41 @@ impl Default for Dictionary {
 }
 
 impl Dictionary {
-    /// Loads the dictionary from a compressed JSON file embedded in the binary.
+    /// Loads the built-in dictionary from an embedded, Zstd-compressed JSON file.
     ///
-    /// # Panics    ///  if decompression or deserialization fails.
+    /// This constructor reads `dictionary.json.zst` bundled at compile time via
+    /// [`include_bytes!`], decompresses it using Zstd, and deserializes it into
+    /// a [`Dictionary`] structure.
+    ///
+    /// # Behavior
+    ///
+    /// - The dictionary is loaded **entirely in memory** from a baked-in byte slice.
+    /// - This method is intended for applications that ship with a fixed dictionary
+    ///   set and do not require external configuration.
+    /// - If deserialization fails due to missing fields or a schema mismatch,
+    ///   a default, empty [`Dictionary`] is returned and a diagnostic message is
+    ///   printed to stderr.
+    ///
+    /// After loading, the method also performs a schema compatibility check and
+    /// panics if the embedded data uses an unsupported `schema_version`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic in the following situations:
+    ///
+    /// - If the Zstd decoder cannot be created.
+    /// - If decompression of `dictionary.json.zst` fails.
+    /// - If the loaded dictionary's `schema_version` does not match the crate's
+    ///   expected [`SCHEMA_VERSION`].
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use opencc_jieba_rs::dictionary_lib::Dictionary;
+    ///
+    /// let dict = Dictionary::new();
+    /// assert!(dict.schema_version >= 1);
+    /// ```
     pub fn new() -> Self {
         const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
 
