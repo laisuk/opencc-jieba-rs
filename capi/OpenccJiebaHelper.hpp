@@ -92,7 +92,7 @@ public:
     {
         if (input.empty()) return {};
 
-        const char* output = opencc_jieba_convert(instance_, input.c_str(), config_.c_str(), punctuation_);
+        char* output = opencc_jieba_convert(instance_, input.c_str(), config_.c_str(), punctuation_);
         if (!output) return {};
 
         std::string result(output);
@@ -108,7 +108,7 @@ public:
         if (input.empty()) return {};
 
         const std::string& cfg = isValidConfig(cfgOverride) ? cfgOverride : config_;
-        const char* output = opencc_jieba_convert(instance_, input.c_str(), cfg.c_str(), punctOverride);
+        char* output = opencc_jieba_convert(instance_, input.c_str(), cfg.c_str(), punctOverride);
         if (!output) return {};
 
         std::string result(output);
@@ -141,7 +141,7 @@ public:
                                          const std::string& delimiter = " ") const
     {
         if (input.empty()) return {};
-        const char* output = opencc_jieba_cut_and_join(instance_, input.c_str(), hmm, delimiter.c_str());
+        char* output = opencc_jieba_cut_and_join(instance_, input.c_str(), hmm, delimiter.c_str());
         if (!output) return {};
 
         std::string result(output);
