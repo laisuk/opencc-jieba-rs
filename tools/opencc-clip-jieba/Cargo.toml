@@ -1,6 +1,6 @@
 [package]
 name = "opencc-clip-jieba"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
 copypasta = "0.10.2"
-clap = "4.5.53"
+clap = "4.5.54"

@@ -1,16 +1,16 @@
 [package]
 name = "opencc-jieba"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = { path = "../.." }
-clap = "4.5.53"
+clap = "4.5.54"
 encoding_rs = "0.8.35"
 encoding_rs_io = "0.1.7"
 regex = "1.12.2"
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 walkdir = "2.5.0"
-zip = ">=3.0, <4.0" # use 3.0.0 for Windows 7 (ructc 1.75.0)
+zip = "=3.0.0" # use 3.0.0 for Windows 7 (ructc 1.75.0)
 # deranged = "=0.4.0"
 # time = "=0.3.41"

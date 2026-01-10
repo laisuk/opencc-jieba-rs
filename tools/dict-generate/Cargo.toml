@@ -1,10 +1,10 @@
 [package]
 name = "dict-generate"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-clap = "4.5.53"
-serde_json = "1.0.145"
+clap = "4.5.54"
+serde_json = "1.0.149"
 ureq = "3.1.4"
