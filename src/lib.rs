@@ -177,6 +177,8 @@ use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::{DictMap, Dictionary};
 pub mod dictionary_lib;
+mod opencc_config;
+pub use opencc_config::OpenccConfig;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
@@ -1247,24 +1249,58 @@ impl OpenCC {
     /// assert_eq!(invalid, "Invalid config: unknown");
     /// ```
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
-        match config.to_lowercase().as_str() {
-            "s2t" => self.s2t(input, punctuation),
-            "s2tw" => self.s2tw(input, punctuation),
-            "s2twp" => self.s2twp(input, punctuation),
-            "s2hk" => self.s2hk(input, punctuation),
-            "t2s" => self.t2s(input, punctuation),
-            "t2tw" => self.t2tw(input),
-            "t2twp" => self.t2twp(input),
-            "t2hk" => self.t2hk(input),
-            "tw2s" => self.tw2s(input, punctuation),
-            "tw2sp" => self.tw2sp(input, punctuation),
-            "tw2t" => self.tw2t(input),
-            "tw2tp" => self.tw2tp(input),
-            "hk2s" => self.hk2s(input, punctuation),
-            "hk2t" => self.hk2t(input),
-            "jp2t" => self.jp2t(input),
-            "t2jp" => self.t2jp(input),
-            _ => format!("Invalid config: {}", config),
+        match OpenccConfig::try_from(config) {
+            Ok(cfg) => self.convert_with_config(input, cfg, punctuation),
+            Err(_) => {
+                format!("Invalid config: {}", config)
+            }
+        }
+    }
+
+    /// Converts Chinese text using a strongly-typed [`OpenccConfig`].
+    ///
+    /// This method avoids string parsing and is the recommended API for Rust callers.
+    /// It also maps cleanly to the C FFI numeric config (`opencc_config_t`).
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 text to convert.
+    /// * `config_id` - Conversion configuration.
+    /// * `punctuation` - Whether to apply punctuation conversion where supported.
+    ///   For some configs, this flag is **ignored** (see [`OpenccConfig`] table).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::{OpenCC, OpenccConfig};
+    ///
+    /// let converter = OpenCC::new();
+    /// let out = converter.convert_with_config("汉字转换测试", OpenccConfig::S2t, false);
+    /// assert_eq!(out, "漢字轉換測試");
+    /// ```
+    pub fn convert_with_config(
+        &self,
+        input: &str,
+        config_id: OpenccConfig,
+        punctuation: bool,
+    ) -> String {
+        match config_id {
+            OpenccConfig::S2t => self.s2t(input, punctuation),
+            OpenccConfig::S2tw => self.s2tw(input, punctuation),
+            OpenccConfig::S2twp => self.s2twp(input, punctuation),
+            OpenccConfig::S2hk => self.s2hk(input, punctuation),
+            OpenccConfig::T2s => self.t2s(input, punctuation),
+            OpenccConfig::T2tw => self.t2tw(input),
+            OpenccConfig::T2twp => self.t2twp(input),
+            OpenccConfig::T2hk => self.t2hk(input),
+            OpenccConfig::Tw2s => self.tw2s(input, punctuation),
+            OpenccConfig::Tw2sp => self.tw2sp(input, punctuation),
+            OpenccConfig::Tw2t => self.tw2t(input),
+            OpenccConfig::Tw2tp => self.tw2tp(input),
+            OpenccConfig::Hk2s => self.hk2s(input, punctuation),
+            OpenccConfig::Hk2t => self.hk2t(input),
+            OpenccConfig::Jp2t => self.jp2t(input),
+            OpenccConfig::T2jp => self.t2jp(input),
         }
     }
 
