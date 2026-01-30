@@ -34,14 +34,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let dict_dir = Path::new("dicts");
     if !dict_dir.exists() {
-        eprint!("{BLUE}Local 'dicts/' not found. Proceed with downloading dictionaries from GitHub? (Y/n): {RESET}");
+        eprint!("{BLUE}Local 'dicts/' not found. Proceed with downloading dictionaries from GitHub? (y/N): {RESET}");
         io::stdout().flush()?; // Ensure prompt is printed before read_line
 
         let mut answer = String::new();
         io::stdin().read_line(&mut answer)?;
         let answer = answer.trim().to_lowercase();
 
-        if answer.is_empty() || answer == "y" || answer == "yes" {
+        if answer == "y" || answer == "yes" {
             eprintln!("{BLUE}Downloading from GitHub...{RESET}");
             fetch_dicts_from_github(dict_dir)?;
         } else {

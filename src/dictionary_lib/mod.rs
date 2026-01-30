@@ -234,37 +234,77 @@ impl Dictionary {
         }
     }
 
-    /// Loads a dictionary mapping from a file at the given path.
+    /// Loads an OpenCC dictionary file.
     ///
-    /// Each line should contain a phrase and its translation separated by whitespace.
-    ///
-    /// # Errors
-    /// Returns an `io::Error` if the file cannot be read.
+    /// Rules:
+    /// - Skip blank lines
+    /// - Skip comment/header lines starting with `#` (after trimming leading whitespace)
+    /// - Strip UTF-8 BOM (`\u{FEFF}`) on the first *data* line
+    /// - Parse strictly `key<TAB>value(s)`
+    /// - If a line is malformed, warn and skip *only that line*
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
     where
         P: AsRef<Path>,
     {
-        let file = File::open(filename)?;
+        let path = filename.as_ref();
+        let file = File::open(path)?;
         let mut dict = DictMap::default();
 
-        for line in BufReader::new(file).lines() {
-            let line = line?;
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() > 1 {
-                let key = parts[0].to_string();
-                let val = parts[1].to_string();
+        let mut saw_data_line = false;
 
-                // Unicode scalar count; keep consistent with the rest of your pipeline.
-                let len_chars = key.chars().count() as u16;
+        for (lineno, line_res) in BufReader::new(file).lines().enumerate() {
+            let line = line_res?;
+            let mut s = line.trim_end();
 
-                // Incremental stats update (no rebuild later)
-                dict.insert_with_len(key, val, len_chars);
-            } else if !line.trim().is_empty() {
-                eprintln!("Invalid line format: {}", line);
+            if s.is_empty() {
+                continue;
             }
+
+            if s.trim_start().starts_with('#') {
+                continue;
+            }
+
+            if !saw_data_line {
+                if let Some(rest) = s.strip_prefix('\u{FEFF}') {
+                    s = rest;
+                }
+                saw_data_line = true;
+
+                if s.is_empty() {
+                    continue;
+                }
+            }
+
+            let Some((k, v)) = s.split_once('\t') else {
+                eprintln!(
+                    "[warn] {}:{} skipped: missing TAB separator: {}",
+                    path.display(),
+                    lineno + 1,
+                    s
+                );
+                continue;
+            };
+
+            // Keep first candidate if multiple values exist.
+            let val = v.split_whitespace().next().unwrap_or("");
+
+            if k.is_empty() || val.is_empty() {
+                eprintln!(
+                    "[warn] {}:{} skipped: empty key/value: {}",
+                    path.display(),
+                    lineno + 1,
+                    s
+                );
+                continue;
+            }
+
+            let key = k.to_string();
+            let val = val.to_string();
+            let len_chars = key.chars().count() as u16;
+
+            dict.insert_with_len(key, val, len_chars);
         }
 
-        // If empty file, stats remain zeros; nothing to fix up.
         Ok(dict)
     }
 
