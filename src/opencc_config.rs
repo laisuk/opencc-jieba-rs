@@ -165,4 +165,54 @@ impl OpenccConfig {
             _ => return None,
         })
     }
+
+    /// Returns `true` if the given string is a supported OpenCC configuration name.
+    ///
+    /// This is a lightweight validation helper intended for:
+    /// - CLI argument checking
+    /// - UI / config file validation
+    /// - Preflight checks before calling conversion APIs
+    ///
+    /// The check is case-insensitive and does **not** allocate on success paths
+    /// beyond the internal normalization already used by `TryFrom<&str>`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenccConfig;
+    ///
+    /// assert!(OpenccConfig::is_valid_config("s2t"));
+    /// assert!(OpenccConfig::is_valid_config("T2JP"));
+    /// assert!(!OpenccConfig::is_valid_config("invalid"));
+    /// ```
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.8.5**.
+    #[inline]
+    pub fn is_valid_config(s: &str) -> bool {
+        Self::try_from(s).is_ok()
+    }
+
+    /// Returns `true` if the given numeric value corresponds to a valid FFI config.
+    ///
+    /// This is intended for validating raw `opencc_config_t` values coming from
+    /// foreign languages **before** attempting conversion.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenccConfig;
+    ///
+    /// assert!(OpenccConfig::is_valid_config_ffi(1));
+    /// assert!(!OpenccConfig::is_valid_config_ffi(999));
+    /// ```
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.8.5**.
+    #[inline]
+    pub fn is_valid_config_ffi(v: u32) -> bool {
+        Self::from_ffi(v).is_some()
+    }
 }

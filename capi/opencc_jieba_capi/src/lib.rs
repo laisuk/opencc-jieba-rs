@@ -3,6 +3,35 @@ use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
 use std::ptr;
 
+const OPENCC_JIEBA_ABI_NUMBER: u32 = 1;
+
+/// Returns the C ABI version number.
+/// This value changes ONLY when the C ABI is broken.
+#[no_mangle]
+pub extern "C" fn opencc_jieba_abi_number() -> u32 {
+    OPENCC_JIEBA_ABI_NUMBER
+}
+
+/// Returns the OpenCC-Jieba version string (UTF-8, null-terminated).
+/// Example: "0.7.3"
+///
+/// The returned pointer is valid for the lifetime of the program.
+#[no_mangle]
+pub extern "C" fn opencc_jieba_version_string() -> *const c_char {
+    // Compile-time version from Cargo.toml
+    static VERSION: &str = env!("CARGO_PKG_VERSION");
+
+    // Leak once, safe by design (process lifetime)
+    static mut CSTR: *const c_char = ptr::null();
+
+    unsafe {
+        if CSTR.is_null() {
+            CSTR = CString::new(VERSION).unwrap().into_raw();
+        }
+        CSTR
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn opencc_jieba_new() -> *mut OpenCC {
     Box::into_raw(Box::new(OpenCC::new()))
@@ -689,5 +718,30 @@ mod tests {
         }
         // Now you can safely free weights from C
         opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+    }
+
+    #[test]
+    fn opencc_abi_number_is_non_zero_and_stable() {
+        let abi = opencc_jieba_abi_number();
+
+        // ABI must be non-zero
+        assert!(abi > 0, "ABI number must be non-zero");
+
+        // Optional: lock current ABI if you want strict guarantee
+        assert_eq!(abi, 1, "Unexpected OpenCC C API ABI number");
+    }
+
+    #[test]
+    fn opencc_version_string_is_valid_utf8_and_non_empty() {
+        use std::ffi::CStr;
+
+        let ptr = opencc_jieba_version_string();
+        assert!(!ptr.is_null(), "Version string pointer must not be null");
+
+        let ver = unsafe { CStr::from_ptr(ptr) }
+            .to_str()
+            .expect("Version string must be valid UTF-8");
+
+        assert!(!ver.is_empty(), "Version string must not be empty");
     }
 }

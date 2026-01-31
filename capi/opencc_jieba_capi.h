@@ -11,6 +11,22 @@ extern "C" {
 #include <stdbool.h> // For bool type
 
 /**
+ * Returns the C ABI version number.
+ *
+ * This value is intended for runtime compatibility checks.
+ * It only changes when the C ABI is broken.
+ */
+uint32_t opencc_jieba_abi_number(void);
+
+/**
+ * Returns the Opencc-Jieba version string (null-terminated UTF-8).
+ *
+ * Example: "0.7.3"
+ * The returned pointer is valid for the lifetime of the program and MUST NOT be freed.
+ */
+const char* opencc_jieba_version_string(void);
+
+/**
  * Creates and initializes a new OpenCC JIEBA instance.
  *
  * This function allocates and returns a new instance used for conversion and segmentation.
