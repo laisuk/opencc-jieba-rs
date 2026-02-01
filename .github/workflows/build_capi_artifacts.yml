@@ -1,0 +1,178 @@
+name: Build CAPI Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or commit SHA). Leave empty for default branch HEAD."
+        required: false
+        default: ""
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # -------------------------
+          # Windows (x64) - normal
+          # -------------------------
+          - name: win-x64
+            os: windows-latest
+            platform: windows
+            arch: x64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: opencc_jieba_capi.dll
+            target_release_dir: target/release
+
+          # -------------------------
+          # Windows 7 (x64) - nightly + build-std
+          # -------------------------
+          - name: win7-x64
+            os: windows-latest
+            platform: windows
+            arch: win7-x64
+            rust_toolchain: nightly
+            is_win7: true
+            target: x86_64-win7-windows-msvc
+            dll_name: opencc_jieba_capi.dll
+            target_release_dir: target/x86_64-win7-windows-msvc/release
+
+          # -------------------------
+          # Windows 7 (x86) - nightly + build-std
+          # -------------------------
+          - name: win7-x86
+            os: windows-latest
+            platform: windows
+            arch: win7-x86
+            rust_toolchain: nightly
+            is_win7: true
+            target: i686-win7-windows-msvc
+            dll_name: opencc_jieba_capi.dll
+            target_release_dir: target/i686-win7-windows-msvc/release
+
+          # -------------------------
+          # Linux (x64)
+          # -------------------------
+          - name: linux-x64
+            os: ubuntu-latest
+            platform: linux
+            arch: x64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: libopencc_jieba_capi.so
+            target_release_dir: target/release
+
+          # -------------------------
+          # macOS (arm64)
+          # -------------------------
+          - name: macos-arm64
+            os: macos-latest
+            platform: macos
+            arch: arm64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: libopencc_jieba_capi.dylib
+            target_release_dir: target/release
+
+          # -------------------------
+          # macOS (x64 / Intel)
+          # -------------------------
+          - name: macos-x64
+            os: macos-15-intel
+            platform: macos
+            arch: x64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: libopencc_jieba_capi.dylib
+            target_release_dir: target/release
+
+    steps:
+      # Checkout: allow building a specific ref if provided
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Stable toolchain for normal builds
+      - name: Set Rust (stable)
+        if: ${{ matrix.rust_toolchain == 'stable' }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      # Nightly toolchain for Win7 builds (needs rust-src for build-std)
+      - name: Set Rust (nightly)
+        if: ${{ matrix.rust_toolchain == 'nightly' }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      # Build ONLY the C API package
+      - name: Build opencc_jieba_capi
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.is_win7 }}" = "true" ]; then
+            cargo +nightly build -r --package opencc_jieba_capi \
+              -Z build-std=std,panic_abort \
+              --target "${{ matrix.target }}"
+          else
+            cargo build -r --package opencc_jieba_capi
+          fi
+
+      # Collect the 3 required files into a clean ZIP layout
+      - name: Prepare CAPI artifact folder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT_DIR="${{ matrix.target_release_dir }}"
+          mkdir -p dist/lib dist/include
+
+          # Shared library
+          if [ ! -f "${OUT_DIR}/${{ matrix.dll_name }}" ]; then
+            echo "❌ Missing shared lib: ${OUT_DIR}/${{ matrix.dll_name }}"
+            ls -la "${OUT_DIR}" || true
+            exit 1
+          fi
+          cp "${OUT_DIR}/${{ matrix.dll_name }}" dist/lib/
+
+          # Headers
+          cp capi/opencc_jieba_capi.h dist/include/
+          cp capi/OpenccJiebaHelper.hpp dist/include/
+
+          # Optional: Windows import library if produced
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            if [ -f "${OUT_DIR}/opencc_jieba_capi.dll.lib" ]; then
+              cp "${OUT_DIR}/opencc_jieba_capi.dll.lib" dist/lib/
+            fi
+          fi
+
+      - name: Package ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use run id so manual builds don't collide
+          ARTIFACT_ZIP="opencc_jieba_capi-run${{ github.run_id }}-${{ matrix.name }}.zip"
+
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            7z a "${ARTIFACT_ZIP}" ./dist/*
+          else
+            (cd dist && zip -r "../${ARTIFACT_ZIP}" .)
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencc_jieba_capi-run${{ github.run_id }}-${{ matrix.name }}
+          path: opencc_jieba_capi-run${{ github.run_id }}-${{ matrix.name }}.zip
