@@ -329,7 +329,10 @@ impl OpenCC {
     pub fn new() -> Self {
         let dict_hans_hant_bytes = decompress_jieba_dict();
         let mut dict_hans_hant = BufReader::new(Cursor::new(dict_hans_hant_bytes));
-        let jieba = Arc::new(Jieba::with_dict(&mut dict_hans_hant).unwrap());
+        let jieba = Arc::new(
+            Jieba::with_dict(&mut dict_hans_hant)
+                .expect("embedded Jieba dictionary is invalid or corrupted"),
+        );
         let dictionary = Dictionary::new();
 
         OpenCC { jieba, dictionary }

@@ -119,7 +119,7 @@ void opencc_jieba_free_string_array(char **array);
  * @return A newly allocated string with all parts joined by the delimiter.
  *         Must be freed using `opencc_jieba_free_string()`.
  */
-char *opencc_jieba_join_str(char *const *strings, const char *delimiter);
+char *opencc_jieba_join_str(const char *const *strings, const char *delimiter);
 
 /**
  * Segments and joins an input string using Jieba, with the specified delimiter.

@@ -11,6 +11,22 @@ extern "C" {
 #include <stdbool.h> // For bool type
 
 /**
+ * Returns the C ABI version number.
+ *
+ * This value is intended for runtime compatibility checks.
+ * It only changes when the C ABI is broken.
+ */
+uint32_t opencc_jieba_abi_number(void);
+
+/**
+ * Returns the Opencc-Jieba version string (null-terminated UTF-8).
+ *
+ * Example: "0.7.3"
+ * The returned pointer is valid for the lifetime of the program and MUST NOT be freed.
+ */
+const char* opencc_jieba_version_string(void);
+
+/**
  * Creates and initializes a new OpenCC JIEBA instance.
  *
  * This function allocates and returns a new instance used for conversion and segmentation.
@@ -18,7 +34,7 @@ extern "C" {
  *
  * @return A pointer to a new instance of OpenCC JIEBA.
  */
-void *opencc_jieba_new();
+void *opencc_jieba_new(void);
 
 /**
  * Converts a null-terminated UTF-8 input string using the specified OpenCC config.
@@ -52,7 +68,7 @@ int opencc_jieba_zho_check(const void *instance, const char *input);
  * @param instance A pointer to an instance previously returned by `opencc_jieba_new`.
  *                 Passing NULL is safe and does nothing.
  */
-void opencc_jieba_delete(const void *instance);
+void opencc_jieba_delete(void *instance);
 
 /**
  * @deprecated Use `opencc_jieba_delete()` instead.
@@ -62,7 +78,7 @@ void opencc_jieba_delete(const void *instance);
  * @param instance A pointer to an instance previously returned by `opencc_jieba_new`.
  *                 Passing NULL is safe and does nothing.
  */
-void opencc_jieba_free(const void *instance);
+void opencc_jieba_free(void *instance);
 
 /**
  * Frees a string returned by `opencc_jieba_convert`, `opencc_jieba_cut_and_join`,
@@ -71,7 +87,7 @@ void opencc_jieba_free(const void *instance);
  * @param ptr A pointer to a string previously returned by the API.
  *            Passing NULL is safe and does nothing.
  */
-void opencc_jieba_free_string(const char *ptr);
+void opencc_jieba_free_string(char *ptr);
 
 /**
  * Performs segmentation on a UTF-8 input string using Jieba.
@@ -103,7 +119,7 @@ void opencc_jieba_free_string_array(char **array);
  * @return A newly allocated string with all parts joined by the delimiter.
  *         Must be freed using `opencc_jieba_free_string()`.
  */
-char *opencc_jieba_join_str(char **strings, const char *delimiter);
+char *opencc_jieba_join_str(const char *const *strings, const char *delimiter);
 
 /**
  * Segments and joins an input string using Jieba, with the specified delimiter.
@@ -129,7 +145,7 @@ char *opencc_jieba_cut_and_join(const void *instance, const char *input, bool hm
  * @return A NULL-terminated array of UTF-8 C strings representing keywords.
  *         Must be freed using `opencc_jieba_free_string_array()`.
  */
-char **opencc_jieba_keywords(const void *instance, const char *input, int top_k, const char *method);
+char **opencc_jieba_keywords(const void *instance, const char *input, size_t top_k, const char *method);
 
 /**
  * Extracts keywords and their corresponding weights using TextRank or TF-IDF.
