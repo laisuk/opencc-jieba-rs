@@ -38,7 +38,7 @@
 /// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)     | ❌ (ignored)                |
 /// # Since
 ///
-/// Available since **v0.8.4**.
+/// Available since **v0.7.3**.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenccConfig {
@@ -100,7 +100,7 @@ impl TryFrom<&str> for OpenccConfig {
     /// This is primarily used by [`OpenCC::convert`] to support legacy `&str` configs.
     /// # Since
     ///
-    /// Available since **v0.8.4**.
+    /// Available since **v0.7.3**.
     type Error = ();
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
@@ -142,7 +142,7 @@ impl OpenccConfig {
     /// ```
     /// # Since
     ///
-    /// Available since **v0.8.4**.
+    /// Available since **v0.7.3**.
     #[inline]
     pub fn from_ffi(v: u32) -> Option<Self> {
         Some(match v {
@@ -188,7 +188,7 @@ impl OpenccConfig {
     ///
     /// # Since
     ///
-    /// Available since **v0.8.5**.
+    /// Available since **v0.7.3**.
     #[inline]
     pub fn is_valid_config(s: &str) -> bool {
         Self::try_from(s).is_ok()
@@ -210,7 +210,7 @@ impl OpenccConfig {
     ///
     /// # Since
     ///
-    /// Available since **v0.8.5**.
+    /// Available since **v0.7.3**.
     #[inline]
     pub fn is_valid_config_ffi(v: u32) -> bool {
         Self::from_ffi(v).is_some()

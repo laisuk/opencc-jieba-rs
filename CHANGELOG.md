@@ -6,25 +6,41 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.3] - 2026-02-07
+
+### Added
+
+- Introduced `OpenccConfig` Enum as conversion configuration.
+- Added `convert_with_config()`.
+
+### Changed
+
+- C API:
+    - Improved memory management.
+    - Add `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
+
+---
+
 ## [0.7.2] – 2025-10-28
 
 ### Changed
 
-- **Dictionary migration:** all `HashMap<String, String>` fields are now refactored into the new **`DictMap`** structure.  
+- **Dictionary migration:** all `HashMap<String, String>` fields are now refactored into the new **`DictMap`**
+  structure.  
   Each `DictMap` includes:
-  - `min_len` — shortest key length (in Unicode scalars)
-  - `max_len` — longest key length
-  - `key_len_mask` — bitmask for fast length gating (1 → 64)
-  - `long_lengths` — explicit set for keys > 64
+    - `min_len` — shortest key length (in Unicode scalars)
+    - `max_len` — longest key length
+    - `key_len_mask` — bitmask for fast length gating (1 → 64)
+    - `long_lengths` — explicit set for keys > 64
 
 - **Serialization:**
-  - Dropped legacy/custom Serde fallback.
-  - Enforced strict JSON schema with `#[serde(deny_unknown_fields)]`.
-  - Introduced **schema version 2** for dictionary consistency.
+    - Dropped legacy/custom Serde fallback.
+    - Enforced strict JSON schema with `#[serde(deny_unknown_fields)]`.
+    - Introduced **schema version 2** for dictionary consistency.
 
 - **Embedded artifact:**
-  - `dictionary_lib` now embeds a rebuilt `dictionary.json.zst` (strict v2 schema).
-  - Verified with **44 / 44 passing tests** across all dictionary and conversion cases.
+    - `dictionary_lib` now embeds a rebuilt `dictionary.json.zst` (strict v2 schema).
+    - Verified with **44 / 44 passing tests** across all dictionary and conversion cases.
 
 --
 
@@ -39,7 +55,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Fixed CLI tool opencc-jieba office pptx (temp file/directory creation error) and epub (Windows file/directory access denied error).
+- Fixed CLI tool opencc-jieba office pptx (temp file/directory creation error) and epub (Windows file/directory access
+  denied error).
 
 ---
 

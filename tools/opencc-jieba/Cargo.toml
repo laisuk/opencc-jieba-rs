@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = { path = "../.." }
-clap = "4.5.56"
+clap = "4.5.57"
 encoding_rs = "0.8.35"
 encoding_rs_io = "0.1.7"
 regex = "1.12.2"
