@@ -26,6 +26,12 @@ jobs:
             bin_ext: ''
             dll_name: libopencc_jieba_capi.dylib
             archive_ext: tar.gz
+          - os: macos-15-intel
+            platform: macos
+            arch: x64
+            bin_ext: ''
+            dll_name: libopencc_jieba_capi.dylib
+            archive_ext: tar.gz
           - os: windows-latest
             platform: windows
             arch: x64
@@ -36,11 +42,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ✅ Pin toolchain to Rust 1.82.0
-      - name: Set Rust 1.82.0
+      # ✅ Pin toolchain to Rust stable
+      - name: Set Rust stable
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.82.0
+          toolchain: stable
           components: clippy,rustfmt
 
       - name: Build Project
