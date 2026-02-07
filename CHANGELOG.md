@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Code optimization.
 - C API:
     - Improved memory management.
     - Add `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
