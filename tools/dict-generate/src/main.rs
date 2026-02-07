@@ -1,4 +1,4 @@
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use opencc_jieba_rs::dictionary_lib::Dictionary;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -8,8 +8,8 @@ use std::{env, fs, io};
 use ureq::Agent;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const BLUE: &str = "\x1B[1;34m"; // Bold Blue
-    const RESET: &str = "\x1B[0m"; // Reset color
+    const BLUE: &str = "\x1B[1;34m";
+    const RESET: &str = "\x1B[0m";
 
     let matches = Command::new("Dictionary Generator")
         .arg(
@@ -27,6 +27,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .value_name("filename")
                 .help("Write generated dictionary to <filename>. If not specified, a default filename is used."),
         )
+        .arg(
+            Arg::new("download_dicts")
+                .long("download-dicts")
+                .action(ArgAction::SetTrue)
+                .help("Download missing OpenCC dict files into ./dicts/ from GitHub (non-interactive)."),
+        )
         .about(format!(
             "{BLUE}Dict Generator: Command Line Dictionary Generator for opencc-jieba-rs{RESET}"
         ))
@@ -34,20 +40,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let dict_dir = Path::new("dicts");
     if !dict_dir.exists() {
-        eprint!("{BLUE}Local 'dicts/' not found. Proceed with downloading dictionaries from GitHub? (y/N): {RESET}");
-        io::stdout().flush()?; // Ensure prompt is printed before read_line
+        let want_download = matches.get_flag("download_dicts");
 
-        let mut answer = String::new();
-        io::stdin().read_line(&mut answer)?;
-        let answer = answer.trim().to_lowercase();
-
-        if answer == "y" || answer == "yes" {
-            eprintln!("{BLUE}Downloading from GitHub...{RESET}");
-            fetch_dicts_from_github(dict_dir)?;
-        } else {
-            eprintln!("{BLUE}Aborted by user. Exiting.{RESET}");
-            return Ok(()); // or `std::process::exit(0);` if you want a hard exit
+        if !want_download {
+            eprintln!(
+                "{BLUE}Local 'dicts/' not found.{RESET}\n\
+                 {BLUE}Hint:{RESET} run with {BLUE}--download-dicts{RESET} to fetch from GitHub, \
+                 or provide the dict files manually.\n\
+                 {BLUE}Exiting.{RESET}"
+            );
+            std::process::exit(2);
         }
+
+        eprintln!("{BLUE}Local 'dicts/' not found. Downloading from GitHub...{RESET}");
+        fetch_dicts_from_github(dict_dir)?;
+        eprintln!("{BLUE}Tip: reuse ./dicts/ for future runs to skip downloads.");
     }
 
     let dict_format = matches.get_one::<String>("format").map(String::as_str);
@@ -86,6 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         other => {
             let format_str = other.unwrap_or("unknown");
             eprintln!("{BLUE}Unsupported format: {format_str}{RESET}");
+            std::process::exit(2);
         }
     }
 
@@ -136,15 +144,14 @@ fn fetch_dicts_from_github(dict_dir: &Path) -> Result<(), Box<dyn std::error::Er
         );
 
         let response = agent.get(&url).call()?;
-        let mut content = String::new();
-        response
-            .into_body()
-            .into_reader()
-            .read_to_string(&mut content)?;
+
+        // Read as bytes (don’t assume UTF-8)
+        let mut bytes = Vec::new();
+        response.into_body().into_reader().read_to_end(&mut bytes)?;
 
         let dest_path = dict_dir.join(filename);
         let mut file = File::create(dest_path)?;
-        file.write_all(content.as_bytes())?;
+        file.write_all(&bytes)?;
 
         eprintln!("Downloaded: {}", filename);
     }
