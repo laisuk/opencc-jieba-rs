@@ -1,0 +1,96 @@
+name: Build macOS Universal CAPI Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or commit SHA). Leave empty for default branch HEAD."
+        required: false
+        default: ""
+
+jobs:
+  build_osx_universal:
+    name: Build (macos-universal)
+    runs-on: macos-latest
+
+    steps:
+      # Checkout: allow building a specific ref if provided
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Rust stable
+      - name: Set Rust (stable)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      # Ensure both macOS targets exist
+      - name: Add Rust targets (macOS arm64 + x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      # Build BOTH arch dylibs (C API package only)
+      - name: Build opencc_jieba_capi (arm64 + x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cargo build -r --package opencc_jieba_capi --target aarch64-apple-darwin
+          cargo build -r --package opencc_jieba_capi --target x86_64-apple-darwin
+
+      # Merge into a single universal dylib using lipo
+      - name: Create universal dylib (lipo)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARM_OUT="target/aarch64-apple-darwin/release/libopencc_jieba_capi.dylib"
+          X64_OUT="target/x86_64-apple-darwin/release/libopencc_jieba_capi.dylib"
+
+          if [ ! -f "$ARM_OUT" ]; then
+            echo "❌ Missing arm64 dylib: $ARM_OUT"
+            ls -la "target/aarch64-apple-darwin/release" || true
+            exit 1
+          fi
+
+          if [ ! -f "$X64_OUT" ]; then
+            echo "❌ Missing x64 dylib: $X64_OUT"
+            ls -la "target/x86_64-apple-darwin/release" || true
+            exit 1
+          fi
+
+          mkdir -p dist/lib dist/include
+
+          # Create universal dylib
+          lipo -create "$ARM_OUT" "$X64_OUT" -output "dist/lib/libopencc_jieba_capi.dylib"
+
+          # Sanity: show architectures
+          lipo -info "dist/lib/libopencc_jieba_capi.dylib"
+
+      # Headers
+      - name: Copy headers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cp capi/opencc_jieba_capi.h dist/include/
+          cp capi/OpenccJiebaHelper.hpp dist/include/
+
+      # Package ZIP
+      - name: Package ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARTIFACT_ZIP="opencc_jieba_capi-run${{ github.run_id }}-macos-universal.zip"
+          (cd dist && zip -r "../${ARTIFACT_ZIP}" .)
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencc_jieba_capi-run${{ github.run_id }}-macos-universal
+          path: opencc_jieba_capi-run${{ github.run_id }}-macos-universal.zip
