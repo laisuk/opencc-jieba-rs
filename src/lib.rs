@@ -170,7 +170,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::BufReader;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::ops::Range;
 use std::sync::Arc;
 use zstd::stream::read::Decoder;
@@ -181,12 +181,6 @@ mod opencc_config;
 pub use opencc_config::OpenccConfig;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
-
-// static DELIMITER_SET: Lazy<HashSet<char>> = Lazy::new(|| {
-//     " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；："
-//         .chars()
-//         .collect()
-// });
 
 /// Master delimiter string containing all punctuation and whitespace
 /// considered as token boundaries by OpenCC-Jieba.
@@ -327,15 +321,20 @@ impl OpenCC {
     /// let opencc = OpenCC::new();
     /// ```
     pub fn new() -> Self {
-        let dict_hans_hant_bytes = decompress_jieba_dict();
-        let mut dict_hans_hant = BufReader::new(Cursor::new(dict_hans_hant_bytes));
-        let jieba = Arc::new(
-            Jieba::with_dict(&mut dict_hans_hant)
-                .expect("embedded Jieba dictionary is invalid or corrupted"),
-        );
-        let dictionary = Dictionary::new();
+        let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
+        let decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
 
-        OpenCC { jieba, dictionary }
+        // Decoder: Read, so wrap it to become BufRead
+        let mut buf = BufReader::new(decoder);
+
+        let jieba = Arc::new(
+            Jieba::with_dict(&mut buf).expect("embedded Jieba dictionary is invalid or corrupted"),
+        );
+
+        OpenCC {
+            jieba,
+            dictionary: Dictionary::new(),
+        }
     }
 
     /// Performs dictionary-based phrase-level conversion with character-level fallback.
@@ -1554,29 +1553,4 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
         byte_count -= 1;
     }
     byte_count
-}
-
-/// Decompresses the embedded Jieba dictionary using Zstandard compression.
-///
-/// This function loads the compressed dictionary from the binary (`DICT_HANS_HANT_ZSTD`),
-/// decompresses it using the `zstd` crate, and returns the raw bytes of the dictionary
-/// data without performing UTF-8 validation or conversion.
-///
-/// This is used internally for initializing Jieba with a dictionary reader.
-///
-/// # Panics
-///
-/// Panics if decompression fails or the dictionary cannot be read into memory.
-///
-/// # Returns
-///
-/// A `Vec<u8>` containing the decompressed dictionary data as raw bytes.
-fn decompress_jieba_dict() -> Vec<u8> {
-    let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
-    let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
-    let mut decompressed = Vec::new();
-    decoder
-        .read_to_end(&mut decompressed)
-        .expect("Failed to decompress dictionary");
-    decompressed
 }

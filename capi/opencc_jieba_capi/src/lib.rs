@@ -454,41 +454,6 @@ fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
     arr
 }
 
-#[allow(dead_code)]
-fn cstr_ptr_to_vec(keyword: *mut *mut c_char) -> Vec<String> {
-    // Convert result to Vec<String>
-    let mut result_strings = Vec::new();
-    let mut i = 0;
-    loop {
-        let ptr = unsafe { *keyword.offset(i) };
-        if ptr.is_null() {
-            break;
-        }
-        let c_str = unsafe { CString::from_raw(ptr) };
-        let string = c_str.to_str().unwrap().to_owned();
-        result_strings.push(string);
-        i += 1;
-    }
-    result_strings
-}
-
-#[allow(dead_code)]
-fn cstr_ptr_to_vec_borrowed(keyword: *mut *mut c_char) -> Vec<String> {
-    let mut result_strings = Vec::new();
-    let mut i = 0;
-    loop {
-        let ptr = unsafe { *keyword.offset(i) };
-        if ptr.is_null() {
-            break;
-        }
-        let c_str = unsafe { CStr::from_ptr(ptr) };
-        let string = c_str.to_str().unwrap().to_owned();
-        result_strings.push(string);
-        i += 1;
-    }
-    result_strings
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,18 +533,37 @@ mod tests {
 
     #[test]
     fn test_opencc_jieba_cut() {
+        use std::ffi::{CStr, CString};
         // Create OpenCC instance
         let opencc = OpenCC::new();
-        // Input string
+
+        // Input string (owned by Rust, must be reclaimed)
         let input = CString::new("你好，世界！").unwrap().into_raw();
+
         // Perform segmentation
         let result = opencc_jieba_cut(&opencc as *const OpenCC, input, true);
-        let result_strings = cstr_ptr_to_vec_borrowed(result);
-        println!("{:?}", result_strings);
+
+        // Convert result to Vec<&str> by borrowing (no ownership transfer)
+        let mut out: Vec<&str> = Vec::new();
+        unsafe {
+            let mut i: isize = 0;
+            loop {
+                let ptr = *result.offset(i);
+                if ptr.is_null() {
+                    break;
+                }
+                let s = CStr::from_ptr(ptr).to_str().expect("non-UTF8 token");
+                out.push(s);
+                i += 1;
+            }
+        }
+
+        println!("{:?}", out);
+
         // Expected result
         let expected = vec!["你好", "，", "世界", "！"];
-        // Check if result matches expected
-        assert_eq!(result_strings, expected);
+        assert_eq!(out, expected);
+
         // Free memory
         unsafe {
             opencc_jieba_free_string_array(result);
@@ -633,41 +617,65 @@ mod tests {
 
     #[test]
     fn test_opencc_jieba_keyword_extract_textrank() {
+        use std::ffi::CString;
+
         // Create OpenCC instance
         let opencc = OpenCC::new();
-        // Input string
+
+        // Input string (owned by Rust, must be reclaimed)
         let input = CString::new(include_str!("../../../src/OneDay.txt"))
             .unwrap()
             .into_raw();
+
+        // Method string (owned by Rust, must be reclaimed)
         let method_str = CString::new("textrank").unwrap().into_raw();
-        // Perform segmentation
+
+        // Extract keywords
         let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
-        let result_strings = cstr_ptr_to_vec_borrowed(result);
-        println!("TextRank: {:?}", result_strings);
+        assert!(!result.is_null());
+
+        // Borrow result tokens as &str (no ownership transfer)
+        let out: Vec<&str> = unsafe { cstr_array_to_vec_str(result) };
+
+        println!("TextRank: {:?}", out);
+
         // Free memory
         unsafe {
             opencc_jieba_free_string_array(result);
             let _ = CString::from_raw(input);
+            let _ = CString::from_raw(method_str);
         }
     }
 
     #[test]
     fn test_opencc_jieba_keyword_extract_tfidf() {
+        use std::ffi::CString;
+
         // Create OpenCC instance
         let opencc = OpenCC::new();
+
         // Input string
         let input = CString::new(include_str!("../../../src/OneDay.txt"))
             .unwrap()
             .into_raw();
+
+        // Method string
         let method_str = CString::new("tfidf").unwrap().into_raw();
-        // Perform segmentation
+
+        // Extract keywords
         let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_str);
-        let result_strings = cstr_ptr_to_vec_borrowed(result);
-        println!("TF-IDF :{:?}", result_strings);
+        assert!(!result.is_null());
+
+        // Borrow result tokens as &str (no ownership transfer)
+        let out: Vec<&str> = unsafe { cstr_array_to_vec_str(result) };
+
+        println!("TF-IDF: {:?}", out);
+
         // Free memory
         unsafe {
             opencc_jieba_free_string_array(result);
             let _ = CString::from_raw(input);
+            let _ = CString::from_raw(method_str);
         }
     }
 
@@ -718,6 +726,23 @@ mod tests {
         }
         // Now you can safely free weights from C
         opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+    }
+
+    #[cfg(test)]
+    unsafe fn cstr_array_to_vec_str<'a>(arr: *mut *mut std::os::raw::c_char) -> Vec<&'a str> {
+        assert!(!arr.is_null());
+
+        let mut out = Vec::new();
+        let mut i: isize = 0;
+        loop {
+            let p = *arr.offset(i);
+            if p.is_null() {
+                break;
+            }
+            out.push(CStr::from_ptr(p).to_str().expect("non-UTF8 token"));
+            i += 1;
+        }
+        out
     }
 
     #[test]
