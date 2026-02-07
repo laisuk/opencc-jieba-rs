@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Update Lexicon dictionary to v1.2.0.
 - Code optimization.
 - C API:
     - Improved memory management.
