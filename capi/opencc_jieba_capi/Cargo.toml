@@ -3,6 +3,9 @@ name = "opencc_jieba_capi"
 version = "0.7.3"
 edition = "2021"
 
+[package.metadata.capi]
+revision = 0
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -11,3 +14,7 @@ libc = "0.2.180"
 
 [lib]
 crate-type = ["cdylib"]
+
+[build-dependencies]
+winres = "0.1.12"
+toml = "=0.8.23"

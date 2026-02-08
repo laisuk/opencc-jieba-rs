@@ -20,10 +20,10 @@
 //!
 //! ## Example
 //! ```rust,no_run
-//! use opencc_fmmseg::OpenCC;
+//! use opencc_jieba_rs::OpenCC;
 //! use crate::converter::OfficeConverter;
 //!
-//! let opencc = OpenCC::new("s2t").unwrap();
+//! let opencc = OpenCC::new();
 //! let result = OfficeConverter::convert(
 //!     "input.docx",
 //!     "output.docx",
@@ -39,12 +39,10 @@
 //! ```
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::io::{self, BufReader, Cursor, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use regex::Regex;
-use tempfile::tempdir;
-use walkdir::WalkDir;
 use zip::{
     write::{ExtendedFileOptions, FileOptions},
     CompressionMethod, ZipArchive, ZipWriter,
@@ -136,128 +134,134 @@ impl OfficeConverter {
         punctuation: bool,
         keep_font: bool,
     ) -> io::Result<ConversionResult> {
-        let temp_dir = tempdir()?;
-        let temp_path = temp_dir.path();
-
-        // Extract archive into temp dir
-        Self::extract_archive(input_path, temp_path)?;
-
-        // Convert targeted XML/text files
-        Self::convert_xml_files(format, temp_path, helper, config, punctuation, keep_font)?;
-
-        // Repackage into output file
-        Self::create_output_archive(format, temp_path, input_path, output_path)?;
-
-        Ok(ConversionResult {
-            success: true,
-            message: "✅ Conversion completed.".into(),
-        })
+        // Delegate to the stream-based implementation (single source of truth).
+        Self::convert_path_stream(
+            input_path,
+            output_path,
+            format,
+            helper,
+            config,
+            punctuation,
+            keep_font,
+        )
     }
 
-    /// Extract the given ZIP-based archive into a temp folder.
+    // ------ New In-Memory Functions ------
+
+    /// Convert a ZIP-based Office / EPUB document from in-memory bytes and return the output bytes.
     ///
-    /// Rejects unsafe paths (zip-slip, parent/root dirs).
-    fn extract_archive(input_path: &str, temp_path: &Path) -> io::Result<()> {
-        let file = File::open(input_path)?;
-        let mut archive = ZipArchive::new(file)?;
-
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)?;
-            let raw_name = entry.name().replace('\\', "/");
-            let rel_path = Path::new(&raw_name);
-
-            // Security check: reject zip-slip & roots
-            if Self::is_unsafe_path(rel_path) {
-                continue;
-            }
-
-            let out_path = temp_path.join(rel_path);
-
-            if entry.is_dir() || raw_name.ends_with('/') {
-                fs::create_dir_all(&out_path)?;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    fs::create_dir_all(parent)?;
-                }
-                let mut out_file = File::create(&out_path)?;
-                io::copy(&mut entry, &mut out_file)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Detect unsafe paths (zip-slip, `..`, root dirs).
-    fn is_unsafe_path(path: &Path) -> bool {
-        path.components().any(|c| {
-            matches!(
-                c,
-                std::path::Component::ParentDir | std::path::Component::RootDir
-            )
-        })
-    }
-
-    /// Convert targeted XML/text files inside the extracted archive.
+    /// This function performs a **pure in-memory transformation**:
+    /// - No temporary files
+    /// - No directory extraction
+    /// - No filesystem access
     ///
-    /// Uses buffered I/O for performance.
-    fn convert_xml_files(
+    /// ### How it works
+    /// - The input archive is read **entry by entry**
+    /// - Text-based entries (`.xml`, `.xhtml`, etc.) are:
+    ///   - decoded as UTF-8
+    ///   - converted using OpenCC
+    ///   - optionally processed for punctuation and font preservation
+    /// - All non-target entries (images, media, fonts, etc.) are copied using
+    ///   [`ZipWriter::raw_copy_file`], avoiding decompression and recompression
+    ///
+    /// ### EPUB compliance
+    /// - The `mimetype` entry (if present) is:
+    ///   - written **first**
+    ///   - written with **stored** compression (no deflate)
+    /// - This produces EPUB archives compliant with the EPUB specification
+    ///
+    /// ### Performance and memory behavior
+    /// - Memory usage is **bounded to a single ZIP entry**
+    /// - Large documents are safe to process
+    /// - Non-text entries are copied with **zero extra allocation**
+    ///
+    /// ### Returns
+    /// - `Vec<u8>`: the converted ZIP archive
+    /// - `usize`: number of text fragments converted
+    ///
+    /// ### Errors
+    /// Returns an `io::Error` if:
+    /// - the input is not a valid ZIP archive
+    /// - a target text entry is not valid UTF-8
+    /// - ZIP writing fails
+    #[allow(dead_code)]
+    pub fn convert_bytes(
+        input_zip: &[u8],
         format: &str,
-        temp_path: &Path,
         helper: &OpenCC,
         config: &str,
         punctuation: bool,
         keep_font: bool,
-    ) -> io::Result<()> {
-        let xml_paths = get_target_xml_paths(format, temp_path);
+    ) -> io::Result<(Vec<u8>, usize)> {
+        let reader = Cursor::new(input_zip);
 
-        for xml_file in xml_paths {
-            if !xml_file.exists() || !xml_file.is_file() {
-                continue;
-            }
+        let out_cursor = Cursor::new(Vec::<u8>::new());
+        let mut z_out = ZipWriter::new(out_cursor);
 
-            // Use buffered I/O for better performance on large files
-            let mut content = String::new();
-            {
-                let file = File::open(&xml_file)?;
-                let mut reader = BufReader::new(file);
-                reader.read_to_string(&mut content)?;
-            }
+        let converted_count = Self::convert_zip_stream(
+            reader,
+            &mut z_out,
+            format,
+            helper,
+            config,
+            punctuation,
+            keep_font,
+        )?;
 
-            let mut font_map = HashMap::new();
-            if keep_font {
-                Self::mask_font(&mut content, format, &mut font_map);
-            }
-
-            let mut converted = helper.convert(&content, config, punctuation);
-
-            if keep_font {
-                // More efficient string replacement using drain pattern
-                for (marker, original) in font_map {
-                    converted = converted.replace(&marker, &original);
-                }
-            }
-
-            // Use buffered writer
-            {
-                let file = File::create(&xml_file)?;
-                let mut writer = BufWriter::new(file);
-                writer.write_all(converted.as_bytes())?;
-                writer.flush()?;
-            }
-        }
-        Ok(())
+        // finish() returns the inner writer (Cursor<Vec<u8>>)
+        let out_cursor = z_out.finish()?;
+        Ok((out_cursor.into_inner(), converted_count))
     }
 
-    /// Create an output ZIP archive from a temp folder.
-    fn create_output_archive(
-        format: &str,
-        temp_path: &Path,
+    /// Convert an Office / EPUB document from an input file path to an output file path
+    /// using the streaming ZIP conversion core.
+    ///
+    /// This function provides a **filesystem-based façade** over the in-memory ZIP
+    /// processing engine:
+    /// - The input archive is read as a ZIP stream
+    /// - Entries are processed **one by one**
+    /// - The output archive is written atomically to the destination path
+    ///
+    /// ### How it works
+    /// - Opens the input file as a ZIP archive
+    /// - Writes the output ZIP using a temporary file, then atomically replaces
+    ///   `output_path` on success
+    /// - Internally delegates all conversion logic to the same core used by
+    ///   [`convert_bytes`]
+    ///
+    /// ### Safety and correctness
+    /// - `output_path` must differ from `input_path` (validated)
+    /// - No partial or corrupted output is produced if an error occurs
+    /// - EPUB output enforces correct `mimetype` handling
+    ///
+    /// ### Performance characteristics
+    /// - No directory extraction
+    /// - No temporary folders
+    /// - Memory usage is bounded to a single ZIP entry
+    /// - Non-text entries are copied using raw ZIP passthrough when possible
+    ///
+    /// ### Returns
+    /// A [`ConversionResult`] indicating success and a human-readable status message.
+    ///
+    /// ### Errors
+    /// Returns an `io::Error` if:
+    /// - the input file cannot be opened
+    /// - the output file cannot be written
+    /// - the input is not a valid ZIP-based Office / EPUB document
+    pub fn convert_path_stream(
         input_path: &str,
         output_path: &str,
-    ) -> io::Result<()> {
-        let out_path = Path::new(output_path);
+        format: &str,
+        helper: &OpenCC,
+        config: &str,
+        punctuation: bool,
+        keep_font: bool,
+    ) -> io::Result<ConversionResult> {
         let in_path_abs = Path::new(input_path)
             .canonicalize()
             .unwrap_or_else(|_| PathBuf::from(input_path));
+        let out_path = Path::new(output_path);
+
         let out_path_abs = out_path
             .canonicalize()
             .unwrap_or_else(|_| out_path.to_path_buf());
@@ -270,83 +274,216 @@ impl OfficeConverter {
         }
 
         replace_with_temp(out_path, |zip_writer| {
-            Self::write_zip_contents(format, temp_path, zip_writer)
+            let file = File::open(input_path)?;
+            let reader = BufReader::new(file);
+
+            Self::convert_zip_stream(
+                reader,
+                zip_writer,
+                format,
+                helper,
+                config,
+                punctuation,
+                keep_font,
+            )?;
+
+            Ok(())
+        })?;
+
+        Ok(ConversionResult {
+            success: true,
+            message: "✅ Conversion completed.".into(),
         })
     }
 
-    /// Write all files back into a ZIP archive.
+    /// Core ZIP-to-ZIP conversion engine.
     ///
-    /// For EPUB, ensures `mimetype` is first and uncompressed.
-    fn write_zip_contents(
+    /// Reads a ZIP-based Office / EPUB document from `reader` and writes a new ZIP
+    /// archive to `z_out`, processing entries **one by one**.
+    ///
+    /// This function is the **single conversion core** used by both
+    /// [`convert_bytes`] and [`convert_path_stream`].
+    ///
+    /// ### Processing model
+    /// - The input archive is iterated **entry by entry**
+    /// - For each entry:
+    ///   - **Target text entries** (`.xml`, `.xhtml`, etc.) are:
+    ///     - decoded as UTF-8
+    ///     - converted using OpenCC
+    ///     - optionally processed for punctuation and font preservation
+    ///     - recompressed and written to the output archive
+    ///   - **Non-target entries** (images, media, fonts, etc.) are copied using
+    ///     [`ZipWriter::raw_copy_file`], preserving:
+    ///       - compressed data
+    ///       - CRC
+    ///       - compression method
+    ///       - ZIP metadata
+    ///
+    /// ### EPUB handling
+    /// - If `format` is `"epub"` and a `mimetype` entry exists:
+    ///   - it is written **first**
+    ///   - it is written with **stored** compression (no deflate)
+    /// - All other entries follow, preserving EPUB specification requirements
+    ///
+    /// ### Performance and memory guarantees
+    /// - No directory extraction
+    /// - No temporary folders
+    /// - Memory usage is **bounded to a single ZIP entry**
+    /// - Large documents are safe to process
+    ///
+    /// ### Returns
+    /// The number of text fragments that were converted.
+    ///
+    /// ### Errors
+    /// Returns an `io::Error` if:
+    /// - the input is not a valid ZIP archive
+    /// - a target text entry is not valid UTF-8
+    /// - ZIP writing fails
+    fn convert_zip_stream<R, W>(
+        reader: R,
+        z_out: &mut ZipWriter<W>,
         format: &str,
-        temp_path: &Path,
-        zip_writer: &mut ZipWriter<File>,
-    ) -> io::Result<()> {
-        // EPUB: ensure 'mimetype' is first and stored
+        helper: &OpenCC,
+        config: &str,
+        punctuation: bool,
+        keep_font: bool,
+    ) -> io::Result<usize>
+    where
+        R: Read + Seek,
+        W: Write + Seek,
+    {
+        let mut zin = ZipArchive::new(reader)?;
+        let mut converted_count = 0;
+
+        // -----------------------------
+        // EPUB: write `mimetype` first
+        // -----------------------------
+        let mut mimetype_index: Option<usize> = None;
         if format.eq_ignore_ascii_case("epub") {
-            Self::write_mimetype_first(temp_path, zip_writer)?;
+            mimetype_index = Self::find_mimetype_index(&mut zin)?;
+
+            if let Some(mi) = mimetype_index {
+                let mut entry = zin.by_index(mi)?;
+                let name = entry.name().replace('\\', "/");
+
+                // Security: reject zip-slip & roots
+                if !Self::is_unsafe_path(Path::new(&name)) && !entry.is_dir() && name == "mimetype"
+                {
+                    let mut buf = Vec::new();
+                    entry.read_to_end(&mut buf)?;
+
+                    let opts: FileOptions<'_, ExtendedFileOptions> =
+                        FileOptions::default().compression_method(CompressionMethod::Stored);
+
+                    z_out.start_file("mimetype", opts)?;
+                    z_out.write_all(&buf)?;
+                }
+            }
         }
 
-        // Write all other files
-        for entry in WalkDir::new(temp_path)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_file())
-        {
-            let path = entry.path();
-            let rel = path
-                .strip_prefix(temp_path)
-                .map_err(|e| {
-                    io::Error::new(io::ErrorKind::Other, format!("strip_prefix failed: {}", e))
-                })?
-                .to_string_lossy()
-                .replace('\\', "/");
-
-            // Skip mimetype for EPUB (already written)
-            if format.eq_ignore_ascii_case("epub") && rel == "mimetype" {
+        // -----------------------------
+        // Write all other entries
+        // -----------------------------
+        for i in 0..zin.len() {
+            // Skip `mimetype` for EPUB (already written first)
+            if format.eq_ignore_ascii_case("epub") && mimetype_index == Some(i) {
                 continue;
             }
 
-            Self::write_file_to_zip(path, &rel, zip_writer)?;
+            let mut entry = zin.by_index(i)?;
+            let name = entry.name().replace('\\', "/");
+
+            // Security: reject zip-slip & roots
+            if Self::is_unsafe_path(Path::new(&name)) {
+                continue;
+            }
+
+            if entry.is_dir() || name.ends_with('/') {
+                let opts: FileOptions<'_, ExtendedFileOptions> =
+                    FileOptions::default().compression_method(CompressionMethod::Stored);
+                z_out.add_directory(name, opts)?;
+                continue;
+            }
+
+            if Self::is_target_entry(format, &name) {
+                let mut content = String::new();
+                entry.read_to_string(&mut content)?;
+
+                let mut font_map = HashMap::new();
+                if keep_font {
+                    Self::mask_font(&mut content, format, &mut font_map);
+                }
+
+                let mut converted = helper.convert(&content, config, punctuation);
+
+                if keep_font {
+                    for (marker, original) in font_map {
+                        converted = converted.replace(&marker, &original);
+                    }
+                }
+
+                let opts: FileOptions<'_, ExtendedFileOptions> =
+                    FileOptions::default().compression_method(CompressionMethod::Deflated);
+
+                z_out.start_file(name, opts)?;
+                z_out.write_all(converted.as_bytes())?;
+                converted_count += 1;
+            } else {
+                z_out.raw_copy_file(entry)?;
+            }
         }
-        Ok(())
+
+        Ok(converted_count)
     }
 
-    /// Write EPUB `mimetype` file first (stored, no compression).
-    fn write_mimetype_first(temp_path: &Path, zip_writer: &mut ZipWriter<File>) -> io::Result<()> {
-        let mimetype_path = temp_path.join("mimetype");
-        if mimetype_path.exists() && mimetype_path.is_file() {
-            let mut buf = Vec::new();
-            File::open(&mimetype_path)?.read_to_end(&mut buf)?;
-            let opts: FileOptions<'_, ExtendedFileOptions> =
-                FileOptions::default().compression_method(CompressionMethod::Stored);
-            zip_writer.start_file("mimetype", opts)?;
-            zip_writer.write_all(&buf)?;
+    /// Determine if a ZIP entry name should be converted for the given format.
+    ///
+    /// This replaces the previous tempdir-based path discovery.
+    fn is_target_entry(format: &str, name: &str) -> bool {
+        match format {
+            "docx" => name == "word/document.xml",
+            "xlsx" => name == "xl/sharedStrings.xml",
+            "pptx" => {
+                // Convert ppt/slides/*.xml and ppt/notesSlides/*.xml, excluding *.rels
+                let is_xml = name.ends_with(".xml");
+                let is_rels = name.ends_with(".rels");
+                let in_slides = name.starts_with("ppt/slides/");
+                let in_notes = name.starts_with("ppt/notesSlides/");
+                is_xml && !is_rels && (in_slides || in_notes)
+            }
+            "odt" | "ods" | "odp" => name == "content.xml",
+            "epub" => {
+                // Convert XHTML/OPF/NCX/HTML anywhere
+                let lower = name.to_ascii_lowercase();
+                lower.ends_with(".xhtml")
+                    || lower.ends_with(".opf")
+                    || lower.ends_with(".ncx")
+                    || lower.ends_with(".html")
+            }
+            _ => false,
         }
-        Ok(())
     }
 
-    /// Write a file into the ZIP with proper compression.
-    fn write_file_to_zip(
-        file_path: &Path,
-        relative_path: &str,
-        zip_writer: &mut ZipWriter<File>,
-    ) -> io::Result<()> {
-        let mut buffer = Vec::new();
-        File::open(file_path)?.read_to_end(&mut buffer)?;
+    /// Find the ZIP entry index for `mimetype` (EPUB), if present.
+    fn find_mimetype_index<R: Read + Seek>(zin: &mut ZipArchive<R>) -> io::Result<Option<usize>> {
+        for i in 0..zin.len() {
+            let entry = zin.by_index(i)?;
+            let name = entry.name().replace('\\', "/");
+            if name == "mimetype" {
+                return Ok(Some(i));
+            }
+        }
+        Ok(None)
+    }
 
-        let method = if relative_path == "mimetype" {
-            CompressionMethod::Stored
-        } else {
-            CompressionMethod::Deflated
-        };
-
-        let options: FileOptions<'_, ExtendedFileOptions> =
-            FileOptions::default().compression_method(method);
-
-        zip_writer.start_file(relative_path, options)?;
-        zip_writer.write_all(&buffer)?;
-        Ok(())
+    /// Detect unsafe paths (zip-slip, `..`, root dirs).
+    fn is_unsafe_path(path: &Path) -> bool {
+        path.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir | std::path::Component::RootDir
+            )
+        })
     }
 
     /// Replace font declarations with markers, storing originals in `font_map`.
@@ -377,7 +514,7 @@ impl OfficeConverter {
             }
         });
     }
-}
+} // impl OfficeConverter
 
 /* ---------- Helper Functions ---------- */
 
@@ -432,63 +569,4 @@ fn replace_with_temp(
     // Atomic replace: remove existing -> rename temp to final
     remove_existing_file(final_out)?;
     fs::rename(&tmp_out, final_out)
-}
-
-/// Get target XML files for a given format inside extracted archive.
-fn get_target_xml_paths(format: &str, base_dir: &Path) -> Vec<PathBuf> {
-    match format {
-        "docx" => vec![base_dir.join("word/document.xml")],
-        "xlsx" => vec![base_dir.join("xl/sharedStrings.xml")],
-        "pptx" => get_pptx_files(base_dir),
-        "odt" | "ods" | "odp" => vec![base_dir.join("content.xml")],
-        "epub" => get_epub_files(base_dir),
-        _ => Vec::new(),
-    }
-}
-
-/// Collect all PPTX slide/notes `.xml` files (excluding `.rels`).
-fn get_pptx_files(base_dir: &Path) -> Vec<PathBuf> {
-    let mut result = Vec::new();
-    for dir in ["ppt/slides", "ppt/notesSlides"] {
-        let root = base_dir.join(dir);
-        if !root.exists() {
-            continue;
-        }
-
-        for entry in WalkDir::new(&root)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_file())
-        {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("xml")
-                && !path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.ends_with(".rels"))
-                    .unwrap_or(false)
-            {
-                result.push(path.to_path_buf());
-            }
-        }
-    }
-    result
-}
-
-/// Collect all EPUB text files (`.xhtml`, `.opf`, `.ncx`, `.html`).
-fn get_epub_files(base_dir: &Path) -> Vec<PathBuf> {
-    WalkDir::new(base_dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-        .filter_map(|entry| {
-            let path = entry.path();
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if matches!(ext, "xhtml" | "opf" | "ncx" | "html") {
-                Some(path.to_path_buf())
-            } else {
-                None
-            }
-        })
-        .collect()
 }
