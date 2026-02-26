@@ -2,4 +2,6 @@
 
 .idea/
 
+.venv/
+
 Cargo.toml.orig

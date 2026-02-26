@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-clap = "4.5.57"
+clap = "4.5.60"
 serde_json = "1.0.149"
 ureq = "3.2.0"
 #bytes = "1.11.1"

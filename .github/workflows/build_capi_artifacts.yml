@@ -30,6 +30,19 @@ jobs:
             target_release_dir: target/release
 
           # -------------------------
+          # Windows (arm64) - native runner
+          # -------------------------
+          - name: win-arm64
+            os: windows-11-arm
+            platform: windows
+            arch: arm64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: opencc_jieba_capi.dll
+            target_release_dir: target/release
+
+          # -------------------------
           # Windows 7 (x64) - nightly + build-std
           # -------------------------
           - name: win7-x64
@@ -56,7 +69,7 @@ jobs:
             target_release_dir: target/i686-win7-windows-msvc/release
 
           # -------------------------
-          # Linux (x64)
+          # Linux (x64) - manylinux2014
           # -------------------------
           - name: linux-x64
             os: ubuntu-latest
@@ -67,6 +80,21 @@ jobs:
             target: ""
             dll_name: libopencc_jieba_capi.so
             target_release_dir: target/release
+            manylinux_image: quay.io/pypa/manylinux2014_x86_64:latest
+
+          # -------------------------
+          # Linux (arm64) - manylinux2014
+          # -------------------------
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            rust_toolchain: stable
+            is_win7: false
+            target: ""
+            dll_name: libopencc_jieba_capi.so
+            target_release_dir: target/release
+            manylinux_image: quay.io/pypa/manylinux2014_aarch64:latest
 
           # -------------------------
           # macOS (arm64)
@@ -116,8 +144,118 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      # Build ONLY the C API package
+      - name: manylinux preflight (inspect base image)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          IMAGE="${{ matrix.manylinux_image }}"
+
+          docker run --rm \
+            --entrypoint /bin/sh \
+            "$IMAGE" -lc '
+              echo "== uname =="
+              uname -a || true
+
+              echo
+              echo "== /etc/os-release =="
+              cat /etc/os-release || true
+
+              echo
+              echo "== shells =="
+              ls -l /bin/*sh* || true
+
+              echo
+              echo "== tool locations =="
+              echo "bash:    $(command -v bash || true)"
+              echo "sh:      $(command -v sh || true)"
+              echo "gcc:     $(command -v gcc || true)"
+              echo "cc:      $(command -v cc || true)"
+              echo "curl:    $(command -v curl || true)"
+              echo "readelf: $(command -v readelf || true)"
+              echo "yum:     $(command -v yum || true)"
+
+              echo
+              echo "== glibc version =="
+              ldd --version || true
+            '
+
+      # Build ONLY the C API package (Linux)
+      - name: Build opencc_jieba_capi (manylinux2014)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="${{ matrix.manylinux_image }}"
+
+          docker run --rm \
+            --entrypoint /bin/bash \
+            -v "${GITHUB_WORKSPACE}:/io" -w /io \
+            -v "${CARGO_HOME}:/cargo" \
+            -v "${HOME}/.rustup:/rustup" \
+            -e CARGO_HOME=/cargo \
+            -e RUSTUP_HOME=/rustup \
+            -e PATH="/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            -e RUSTC_WRAPPER= \
+            -e SCCACHE_DISABLE=1 \
+            "${IMAGE}" -lc '
+              set -euxo pipefail
+
+              echo "hello from container"
+              uname -a
+              echo "PATH(before)=$PATH"
+
+              # Prefer devtoolset gcc if present, without sourcing enable scripts
+              if [ -d /opt/rh/devtoolset-11/root/usr/bin ]; then
+                export PATH="/opt/rh/devtoolset-11/root/usr/bin:$PATH"
+              elif [ -d /opt/rh/devtoolset-10/root/usr/bin ]; then
+                export PATH="/opt/rh/devtoolset-10/root/usr/bin:$PATH"
+              fi
+
+              echo "PATH(after)=$PATH"
+
+              echo "gcc -> $(command -v gcc || true)"
+              gcc --version || true
+
+              # Ensure `cc` exists (Rust may call `cc` by default)
+              if ! command -v cc >/dev/null 2>&1; then
+                ln -sf "$(command -v gcc)" /usr/bin/cc
+              fi
+              echo "cc  -> $(command -v cc || true)"
+              cc --version || true
+
+              # Force Rust to use gcc as linker/toolchain
+              export CC=gcc
+              export CXX=g++
+              export AR=ar
+              export RUSTFLAGS="-C linker=gcc"
+
+              cargo build -r --package opencc_jieba_capi
+
+              readelf -sW target/release/libopencc_jieba_capi.so \
+                | grep -o "GLIBC_[0-9.]*" | sort -V | tail -n 1
+            '
+
+          sudo chown -R "$(id -u)":"$(id -g)" target || true
+
+      - name: Verify manylinux2014 GLIBC (<= 2.17)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          so="${{ matrix.target_release_dir }}/${{ matrix.dll_name }}"
+          max_ver="$(readelf -sW "$so" | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -n 1)"
+          echo "Max GLIBC requirement: $max_ver"
+          if [[ "$(printf '%s\n' "GLIBC_2.17" "$max_ver" | sort -V | tail -n 1)" != "GLIBC_2.17" ]]; then
+            echo "❌ Too new: $max_ver (need <= GLIBC_2.17)"
+            exit 1
+          fi
+          echo "✅ OK"
+
+      # Build ONLY the C API package (Non-Linux)
       - name: Build opencc_jieba_capi
+        if: ${{ matrix.platform != 'linux' }}
         shell: bash
         run: |
           set -euo pipefail
