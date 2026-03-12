@@ -6,6 +6,9 @@ on:
       - 'v*.*.*'
       - 'v*.*.*-beta*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build (${{ matrix.name }})
@@ -265,7 +268,7 @@ jobs:
           $outDir = "${{ matrix.target_release_dir }}"
           Write-Host "OUT_DIR=$outDir"
 
-          $exe = Join-Path $outDir ("opencc-rs${{ matrix.bin_ext }}")
+          $exe = Join-Path $outDir ("opencc-jieba${{ matrix.bin_ext }}")
           if (!(Test-Path $exe)) { throw "Missing Win7 exe: $exe" }
 
           $dll = Join-Path $outDir "${{ matrix.dll_name }}"
