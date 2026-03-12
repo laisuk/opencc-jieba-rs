@@ -57,25 +57,25 @@ pub enum OpenccConfig {
     /// Traditional Chinese → Simplified Chinese.
     T2s = 5,
 
-    /// Traditional Chinese → Taiwanese variant.
+    /// Traditional Chinese → Taiwan variant.
     T2tw = 6,
 
-    /// Traditional Chinese → Taiwanese variant (with phrases).
+    /// Traditional Chinese → Taiwan variant (with phrases).
     T2twp = 7,
 
     /// Traditional Chinese → Hong Kong variant.
     T2hk = 8,
 
-    /// Taiwanese variant → Simplified Chinese.
+    /// Taiwan variant → Simplified Chinese.
     Tw2s = 9,
 
-    /// Taiwanese variant → Simplified Chinese (with phrases).
+    /// Taiwan variant → Simplified Chinese (with phrases).
     Tw2sp = 10,
 
-    /// Taiwanese variant → Traditional Chinese.
+    /// Taiwan variant → Traditional Chinese.
     Tw2t = 11,
 
-    /// Taiwanese variant → Traditional Chinese (with phrases).
+    /// Taiwan variant → Traditional Chinese (with phrases).
     Tw2tp = 12,
 
     /// Hong Kong variant → Simplified Chinese.
@@ -92,41 +92,61 @@ pub enum OpenccConfig {
 }
 
 impl TryFrom<&str> for OpenccConfig {
-    /// Parses a configuration name (case-insensitive).
+    /// Converts a configuration name into [`OpenccConfig`].
     ///
-    /// Accepted names: `"s2t"`, `"s2tw"`, `"s2twp"`, `"s2hk"`, `"t2s"`, `"t2tw"`, `"t2twp"`,
-    /// `"t2hk"`, `"tw2s"`, `"tw2sp"`, `"tw2t"`, `"tw2tp"`, `"hk2s"`, `"hk2t"`, `"jp2t"`, `"t2jp"`.
+    /// This conversion is **case-insensitive** and accepts the canonical
+    /// OpenCC configuration identifiers (e.g. `"s2t"`, `"t2s"`).
     ///
-    /// This is primarily used by [`OpenCC::convert`] to support legacy `&str` configs.
+    /// Internally this delegates to [`OpenccConfig::parse`].
+    ///
     /// # Since
     ///
     /// Available since **v0.7.3**.
     type Error = ();
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        match s.to_ascii_lowercase().as_str() {
-            "s2t" => Ok(Self::S2t),
-            "s2tw" => Ok(Self::S2tw),
-            "s2twp" => Ok(Self::S2twp),
-            "s2hk" => Ok(Self::S2hk),
-            "t2s" => Ok(Self::T2s),
-            "t2tw" => Ok(Self::T2tw),
-            "t2twp" => Ok(Self::T2twp),
-            "t2hk" => Ok(Self::T2hk),
-            "tw2s" => Ok(Self::Tw2s),
-            "tw2sp" => Ok(Self::Tw2sp),
-            "tw2t" => Ok(Self::Tw2t),
-            "tw2tp" => Ok(Self::Tw2tp),
-            "hk2s" => Ok(Self::Hk2s),
-            "hk2t" => Ok(Self::Hk2t),
-            "jp2t" => Ok(Self::Jp2t),
-            "t2jp" => Ok(Self::T2jp),
-            _ => Err(()),
-        }
+        Self::parse(s).ok_or(())
     }
 }
 
 impl OpenccConfig {
+    /// All supported OpenCC configurations in canonical order.
+    ///
+    /// This constant lists every [`OpenccConfig`] variant supported by the
+    /// library. The ordering corresponds to the canonical configuration
+    /// identifiers used by OpenCC.
+    ///
+    /// This table is primarily used internally for:
+    ///
+    /// - Iteration over all supported configurations
+    /// - Case-insensitive parsing via [`OpenccConfig::parse`]
+    /// - Validation helpers such as [`OpenccConfig::is_valid_config`]
+    ///
+    /// The contents of this array are stable and reflect the same ordering
+    /// defined by the enum and its `#[repr(u32)]` FFI mapping.
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.7.3**.
+    pub const ALL: [Self; 16] = [
+        Self::S2t,
+        Self::S2tw,
+        Self::S2twp,
+        Self::S2hk,
+        Self::T2s,
+        Self::T2tw,
+        Self::T2twp,
+        Self::T2hk,
+        Self::Tw2s,
+        Self::Tw2sp,
+        Self::Tw2t,
+        Self::Tw2tp,
+        Self::Hk2s,
+        Self::Hk2t,
+        Self::Jp2t,
+        Self::T2jp,
+    ];
+
     /// Converts an FFI numeric config value into [`OpenccConfig`].
     ///
     /// Returns `None` for unknown values. This is the **only** supported way to accept
@@ -144,26 +164,153 @@ impl OpenccConfig {
     ///
     /// Available since **v0.7.3**.
     #[inline]
-    pub fn from_ffi(v: u32) -> Option<Self> {
-        Some(match v {
-            1 => Self::S2t,
-            2 => Self::S2tw,
-            3 => Self::S2twp,
-            4 => Self::S2hk,
-            5 => Self::T2s,
-            6 => Self::T2tw,
-            7 => Self::T2twp,
-            8 => Self::T2hk,
-            9 => Self::Tw2s,
-            10 => Self::Tw2sp,
-            11 => Self::Tw2t,
-            12 => Self::Tw2tp,
-            13 => Self::Hk2s,
-            14 => Self::Hk2t,
-            15 => Self::Jp2t,
-            16 => Self::T2jp,
-            _ => return None,
-        })
+    pub const fn from_ffi(v: u32) -> Option<Self> {
+        match v {
+            1 => Some(Self::S2t),
+            2 => Some(Self::S2tw),
+            3 => Some(Self::S2twp),
+            4 => Some(Self::S2hk),
+            5 => Some(Self::T2s),
+            6 => Some(Self::T2tw),
+            7 => Some(Self::T2twp),
+            8 => Some(Self::T2hk),
+            9 => Some(Self::Tw2s),
+            10 => Some(Self::Tw2sp),
+            11 => Some(Self::Tw2t),
+            12 => Some(Self::Tw2tp),
+            13 => Some(Self::Hk2s),
+            14 => Some(Self::Hk2t),
+            15 => Some(Self::Jp2t),
+            16 => Some(Self::T2jp),
+            _ => None,
+        }
+    }
+
+    /// Returns the numeric FFI representation of this configuration.
+    ///
+    /// This converts the strongly-typed [`OpenccConfig`] enum into its
+    /// stable `u32` value as used by the C API (`opencc_config_t`).
+    ///
+    /// The returned value is guaranteed to match the numeric mapping
+    /// defined by the enum’s `#[repr(u32)]` layout.
+    ///
+    /// This method is primarily intended for:
+    ///
+    /// - Passing configuration values to C FFI layers
+    /// - Interoperating with foreign language bindings (C, Python, C#, Java)
+    /// - Logging or serialization where the numeric representation is required
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenccConfig;
+    ///
+    /// let cfg = OpenccConfig::S2t;
+    /// assert_eq!(cfg.to_ffi(), 1);
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`OpenccConfig::from_ffi`] for converting raw FFI values back into
+    ///   a validated [`OpenccConfig`].
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.7.3**.
+    #[inline]
+    pub const fn to_ffi(self) -> u32 {
+        self as u32
+    }
+
+    /// Returns the canonical OpenCC configuration name.
+    ///
+    /// The returned string matches the standard OpenCC configuration
+    /// identifiers (e.g. `"s2t"`, `"t2s"`, `"s2tw"`). These names are used by:
+    ///
+    /// - CLI tools
+    /// - configuration files
+    /// - legacy OpenCC string-based APIs
+    ///
+    /// This method does **not allocate** and always returns a static string.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenccConfig;
+    ///
+    /// let cfg = OpenccConfig::T2jp;
+    /// assert_eq!(cfg.as_str(), "t2jp");
+    /// ```
+    ///
+    /// # Typical usage
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenccConfig;
+    ///
+    /// let cfg = OpenccConfig::S2tw;
+    /// println!("Using config {}", cfg.as_str());
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`TryFrom<&str>`](TryFrom) implementation for parsing
+    ///   configuration names into [`OpenccConfig`].
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.7.3**.
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::S2t => "s2t",
+            Self::S2tw => "s2tw",
+            Self::S2twp => "s2twp",
+            Self::S2hk => "s2hk",
+            Self::T2s => "t2s",
+            Self::T2tw => "t2tw",
+            Self::T2twp => "t2twp",
+            Self::T2hk => "t2hk",
+            Self::Tw2s => "tw2s",
+            Self::Tw2sp => "tw2sp",
+            Self::Tw2t => "tw2t",
+            Self::Tw2tp => "tw2tp",
+            Self::Hk2s => "hk2s",
+            Self::Hk2t => "hk2t",
+            Self::Jp2t => "jp2t",
+            Self::T2jp => "t2jp",
+        }
+    }
+
+    /// Parses a configuration name into an [`OpenccConfig`].
+    ///
+    /// The input string is matched against the canonical OpenCC configuration
+    /// identifiers (e.g. `"s2t"`, `"t2s"`, `"s2tw"`). Matching is
+    /// **case-insensitive**.
+    ///
+    /// If the input does not correspond to a supported configuration,
+    /// `None` is returned.
+    ///
+    /// This method provides the internal parsing logic used by the
+    /// [`TryFrom<&str>`] implementation and higher-level helpers such as
+    /// [`OpenccConfig::is_valid_config`].
+    ///
+    /// The implementation performs a lightweight linear search over
+    /// [`OpenccConfig::ALL`], which is efficient given the small number
+    /// of supported configurations.
+    ///
+    /// # See also
+    ///
+    /// - [`TryFrom<&str>`] for ergonomic conversion using `Result`
+    /// - [`OpenccConfig::as_str`] for retrieving the canonical name
+    ///
+    /// # Since
+    ///
+    /// Available since **v0.7.3**.
+    #[inline]
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|cfg| cfg.as_str().eq_ignore_ascii_case(s))
     }
 
     /// Returns `true` if the given string is a supported OpenCC configuration name.
@@ -191,7 +338,7 @@ impl OpenccConfig {
     /// Available since **v0.7.3**.
     #[inline]
     pub fn is_valid_config(s: &str) -> bool {
-        Self::try_from(s).is_ok()
+        Self::parse(s).is_some()
     }
 
     /// Returns `true` if the given numeric value corresponds to a valid FFI config.
