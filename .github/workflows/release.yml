@@ -4,71 +4,309 @@ on:
   push:
     tags:
       - 'v*.*.*'
-
-permissions:
-  contents: write  # required for creating GitHub releases
+      - 'v*.*.*-beta*'
 
 jobs:
   build:
+    name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Linux (x64) - manylinux2014 via Docker
+          - name: linux-x64
+            os: ubuntu-latest
             platform: linux
             arch: x64
             bin_ext: ''
             dll_name: libopencc_jieba_capi.so
             archive_ext: tar.gz
-          - os: macos-latest
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+            manylinux_image: quay.io/pypa/manylinux2014_x86_64:latest
+
+          # Linux (arm64) - manylinux2014 via Docker
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            bin_ext: ''
+            dll_name: libopencc_jieba_capi.so
+            archive_ext: tar.gz
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+            manylinux_image: quay.io/pypa/manylinux2014_aarch64:latest
+
+          # macOS (arm64)
+          - name: macos-arm64
+            os: macos-latest
             platform: macos
             arch: arm64
             bin_ext: ''
             dll_name: libopencc_jieba_capi.dylib
             archive_ext: tar.gz
-          - os: macos-15-intel
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+
+          # macOS Intel (x64)
+          - name: macos-x64
+            os: macos-15-intel
             platform: macos
             arch: x64
             bin_ext: ''
             dll_name: libopencc_jieba_capi.dylib
             archive_ext: tar.gz
-          - os: windows-latest
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+
+          # Windows (x64)
+          - name: win-x64
+            os: windows-latest
             platform: windows
             arch: x64
             bin_ext: '.exe'
             dll_name: opencc_jieba_capi.dll
             archive_ext: zip
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+
+          # Windows (arm64)
+          - name: win-arm64
+            os: windows-11-arm
+            platform: windows
+            arch: arm64
+            bin_ext: '.exe'
+            dll_name: opencc_jieba_capi.dll
+            archive_ext: zip
+            rust_toolchain: stable
+            is_win7: false
+            cargo_cmd: cargo build --release --workspace
+            target_release_dir: target/release
+
+          # Windows 7 (x64)
+          - name: win7-x64
+            os: windows-latest
+            platform: windows
+            arch: win7-x64
+            bin_ext: '.exe'
+            dll_name: opencc_jieba_capi.dll
+            archive_ext: zip
+            rust_toolchain: nightly
+            is_win7: true
+            cargo_cmd: cargo +nightly build -Z build-std=std,panic_abort --target x86_64-win7-windows-msvc --release --workspace
+            target_release_dir: target/x86_64-win7-windows-msvc/release
+
+          # Windows 7 (x86)
+          - name: win7-x86
+            os: windows-latest
+            platform: windows
+            arch: win7-x86
+            bin_ext: '.exe'
+            dll_name: opencc_jieba_capi.dll
+            archive_ext: zip
+            rust_toolchain: nightly
+            is_win7: true
+            cargo_cmd: cargo +nightly build -Z build-std=std,panic_abort --target i686-win7-windows-msvc --release --workspace
+            target_release_dir: target/i686-win7-windows-msvc/release
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # ✅ Pin toolchain to Rust stable
-      - name: Set Rust stable
+      - name: Normalize cargo home (Linux Docker builds)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          echo "CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}" >> "$GITHUB_ENV"
+
+      # Stable toolchain for normal builds
+      - name: Set Rust (stable)
+        if: ${{ matrix.rust_toolchain == 'stable' }}
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          components: clippy,rustfmt
+
+      # Nightly toolchain for Win7 builds
+      - name: Set Rust (nightly)
+        if: ${{ matrix.rust_toolchain == 'nightly' }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: manylinux preflight
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          IMAGE="${{ matrix.manylinux_image }}"
+
+          docker run --rm \
+            --entrypoint /bin/sh \
+            "$IMAGE" -lc '
+              echo "== uname =="
+              uname -a || true
+
+              echo
+              echo "== /etc/os-release =="
+              cat /etc/os-release || true
+
+              echo
+              echo "== tool locations =="
+              echo "bash:    $(command -v bash || true)"
+              echo "sh:      $(command -v sh || true)"
+              echo "gcc:     $(command -v gcc || true)"
+              echo "cc:      $(command -v cc || true)"
+              echo "curl:    $(command -v curl || true)"
+              echo "readelf: $(command -v readelf || true)"
+
+              echo
+              echo "== glibc version =="
+              ldd --version || true
+            '
+
+      - name: Build Project (manylinux2014 Docker)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="${{ matrix.manylinux_image }}"
+
+          docker run --rm \
+            --entrypoint /bin/bash \
+            -v "${GITHUB_WORKSPACE}:/io" \
+            -w /io \
+            -v "${CARGO_HOME}:/cargo" \
+            -v "${HOME}/.rustup:/rustup" \
+            -e CARGO_HOME=/cargo \
+            -e RUSTUP_HOME=/rustup \
+            -e PATH="/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            -e RUSTC_WRAPPER= \
+            -e SCCACHE_DISABLE=1 \
+            "${IMAGE}" -lc '
+              set -euxo pipefail
+
+              echo "hello from manylinux container"
+              uname -a
+              echo "PATH(before)=$PATH"
+
+              if [ -d /opt/rh/devtoolset-11/root/usr/bin ]; then
+                export PATH="/opt/rh/devtoolset-11/root/usr/bin:$PATH"
+              elif [ -d /opt/rh/devtoolset-10/root/usr/bin ]; then
+                export PATH="/opt/rh/devtoolset-10/root/usr/bin:$PATH"
+              fi
+
+              echo "PATH(after)=$PATH"
+              echo "gcc -> $(command -v gcc || true)"
+              gcc --version || true
+
+              if ! command -v cc >/dev/null 2>&1; then
+                ln -sf "$(command -v gcc)" /usr/bin/cc
+              fi
+
+              echo "cc -> $(command -v cc || true)"
+              cc --version || true
+
+              export CC=gcc
+              export CXX=g++
+              export AR=ar
+              export RUSTFLAGS="-C linker=gcc"
+
+              ${{ matrix.cargo_cmd }}
+
+              readelf -sW target/release/${{ matrix.dll_name }} \
+                | grep -o "GLIBC_[0-9.]*" | sort -V | tail -n 1
+            '
+
+          sudo chown -R "$(id -u)":"$(id -g)" target || true
+
+      - name: Verify manylinux2014 GLIBC (<= 2.17)
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          so="${{ matrix.target_release_dir }}/${{ matrix.dll_name }}"
+          max_ver="$(readelf -sW "$so" | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -n 1)"
+          echo "Max GLIBC requirement: $max_ver"
+          if [[ "$(printf '%s\n' "GLIBC_2.17" "$max_ver" | sort -V | tail -n 1)" != "GLIBC_2.17" ]]; then
+            echo "❌ Too new: $max_ver (need <= GLIBC_2.17)"
+            exit 1
+          fi
+          echo "✅ manylinux2014-compatible"
 
       - name: Build Project
-        run: cargo build --release --workspace
+        if: ${{ matrix.platform != 'linux' }}
+        shell: bash
+        env:
+          RUSTFLAGS: ${{ matrix.is_win7 && '-C link-arg=/SUBSYSTEM:CONSOLE,6.01' || '' }}
+        run: |
+          set -euo pipefail
+          ${{ matrix.cargo_cmd }}
+
+      # Ensure MSVC tools (dumpbin) are available
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ matrix.is_win7 }}
+
+      - name: Verify Win7 subsystem (6.01)
+        if: ${{ matrix.is_win7 }}
+        shell: powershell
+        run: |
+          $outDir = "${{ matrix.target_release_dir }}"
+          Write-Host "OUT_DIR=$outDir"
+
+          $exe = Join-Path $outDir ("opencc-rs${{ matrix.bin_ext }}")
+          if (!(Test-Path $exe)) { throw "Missing Win7 exe: $exe" }
+
+          $dll = Join-Path $outDir "${{ matrix.dll_name }}"
+          if (!(Test-Path $dll)) { throw "Missing Win7 dll: $dll" }
+
+          foreach ($p in @($exe, $dll)) {
+            Write-Host "`nChecking: $p"
+            $out = & dumpbin /headers $p | Select-String -Pattern "subsystem version"
+            $text = ($out | ForEach-Object { $_.ToString() }) -join "`n"
+            Write-Host $text
+            if ($text -notmatch "6\.01") { throw "Subsystem is not 6.01: $p" }
+          }
 
       - name: Prepare Structured Release Folder
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/bin/dicts dist/lib dist/include
 
-          cp target/release/opencc-jieba${{ matrix.bin_ext }} dist/bin/
-          cp target/release/opencc-clip-jieba${{ matrix.bin_ext }} dist/bin/
-          cp target/release/dict-generate${{ matrix.bin_ext }} dist/bin/
+          OUT_DIR="${{ matrix.target_release_dir }}"
 
+          # CLI tools
+          cp "${OUT_DIR}/opencc-jieba${{ matrix.bin_ext }}" dist/bin/
+          cp "${OUT_DIR}/opencc-clip-jieba${{ matrix.bin_ext }}" dist/bin/
+          cp "${OUT_DIR}/dict-generate${{ matrix.bin_ext }}" dist/bin/
+
+          # Headers
           cp capi/opencc_jieba_capi.h dist/include/
           cp capi/OpenccJiebaHelper.hpp dist/include/
 
-          cp target/release/${{ matrix.dll_name }} dist/lib/
+          # C API shared lib
+          cp "${OUT_DIR}/${{ matrix.dll_name }}" dist/lib/
+
+          # Windows import lib (if produced)
           if [ "${{ matrix.platform }}" = "windows" ]; then
-            cp target/release/opencc_jieba_capi.dll.lib dist/lib/
+            if [ -f "${OUT_DIR}/opencc_jieba_capi.dll.lib" ]; then
+              cp "${OUT_DIR}/opencc_jieba_capi.dll.lib" dist/lib/
+            fi
           fi
 
+          # dict sources for dict-generate
           cp dicts/*.txt dist/bin/dicts/
 
       - name: Write README.txt and version.txt
@@ -79,11 +317,21 @@ jobs:
           {
             echo "Opencc-Jieba ${{ github.ref_name }}"
             echo ""
+            echo "Package: ${{ matrix.platform }} / ${{ matrix.arch }}"
+            if [ "${{ matrix.platform }}" = "linux" ]; then
+              echo "NOTE: This Linux build is produced inside a manylinux2014 container."
+              echo "      GLIBC requirement is verified to be <= 2.17."
+            fi
+            if [ "${{ matrix.is_win7 }}" = "true" ]; then
+              echo "NOTE: This Windows 7 build is compiled with Rust nightly + -Z build-std"
+              echo "      and targets x86_64-win7-windows-msvc (x64) or i686-win7-windows-msvc (x86)."
+              echo "      Subsystem is set to 6.01 for Win7 compatibility."
+            fi
+            echo ""
             echo "Included folders:"
             echo "- bin/: Command-line tools (opencc-jieba, opencc-clip-jieba, dict-generate) and dicts/ folder used at runtime"
             echo "- lib/: C API shared library (platform-specific)"
             echo "- include/: C API header and C++ header-only helper"
-            echo "- dicts/: Dictionary TXT files for dict-generate"
             echo ""
             echo "Usage:"
             echo "- Place the shared library in your LD_LIBRARY_PATH (Linux/macOS) or alongside .exe (Windows)."
@@ -94,6 +342,7 @@ jobs:
       - name: Package Structured Artifacts
         shell: bash
         run: |
+          set -euo pipefail
           ARTIFACT_NAME="opencc-jieba-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}"
           if [ "${{ matrix.archive_ext }}" = "tar.gz" ]; then
             tar -czf "${ARTIFACT_NAME}.tar.gz" -C dist .
@@ -113,16 +362,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      - name: Detect release channel from tag
+        id: tagmeta
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta[0-9]+$ ]]; then
+            echo "is_beta=true" >> "$GITHUB_OUTPUT"
+            echo "release_name=Opencc-Jieba ${TAG} (Beta)" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_beta=false" >> "$GITHUB_OUTPUT"
+            echo "release_name=Opencc-Jieba ${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.tagmeta.outputs.release_name }}
+          prerelease: ${{ steps.tagmeta.outputs.is_beta == 'true' }}
+          make_latest: ${{ steps.tagmeta.outputs.is_beta == 'true' && 'false' || 'true' }}
           files: |
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
