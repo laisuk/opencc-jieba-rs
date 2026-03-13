@@ -272,6 +272,42 @@ static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
 // Minimum input length (in chars) to trigger parallel processing
 const PARALLEL_THRESHOLD: usize = 1000;
 
+/// A slice of dictionary references used in a single conversion round.
+///
+/// Each round consists of one or more [`DictMap`] dictionaries that are
+/// applied in priority order during phrase conversion.
+///
+/// The first dictionary that matches a phrase wins.
+///
+/// This is an internal helper type used by [`OpenCC::convert_rounds`]
+/// to represent a single stage of dictionary-based conversion.
+///
+/// # Example
+///
+/// ```ignore
+/// let round = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+/// ```
+type DictRefs<'a> = &'a [&'a DictMap];
+
+/// A sequence of dictionary rounds used in a multi-stage conversion pipeline.
+///
+/// Each element in the slice represents one conversion stage. The output of
+/// each round becomes the input of the next.
+///
+/// Internally this allows OpenCC configurations such as:
+///
+/// ```text
+/// input
+///   ↓ round1 (phrase dictionaries)
+///   ↓ round2 (variant dictionaries)
+///   ↓ round3 (final normalization)
+/// output
+/// ```
+///
+/// This type is used internally by [`OpenCC::convert_rounds`] to simplify
+/// multi-pass dictionary pipelines like `s2twp`, `tw2sp`, and `hk2s`.
+type DictRounds<'a> = &'a [DictRefs<'a>];
+
 /// The main struct for performing Chinese text conversion and segmentation.
 ///
 /// `OpenCC` combines a [`Jieba`] tokenizer with OpenCC-style dictionaries,
@@ -732,13 +768,11 @@ impl OpenCC {
     /// println!("{}", tw); // "「春眠不覺曉，處處聞啼鳥。」"
     /// ```
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let dict_refs_round_2 = [&self.dictionary.tw_variants];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        );
+        let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+        let round2 = [&self.dictionary.tw_variants];
+
+        let result = self.convert_rounds(input, &[&round1, &round2], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -766,16 +800,14 @@ impl OpenCC {
     /// println!("{}", simp); // "“春眠不觉晓，处处闻啼鸟。”"
     /// ```
     pub fn tw2s(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [
+        let round1 = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        );
+        let round2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+
+        let result = self.convert_rounds(input, &[&round1, &round2], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -799,20 +831,13 @@ impl OpenCC {
     /// let result = opencc.s2twp("“你好，世界”", true);
     /// assert_eq!(result.contains("「你好，世界」"), true);
     /// ```
-
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases];
-        let dict_refs_round_3 = [&self.dictionary.tw_variants];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(
-                &self.phrases_cut_convert(input, &dict_refs, true),
-                &dict_refs_round_2,
-                true,
-            ),
-            &dict_refs_round_3,
-            true,
-        );
+        let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+        let round2 = [&self.dictionary.tw_phrases];
+        let round3 = [&self.dictionary.tw_variants];
+
+        let result = self.convert_rounds(input, &[&round1, &round2, &round3], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -840,23 +865,16 @@ impl OpenCC {
     /// let result = opencc.tw2sp("「春眠不覺曉，處處聞啼鳥。」", true);
     /// assert!(result.contains("“春眠不觉晓，处处闻啼鸟。”"));
     /// ```
-
     pub fn tw2sp(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [
+        let round1 = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
-        let dict_refs_round_3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(
-                &self.phrases_cut_convert(input, &dict_refs, true),
-                &dict_refs_round_2,
-                true,
-            ),
-            &dict_refs_round_3,
-            true,
-        );
+        let round2 = [&self.dictionary.tw_phrases_rev];
+        let round3 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+
+        let result = self.convert_rounds(input, &[&round1, &round2, &round3], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -881,13 +899,11 @@ impl OpenCC {
     /// println!("{}", hk); // "「春眠不覺曉，處處聞啼鳥。」"
     /// ```
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let dict_refs_round_2 = [&self.dictionary.hk_variants];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        );
+        let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
+        let round2 = [&self.dictionary.hk_variants];
+
+        let result = self.convert_rounds(input, &[&round1, &round2], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "s")
         } else {
@@ -912,16 +928,14 @@ impl OpenCC {
     /// println!("{}", hk); // "「春眠不覺曉，處處聞啼鳥。」"
     /// ```
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
-        let dict_refs = [
+        let round1 = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
-        let dict_refs_round_2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
-        let result = self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        );
+        let round2 = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
+
+        let result = self.convert_rounds(input, &[&round1, &round2], true);
+
         if punctuation {
             Self::convert_punctuation(&result, "t")
         } else {
@@ -982,13 +996,10 @@ impl OpenCC {
     /// let out = opencc.t2twp("後臺資訊");
     /// ```
     pub fn t2twp(&self, input: &str) -> String {
-        let dict_refs = [&self.dictionary.tw_phrases];
-        let dict_refs_round_2 = [&self.dictionary.tw_variants];
-        self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        )
+        let round1 = [&self.dictionary.tw_phrases];
+        let round2 = [&self.dictionary.tw_variants];
+
+        self.convert_rounds(input, &[&round1, &round2], true)
     }
 
     /// Converts **Taiwan Traditional Chinese (Tw)** text to **Standard Traditional
@@ -1062,16 +1073,13 @@ impl OpenCC {
     /// println!("{}", out);
     /// ```
     pub fn tw2tp(&self, input: &str) -> String {
-        let dict_refs = [
+        let round1 = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        let dict_refs_round_2 = [&self.dictionary.tw_phrases_rev];
-        self.phrases_cut_convert(
-            &self.phrases_cut_convert(input, &dict_refs, true),
-            &dict_refs_round_2,
-            true,
-        )
+        let round2 = [&self.dictionary.tw_phrases_rev];
+
+        self.convert_rounds(input, &[&round1, &round2], true)
     }
 
     /// Converts Standard Traditional Chinese (T) text to **Hong Kong Traditional
@@ -1155,6 +1163,58 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Applies multiple dictionary-conversion rounds sequentially.
+    ///
+    /// This helper implements the **multi-stage dictionary pipeline** used by
+    /// several OpenCC configurations (such as `s2twp`, `tw2sp`, `hk2s`, etc.).
+    ///
+    /// Each round is a slice of [`DictMap`] dictionaries applied in priority order.
+    /// The output of one round becomes the input to the next.
+    ///
+    /// Conceptually the pipeline looks like:
+    ///
+    /// ```text
+    /// input
+    ///   ↓ round1 (phrase dictionaries)
+    ///   ↓ round2 (variant dictionaries)
+    ///   ↓ round3 (final normalization)
+    /// output
+    /// ```
+    ///
+    /// Internally this simply loops through each round and calls
+    /// [`phrases_cut_convert`] with the corresponding dictionary slice.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The source UTF-8 text.
+    /// * `rounds` - Ordered sequence of dictionary rounds.
+    /// * `hmm` - Whether to enable Jieba HMM segmentation.
+    ///
+    /// # Returns
+    ///
+    /// A newly allocated `String` containing the fully converted text.
+    ///
+    /// # Notes
+    ///
+    /// - This function is an **internal helper** used to simplify conversion
+    ///   pipelines and reduce nested `phrases_cut_convert` calls.
+    /// - Performance is identical to the nested version since each round
+    ///   still performs a single conversion pass.
+    ///
+    /// [`DictMap`]: DictMap
+    #[inline]
+    fn convert_rounds(&self, input: &str, rounds: DictRounds<'_>, hmm: bool) -> String {
+        if rounds.is_empty() {
+            return input.to_owned();
+        }
+
+        let mut current = input.to_owned();
+        for round in rounds {
+            current = self.phrases_cut_convert(&current, round, hmm);
+        }
+        current
+    }
+
     /// Performs **fast character-level Simplified → Traditional** Chinese conversion.
     ///
     /// This corresponds to OpenCC’s **`st`** character-variant mapping and uses
@@ -1209,47 +1269,71 @@ impl OpenCC {
         output
     }
 
-    /// Converts Chinese text between different variants using a specified conversion configuration.
+    /// Converts Chinese text between different variants using a configuration string.
     ///
-    /// This is the core function for text conversion. It supports conversion between Simplified, Traditional,
-    /// Taiwanese, Hong Kong, and Japanese Chinese variants, as well as punctuation conversion.
+    /// This is the **generic entry point** for OpenCC-style conversions. It supports
+    /// conversion between Simplified, Traditional, Taiwan, Hong Kong, and Japanese
+    /// character variants.
+    ///
+    /// Internally this function parses `config` into [`OpenccConfig`] and dispatches
+    /// to the corresponding conversion pipeline.
+    ///
+    /// For Rust callers, using [`convert_with_config`] with the strongly-typed
+    /// [`OpenccConfig`] enum is recommended to avoid string parsing.
     ///
     /// # Arguments
     ///
-    /// * `input` - The input string to be converted.
-    /// * `config` - The conversion configuration. Supported values (case-insensitive) include:
-    ///     - `"s2t"`: Simplified to Traditional
-    ///     - `"s2tw"`: Simplified to Taiwanese
-    ///     - `"s2twp"`: Simplified to Taiwanese (with phrases)
-    ///     - `"s2hk"`: Simplified to Hong Kong
-    ///     - `"t2s"`: Traditional to Simplified
-    ///     - `"t2tw"`: Traditional to Taiwanese
-    ///     - `"t2twp"`: Traditional to Taiwanese (with phrases)
-    ///     - `"t2hk"`: Traditional to Hong Kong
-    ///     - `"tw2s"`: Taiwanese to Simplified
-    ///     - `"tw2sp"`: Taiwanese to Simplified (with phrases)
-    ///     - `"tw2t"`: Taiwanese to Traditional
-    ///     - `"tw2tp"`: Taiwanese to Traditional (with phrases)
-    ///     - `"hk2s"`: Hong Kong to Simplified
-    ///     - `"hk2t"`: Hong Kong to Traditional
-    ///     - `"jp2t"`: Japanese to Traditional
-    ///     - `"t2jp"`: Traditional to Japanese
-    /// * `punctuation` - Whether to convert punctuation marks according to the target variant.
+    /// * `input` - The UTF-8 text to convert.
+    /// * `config` - Conversion configuration (case-insensitive). Supported values:
+    ///
+    ///   - `"s2t"`   — Simplified → Traditional
+    ///   - `"s2tw"`  — Simplified → Taiwan Traditional
+    ///   - `"s2twp"` — Simplified → Taiwan Traditional (phrase-level refinement)
+    ///   - `"s2hk"`  — Simplified → Hong Kong Traditional
+    ///   - `"t2s"`   — Traditional → Simplified
+    ///   - `"t2tw"`  — Traditional → Taiwan Traditional
+    ///   - `"t2twp"` — Traditional → Taiwan Traditional (phrase-level refinement)
+    ///   - `"t2hk"`  — Traditional → Hong Kong Traditional
+    ///   - `"tw2s"`  — Taiwan Traditional → Simplified
+    ///   - `"tw2sp"` — Taiwan Traditional → Simplified (phrase-level refinement)
+    ///   - `"tw2t"`  — Taiwan Traditional → Standard Traditional
+    ///   - `"tw2tp"` — Taiwan Traditional → Standard Traditional (phrase refinement)
+    ///   - `"hk2s"`  — Hong Kong Traditional → Simplified
+    ///   - `"hk2t"`  — Hong Kong Traditional → Standard Traditional
+    ///   - `"jp2t"`  — Japanese Shinjitai → Traditional Chinese
+    ///   - `"t2jp"`  — Traditional Chinese → Japanese Shinjitai
+    ///
+    /// * `punctuation` - Whether to convert punctuation marks (e.g. `“”` ↔ `「」`)
+    ///   when applicable.
+    ///   Some configurations ignore this flag if punctuation normalization does
+    ///   not apply to that conversion pipeline.
     ///
     /// # Returns
     ///
-    /// A `String` containing the converted text. If the `config` is invalid, returns an error message.
+    /// A newly allocated `String` containing the converted text.
+    ///
+    /// If `config` is invalid, the function returns a string in the form:
+    ///
+    /// ```text
+    /// Invalid config: <config>
+    /// ```
     ///
     /// # Examples
     ///
     /// ```
     /// use opencc_jieba_rs::OpenCC;
+    ///
     /// let opencc = OpenCC::new();
+    ///
     /// let traditional = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "s2t", true);
     /// let taiwanese = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "s2tw", true);
+    ///
     /// let invalid = opencc.convert("“春眠不觉晓，处处闻啼鸟。”", "unknown", true);
     /// assert_eq!(invalid, "Invalid config: unknown");
     /// ```
+    ///
+    /// [`convert_with_config`]: OpenCC::convert_with_config
+    /// [`OpenccConfig`]: OpenccConfig
     pub fn convert(&self, input: &str, config: &str, punctuation: bool) -> String {
         match OpenccConfig::try_from(config) {
             Ok(cfg) => self.convert_with_config(input, cfg, punctuation),
@@ -1402,14 +1486,14 @@ impl OpenCC {
     /// let keywords = opencc.keyword_extract_textrank("自然语言处理和机器学习", 5);
     /// println!("{:?}", keywords);
     /// ```
-    pub fn keyword_extract_textrank(&self, input: &str, tok_k: usize) -> Vec<String> {
+    pub fn keyword_extract_textrank(&self, input: &str, top_k: usize) -> Vec<String> {
         // Remove newline characters from the input
         let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
         let keyword_extractor = TextRank::default();
         let top_k = keyword_extractor.extract_keywords(
             &self.jieba,
             &cleaned_input,
-            tok_k,
+            top_k,
             // vec![String::from("ns"), String::from("n"), String::from("vn"), String::from("v")],
             vec![],
         );
