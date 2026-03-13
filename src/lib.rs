@@ -1604,6 +1604,34 @@ impl OpenCC {
     }
 }
 
+/// Provides a default [`OpenCC`] instance.
+///
+/// This is equivalent to calling [`OpenCC::new`]. It allows `OpenCC`
+/// to integrate with common Rust patterns where types implement
+/// [`Default`], such as:
+///
+/// - `OpenCC::default()`
+/// - `#[derive(Default)]` in structs containing `OpenCC`
+/// - generic APIs requiring `T: Default`
+///
+/// # Examples
+///
+/// ```
+/// use opencc_jieba_rs::OpenCC;
+///
+/// let opencc = OpenCC::default();
+/// let result = opencc.convert("汉字", "s2t", false);
+///
+/// assert_eq!(result, "漢字");
+/// ```
+///
+/// [`Default`]: Default
+impl Default for OpenCC {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Returns the maximum valid UTF-8 byte length for a string slice, ensuring no partial characters.
 ///
 /// This function is useful when you need to truncate a string to a maximum byte count
