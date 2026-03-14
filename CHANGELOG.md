@@ -10,16 +10,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Introduced `OpenccConfig` Enum as conversion configuration.
+- Introduced `OpenccConfig` enum as the conversion configuration.
 - Added `convert_with_config()`.
+- Added Jieba segmentation APIs:
+  - `jieba_cut_for_search()` — segmentation optimized for search indexing.
+  - `jieba_cut_all()` — full segmentation mode.
 
 ### Changed
 
-- Update Lexicon dictionary to v1.2.0.
-- Code optimization.
+- Updated lexicon dictionaries to v1.2.0.
+- Code optimizations and internal refactoring.
+- Refactored Jieba segmentation pipeline with a shared internal implementation.
 - C API:
-    - Improved memory management.
-    - Add `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
+  - Improved memory management.
+  - Added `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
 
 ---
 

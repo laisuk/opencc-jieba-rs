@@ -74,7 +74,31 @@ mod tests {
         let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
         let expected_output = "「/ 數大/ 」/ 便是/ 美/ ，/ 碧綠/ 的/ 山坡/ 前/ 幾千隻/ 綿羊/ ，/ 挨成/ 一片/ 的/ 雪絨/ ，/ 是/ 美/ ；";
         let opencc = OpenCC::new();
-        let actual_output = opencc.jieba.cut(input, true).join("/ ");
+        let actual_output = opencc.jieba_cut(input, true).join("/ ");
+        println!("{}", actual_output);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn test_jieba_cut_for_search() {
+        let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
+        let expected_output =
+            "「/ 數大/ 」/ 便是/ 美/ ，/ 碧綠/ 的/ 山坡/ 前/ 幾千/ 千隻/ 幾千隻/ 綿羊/ ，/ 挨成/ 一片/ 的/ 雪絨/ ，/ 是/ 美/ ；";
+
+        let opencc = OpenCC::new();
+        let actual_output = opencc.jieba_cut_for_search(input, true).join("/ ");
+        println!("{}", actual_output);
+        assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn test_jieba_cut_all() {
+        let input = "「數大」便是美，碧綠的山坡前幾千隻綿羊，挨成一片的雪絨，是美；";
+        let expected_output =
+            "「/ 數/ 大/ 」/ 便/ 便是/ 是/ 美/ ，/ 碧/ 碧綠/ 綠/ 的/ 山/ 山坡/ 坡/ 前/ 幾/ 幾千/ 幾千隻/ 千/ 千隻/ 綿/ 綿羊/ 羊/ ，/ 挨/ 成/ 一/ 一片/ 片/ 的/ 雪/ 絨/ ，/ 是/ 美/ ；";
+
+        let opencc = OpenCC::new();
+        let actual_output = opencc.jieba_cut_all(input).join("/ ");
         println!("{}", actual_output);
         assert_eq!(actual_output, expected_output);
     }

@@ -36,9 +36,9 @@
 /// | 14      | `Hk2t` | Hong Kong → Traditional                    | ❌ (ignored)                |
 /// | 15      | `Jp2t` | Japanese (Kanji variants) → Traditional     | ❌ (ignored)                |
 /// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)     | ❌ (ignored)                |
+/// 
 /// # Since
-///
-/// Available since **v0.7.3**.
+/// v0.7.3
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenccConfig {
@@ -100,8 +100,7 @@ impl TryFrom<&str> for OpenccConfig {
     /// Internally this delegates to [`OpenccConfig::parse`].
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     type Error = ();
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
@@ -126,8 +125,7 @@ impl OpenccConfig {
     /// defined by the enum and its `#[repr(u32)]` FFI mapping.
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     pub const ALL: [Self; 16] = [
         Self::S2t,
         Self::S2tw,
@@ -160,9 +158,9 @@ impl OpenccConfig {
     /// assert_eq!(OpenccConfig::from_ffi(1), Some(OpenccConfig::S2t));
     /// assert_eq!(OpenccConfig::from_ffi(999), None);
     /// ```
+    /// 
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     #[inline]
     pub const fn from_ffi(v: u32) -> Option<Self> {
         match v {
@@ -215,8 +213,7 @@ impl OpenccConfig {
     ///   a validated [`OpenccConfig`].
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     #[inline]
     pub const fn to_ffi(self) -> u32 {
         self as u32
@@ -257,8 +254,7 @@ impl OpenccConfig {
     ///   configuration names into [`OpenccConfig`].
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     #[inline]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -304,8 +300,7 @@ impl OpenccConfig {
     /// - [`OpenccConfig::as_str`] for retrieving the canonical name
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     #[inline]
     pub fn parse(s: &str) -> Option<Self> {
         Self::ALL
@@ -334,8 +329,8 @@ impl OpenccConfig {
     /// ```
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
+    
     #[inline]
     pub fn is_valid_config(s: &str) -> bool {
         Self::parse(s).is_some()
@@ -356,8 +351,7 @@ impl OpenccConfig {
     /// ```
     ///
     /// # Since
-    ///
-    /// Available since **v0.7.3**.
+    /// v0.7.3
     #[inline]
     pub fn is_valid_config_ffi(v: u32) -> bool {
         Self::from_ffi(v).is_some()

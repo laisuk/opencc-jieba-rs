@@ -158,11 +158,16 @@
 //!   with minimal overhead.
 //!
 //! For segmentation-only or keyword extraction APIs, see:
-//! - [`OpenCC::jieba_cut`] — Jieba-based segmentation
-//! - [`OpenCC::keyword_extract_textrank`] — keyword extraction utilities
-//! - [`OpenCC::keyword_extract_tfidf`] — keyword extraction utilities
 //!
-//! These can be combined with conversion results for downstream NLP tasks.
+//! - [`OpenCC::jieba_cut`] — Jieba segmentation (accurate mode)
+//! - [`OpenCC::jieba_cut_for_search`] — Jieba segmentation optimized for search indexing
+//! - [`OpenCC::jieba_cut_all`] — Jieba full segmentation mode
+//! - [`OpenCC::keyword_extract_textrank`] — keyword extraction using TextRank
+//! - [`OpenCC::keyword_extract_tfidf`] — keyword extraction using TF-IDF
+//!
+//! These utilities can be used independently of Chinese variant conversion,
+//! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
+//! as indexing, text analysis, and keyword extraction.
 use jieba_rs::{Jieba, Keyword, TfIdf};
 use jieba_rs::{KeywordExtract, TextRank};
 use once_cell::sync::Lazy;
@@ -596,47 +601,49 @@ impl OpenCC {
 
     /// Performs Jieba-based phrase segmentation over each non-delimiter chunk.
     ///
-    /// This method is used internally to pre-segment input text into a vector of phrases
-    /// before dictionary-based conversion or keyword extraction. It ensures consistent
-    /// segmentation behavior across single-threaded and parallel execution modes.
+    /// This is the shared internal implementation behind the public Jieba
+    /// segmentation APIs, such as [`jieba_cut()`], [`jieba_cut_for_search()`],
+    /// and [`jieba_cut_all()`].
     ///
-    /// The segmentation respects delimiters (such as punctuation or whitespace) by first
-    /// splitting the text into non-delimiter ranges using [`split_string_ranges()`]. Each
-    /// range is then processed by Jieba’s `cut()` function, producing an ordered sequence
-    /// of token strings.
+    /// The function first splits the input into non-delimiter ranges using
+    /// [`split_string_ranges()`], so punctuation, whitespace, and other delimiters
+    /// are handled separately from lexical segmentation. Each non-delimiter chunk
+    /// is then passed to the provided `cutter` function, which determines the
+    /// segmentation mode.
     ///
-    /// When `use_parallel` is enabled, segmentation is parallelized using Rayon’s
-    /// [`IndexedParallelIterator`], which preserves the global order of tokens while
-    /// distributing work across CPU cores. This improves throughput on large texts
-    /// without affecting deterministic output ordering.
+    /// When `use_parallel` is enabled, chunk processing is parallelized with Rayon.
+    /// Because the outer range iterator is indexed, the final collected output
+    /// preserves the original global token order.
+    ///
+    /// # Type Parameters
+    /// - `F` — A Jieba segmentation function that maps an input chunk to a vector
+    ///   of borrowed token slices.
     ///
     /// # Arguments
     /// - `input` — The input text to segment.
-    /// - `hmm` — Whether to enable Jieba’s Hidden Markov Model (HMM) for unknown word detection.
-    /// - `use_parallel` — Whether to perform segmentation in parallel using Rayon.
+    /// - `use_parallel` — Whether to process chunks in parallel using Rayon.
+    /// - `cutter` — The Jieba segmentation function to apply to each chunk.
     ///
     /// # Returns
-    /// A vector of segmented phrase strings (`Vec<String>`), preserving the order
-    /// of appearance in the input.
+    /// A `Vec<String>` containing segmented tokens in input order.
     ///
     /// # Notes
-    /// - Each phrase corresponds to a Jieba token.
-    /// - Global order of phrases is guaranteed even in parallel mode.
-    /// - Delimiters are handled separately by [`split_string_ranges()`].
-    fn phrases_cut_impl(&self, input: &str, hmm: bool, use_parallel: bool) -> Vec<String> {
+    /// - Returned token order is deterministic, including in parallel mode.
+    /// - Token slices produced by `cutter` are converted into owned [`String`] values.
+    /// - Delimiters are not segmented by Jieba; they are handled by
+    ///   [`split_string_ranges()`].
+    fn phrases_cut_impl<F>(&self, input: &str, use_parallel: bool, cutter: F) -> Vec<String>
+    where
+        F: for<'a> Fn(&Jieba, &'a str) -> Vec<&'a str> + Sync + Send,
+    {
         let ranges = self.split_string_ranges(input, true);
 
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
-            self.jieba
-                .cut(chunk, hmm) // Vec<&str>
-                .into_iter()
-                .map(str::to_owned)
+            cutter(&self.jieba, chunk).into_iter().map(str::to_owned)
         };
 
         if use_parallel {
-            // Because `ranges.into_par_iter()` is an IndexedParallelIterator and each inner
-            // iterator is ExactSizeIterator, Rayon preserves global order when collecting.
             ranges
                 .into_par_iter()
                 .flat_map_iter(process_range)
@@ -646,26 +653,146 @@ impl OpenCC {
         }
     }
 
-    /// Segments input text using Jieba tokenizer.
+    /// Segments input text using Jieba **accurate mode**.
+    ///
+    /// Accurate mode is the standard segmentation algorithm used for
+    /// natural-language processing tasks. It attempts to produce the most
+    /// reasonable tokenization for general text processing.
+    ///
+    /// The input text is first divided into non-delimiter ranges using
+    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `cut()` function. Delimiters such as punctuation and whitespace are
+    /// handled separately and are not segmented.
+    ///
+    /// For large inputs, segmentation may be automatically parallelized
+    /// using Rayon. The final output order always matches the original
+    /// input order.
     ///
     /// # Arguments
     ///
-    /// * `text` - The input text to be segmented.
-    /// * `hmm` - Whether to enable HMM for unknown word recognition.
+    /// * `input` — The input text to segment.
+    /// * `hmm` — Whether to enable Hidden Markov Model (HMM) for unknown word detection.
     ///
     /// # Returns
     ///
-    /// A `Vec<String>` containing segmented words.
+    /// A `Vec<String>` containing segmented tokens.
+    ///
+    /// # Notes
+    ///
+    /// - This is the **default Jieba segmentation mode**.
+    /// - It balances segmentation accuracy and token count.
+    /// - Parallel execution is automatically enabled for sufficiently large inputs.
     ///
     /// # Example
+    ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
+    ///
     /// let tokens = opencc.jieba_cut("南京市长江大桥", true);
-    /// assert!(tokens.contains(&"南京市".to_string()));  // "南京市/长江大桥"
+    ///
+    /// assert!(tokens.contains(&"南京市".to_string()));
     /// ```
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
-        self.phrases_cut_impl(input, hmm, use_parallel)
+        self.phrases_cut_impl(input, use_parallel, |jieba, chunk| jieba.cut(chunk, hmm))
+    }
+
+    /// Segments input text using Jieba **search mode**.
+    ///
+    /// Search mode generates additional overlapping tokens to improve
+    /// recall for search engines or indexing systems. Longer words are
+    /// further decomposed into smaller substrings so that partial matches
+    /// can be discovered during search queries.
+    ///
+    /// The input text is first divided into non-delimiter ranges using
+    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `cut_for_search()` function. Delimiters such as punctuation and
+    /// whitespace are handled separately and are not segmented.
+    ///
+    /// For large inputs, segmentation may be automatically parallelized
+    /// using Rayon. The final output order always matches the original
+    /// input order.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` — The input text to segment.
+    /// * `hmm` — Whether to enable Hidden Markov Model (HMM) for unknown word detection.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` containing segmented tokens suitable for search indexing.
+    ///
+    /// # Notes
+    ///
+    /// - Search mode produces **more tokens** than [`jieba_cut()`].
+    /// - Tokens may overlap due to substring generation.
+    /// - Parallel execution is automatically enabled for sufficiently large inputs.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    ///
+    /// let tokens = opencc.jieba_cut_for_search("南京市长江大桥", true);
+    ///
+    /// assert!(tokens.contains(&"南京市".to_string()));
+    /// assert!(tokens.contains(&"南京".to_string()));
+    /// ```
+    ///
+    /// # Since
+    /// v0.7.3
+    pub fn jieba_cut_for_search(&self, input: &str, hmm: bool) -> Vec<String> {
+        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        self.phrases_cut_impl(input, use_parallel, |jieba, chunk| {
+            jieba.cut_for_search(chunk, hmm)
+        })
+    }
+
+    /// Segments input text using Jieba **full mode**.
+    ///
+    /// Full mode returns all possible words that can be matched from the
+    /// dictionary. This produces the largest number of tokens and is mainly
+    /// useful for exhaustive text analysis.
+    ///
+    /// The input text is first divided into non-delimiter ranges using
+    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `cut_all()` function. Delimiters such as punctuation and whitespace
+    /// are handled separately and are not segmented.
+    ///
+    /// For large inputs, segmentation may be automatically parallelized
+    /// using Rayon. The final output order always matches the original
+    /// input order.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` — The input text to segment.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` containing all matched tokens.
+    ///
+    /// # Notes
+    ///
+    /// - Full mode produces **significantly more tokens** than [`jieba_cut()`].
+    /// - Hidden Markov Model (HMM) is **not used** in this mode.
+    /// - Parallel execution is automatically enabled for sufficiently large inputs.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    ///
+    /// let tokens = opencc.jieba_cut_all("南京市长江大桥");
+    ///
+    /// assert!(tokens.contains(&"南京".to_string()));
+    /// assert!(tokens.contains(&"南京市".to_string()));
+    /// ```
+    ///
+    /// # Since
+    /// v0.7.3
+    pub fn jieba_cut_all(&self, input: &str) -> Vec<String> {
+        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        self.phrases_cut_impl(input, use_parallel, |jieba, chunk| jieba.cut_all(chunk))
     }
 
     /// Segments input text using Jieba and joins the result into a single string.
