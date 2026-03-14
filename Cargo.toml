@@ -38,7 +38,7 @@ once_cell = "1.21.3"
 rayon = "=1.10.0"
 rayon-core = "=1.12.1"
 include-flate = "=0.3.0"
-#libflate = "=2.1.0"
+libflate = "=2.1.0"
 
 [profile.release]
 opt-level = 3              # Maximize speed (better suited for C API performance)
