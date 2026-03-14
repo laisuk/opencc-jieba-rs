@@ -899,7 +899,6 @@ dependencies = [
 name = "opencc-jieba-rs"
 version = "0.7.3"
 dependencies = [
- "include-flate",
  "jieba-rs",
  "once_cell",
  "rayon",
