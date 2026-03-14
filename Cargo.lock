@@ -901,6 +901,7 @@ version = "0.7.3"
 dependencies = [
  "include-flate",
  "jieba-rs",
+ "libflate",
  "once_cell",
  "rayon",
  "rayon-core",
