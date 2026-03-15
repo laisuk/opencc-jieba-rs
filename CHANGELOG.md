@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added Jieba segmentation APIs:
   - `jieba_cut_for_search()` — segmentation optimized for search indexing.
   - `jieba_cut_all()` — full segmentation mode.
+- Added `jieba_tag()` — part-of-speech (POS) tagging API returning `(token, tag)` pairs.
 
 ### Changed
 

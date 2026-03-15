@@ -795,6 +795,118 @@ impl OpenCC {
         self.phrases_cut_impl(input, use_parallel, |jieba, chunk| jieba.cut_all(chunk))
     }
 
+    /// Performs Jieba-based part-of-speech (POS) tagging over each non-delimiter chunk.
+    ///
+    /// This is the shared internal implementation behind the public POS tagging API
+    /// [`jieba_tag()`].
+    ///
+    /// The function first splits the input into non-delimiter ranges using
+    /// [`split_string_ranges()`], so punctuation, whitespace, and other delimiters
+    /// are handled separately from lexical analysis. Each non-delimiter chunk is
+    /// then passed to the provided `tagger` function, which performs segmentation
+    /// together with part-of-speech annotation.
+    ///
+    /// When `use_parallel` is enabled, chunk processing is parallelized with Rayon.
+    /// Because the outer range iterator is indexed, the final collected output
+    /// preserves the original global token order.
+    ///
+    /// # Type Parameters
+    /// - `F` — A Jieba POS-tagging function that maps an input chunk to owned
+    ///   `(word, tag)` pairs.
+    ///
+    /// # Arguments
+    /// - `input` — The input text to tag.
+    /// - `use_parallel` — Whether to process chunks in parallel using Rayon.
+    /// - `tagger` — The Jieba POS-tagging function to apply to each chunk.
+    ///
+    /// # Returns
+    /// A `Vec<(String, String)>` containing `(token, tag)` pairs in input order.
+    ///
+    /// # Notes
+    /// - Returned token order is deterministic, including in parallel mode.
+    /// - Delimiters are not tagged by Jieba; they are handled by
+    ///   [`split_string_ranges()`].
+    fn phrases_tag_impl<F>(
+        &self,
+        input: &str,
+        use_parallel: bool,
+        tagger: F,
+    ) -> Vec<(String, String)>
+    where
+        F: Fn(&Jieba, &str) -> Vec<(String, String)> + Sync + Send,
+    {
+        let ranges = self.split_string_ranges(input, true);
+
+        let process_range = |range: Range<usize>| {
+            let chunk = &input[range];
+            tagger(&self.jieba, chunk).into_iter()
+        };
+
+        if use_parallel {
+            ranges
+                .into_par_iter()
+                .flat_map_iter(process_range)
+                .collect()
+        } else {
+            ranges.into_iter().flat_map(process_range).collect()
+        }
+    }
+
+    /// Tags input text using Jieba **part-of-speech (POS) tagging**.
+    ///
+    /// POS tagging performs segmentation and assigns a grammatical category
+    /// to each token, such as noun, verb, adjective, pronoun, or English word.
+    /// This is useful for downstream natural-language processing tasks such as
+    /// keyword filtering, grammar analysis, readability checks, and text mining.
+    ///
+    /// The input text is first divided into non-delimiter ranges using
+    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `tag()` function. Delimiters such as punctuation and whitespace are
+    /// handled separately and are not tagged.
+    ///
+    /// For large inputs, tagging may be automatically parallelized
+    /// using Rayon. The final output order always matches the original
+    /// input order.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` — The input text to tag.
+    /// * `hmm` — Whether to enable Hidden Markov Model (HMM) for unknown word detection.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<(String, String)>` containing `(token, tag)` pairs.
+    ///
+    /// # Notes
+    ///
+    /// - This API performs both segmentation and POS annotation.
+    /// - Common tags include `n` (noun), `v` (verb), `a` (adjective),
+    ///   `r` (pronoun), `ns` (place name), and `eng` (English word).
+    /// - Parallel execution is automatically enabled for sufficiently large inputs.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    ///
+    /// let tagged = opencc.jieba_tag("我喜欢学习Rust语言", true);
+    ///
+    /// assert!(tagged.iter().any(|(word, tag)| word == "我" && tag == "r"));
+    /// ```
+    ///
+    /// # Since
+    /// v0.7.3
+    pub fn jieba_tag(&self, input: &str, hmm: bool) -> Vec<(String, String)> {
+        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        self.phrases_tag_impl(input, use_parallel, |jieba, chunk| {
+            jieba
+                .tag(chunk, hmm)
+                .into_iter()
+                .map(|tag| (tag.word.to_owned(), tag.tag.to_owned()))
+                .collect()
+        })
+    }
+
     /// Segments input text using Jieba and joins the result into a single string.
     ///
     /// Similar to [`jieba_cut`] but returns a space-separated string instead of a vector.

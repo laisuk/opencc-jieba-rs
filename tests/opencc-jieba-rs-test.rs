@@ -104,6 +104,30 @@ mod tests {
     }
 
     #[test]
+    fn test_jieba_tag_hant() {
+        let opencc = OpenCC::new();
+
+        let text = "我喜歡學習Rust語言";
+        let tagged = opencc.jieba_tag(text, true);
+
+        println!("Input: {text}");
+        println!("POS tagging result:");
+
+        for (word, tag) in &tagged {
+            println!("{word} / {tag}");
+        }
+
+        assert!(!tagged.is_empty());
+
+        // sanity checks
+        assert!(tagged.iter().any(|(w, _)| w == "我"));
+        assert!(tagged.iter().any(|(w, _)| w == "喜歡"));
+        assert!(tagged.iter().any(|(w, _)| w == "學習"));
+        assert!(tagged.iter().any(|(w, _)| w == "Rust"));
+        assert!(tagged.iter().any(|(w, _)| w == "語言"));
+    }
+
+    #[test]
     fn s2t_punct_test() {
         let input = "你好，世界！“龙马精神”！";
         let expected_output = "你好，世界！「龍馬精神」！";
