@@ -15,12 +15,12 @@ use std::collections::{HashMap, HashSet};
 ///
 /// # Fields
 ///
-/// - [`map`]: The actual dictionary data mapping source → target strings.
-/// - [`min_len`]: The shortest key length in Unicode scalar values.
-/// - [`max_len`]: The longest key length in Unicode scalar values.
-/// - [`key_len_mask`]: Bitmask (bits 0–63 → lengths 1–64) marking which
+/// - [`DictMap::map`]: The actual dictionary data mapping source → target strings.
+/// - [`DictMap::min_len`]: The shortest key length in Unicode scalar values.
+/// - [`DictMap::max_len`]: The longest key length in Unicode scalar values.
+/// - [`DictMap::key_len_mask`]: Bitmask (bits 0–63 → lengths 1–64) marking which
 ///   key lengths are present in the dictionary.
-/// - [`long_lengths`]: Set of key lengths greater than 64, if any.
+/// - [`DictMap::long_lengths`]: Set of key lengths greater than 64, if any.
 ///
 /// # Serialization
 ///
@@ -103,8 +103,8 @@ impl Default for DictMap {
 impl DictMap {
     /// Inserts a new key–value pair and updates length statistics incrementally.
     ///
-    /// This method updates [`min_len`], [`max_len`], [`key_len_mask`],
-    /// and [`long_lengths`] in a single pass, avoiding later rescans.
+    /// This method updates [`DictMap::min_len`], [`DictMap::max_len`],
+    /// [`DictMap::key_len_mask`], and [`DictMap::long_lengths`] in a single pass, avoiding later rescans.
     ///
     /// # Arguments
     ///
@@ -157,7 +157,7 @@ impl DictMap {
     /// Checks whether this dictionary contains any keys of a specific length.
     ///
     /// The lookup uses a 64-bit mask for lengths 1–64 and falls back
-    /// to [`long_lengths`] for larger phrases.
+    /// to [`DictMap::long_lengths`] for larger phrases.
     ///
     /// # Arguments
     ///

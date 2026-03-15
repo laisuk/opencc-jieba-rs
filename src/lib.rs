@@ -75,8 +75,8 @@
 //! |----------|----------------|-----------|-------------------------------------------|
 //! | S → T    | [`OpenCC::s2t`] | Phrase    | Standard Simplified → Traditional.        |
 //! | T → S    | [`OpenCC::t2s`] | Phrase    | Standard Traditional → Simplified.        |
-//! | S → T    | [`OpenCC::st`]  | Character | Fast char-only S→T (no segmentation).     |
-//! | T → S    | [`OpenCC::ts`]  | Character | Fast char-only T→S (no segmentation).     |
+//! | S → T    | `st`            | Character | Fast char-only S→T (no segmentation).     |
+//! | T → S    | `ts`            | Character | Fast char-only T→S (no segmentation).     |
 //!
 //! ### `s2t` / `t2s`
 //!
@@ -217,7 +217,7 @@ static DELIM_BMP: Lazy<[u64; 1024]> = Lazy::new(|| {
 /// Tests whether a character is a delimiter.
 ///
 /// This function performs a **constant-time bitmap lookup** for any BMP
-/// character (`U+0000..=U+FFFF`), using the precomputed [`DELIM_BMP`] table.
+/// character (`U+0000..=U+FFFF`), using the precomputed delimiter bitmap table.
 /// For non-BMP code points, it currently always returns `false`
 /// (extend this if you need astral punctuation).
 ///
@@ -606,7 +606,7 @@ impl OpenCC {
     /// and [`jieba_cut_all()`].
     ///
     /// The function first splits the input into non-delimiter ranges using
-    /// [`split_string_ranges()`], so punctuation, whitespace, and other delimiters
+    /// `split_string_ranges()`, so punctuation, whitespace, and other delimiters
     /// are handled separately from lexical segmentation. Each non-delimiter chunk
     /// is then passed to the provided `cutter` function, which determines the
     /// segmentation mode.
@@ -631,7 +631,7 @@ impl OpenCC {
     /// - Returned token order is deterministic, including in parallel mode.
     /// - Token slices produced by `cutter` are converted into owned [`String`] values.
     /// - Delimiters are not segmented by Jieba; they are handled by
-    ///   [`split_string_ranges()`].
+    ///   `split_string_ranges()`.
     fn phrases_cut_impl<F>(&self, input: &str, use_parallel: bool, cutter: F) -> Vec<String>
     where
         F: for<'a> Fn(&Jieba, &'a str) -> Vec<&'a str> + Sync + Send,
@@ -660,7 +660,7 @@ impl OpenCC {
     /// reasonable tokenization for general text processing.
     ///
     /// The input text is first divided into non-delimiter ranges using
-    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `split_string_ranges()`. Each range is then processed by Jieba’s
     /// `cut()` function. Delimiters such as punctuation and whitespace are
     /// handled separately and are not segmented.
     ///
@@ -705,7 +705,7 @@ impl OpenCC {
     /// can be discovered during search queries.
     ///
     /// The input text is first divided into non-delimiter ranges using
-    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `split_string_ranges()`. Each range is then processed by Jieba’s
     /// `cut_for_search()` function. Delimiters such as punctuation and
     /// whitespace are handled separately and are not segmented.
     ///
@@ -724,7 +724,7 @@ impl OpenCC {
     ///
     /// # Notes
     ///
-    /// - Search mode produces **more tokens** than [`jieba_cut()`].
+    /// - Search mode produces **more tokens** than [`OpenCC::jieba_cut`].
     /// - Tokens may overlap due to substring generation.
     /// - Parallel execution is automatically enabled for sufficiently large inputs.
     ///
@@ -755,7 +755,7 @@ impl OpenCC {
     /// useful for exhaustive text analysis.
     ///
     /// The input text is first divided into non-delimiter ranges using
-    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `split_string_ranges()`. Each range is then processed by Jieba’s
     /// `cut_all()` function. Delimiters such as punctuation and whitespace
     /// are handled separately and are not segmented.
     ///
@@ -773,7 +773,7 @@ impl OpenCC {
     ///
     /// # Notes
     ///
-    /// - Full mode produces **significantly more tokens** than [`jieba_cut()`].
+    /// - Full mode produces **significantly more tokens** than [`OpenCC::jieba_cut`].
     /// - Hidden Markov Model (HMM) is **not used** in this mode.
     /// - Parallel execution is automatically enabled for sufficiently large inputs.
     ///
@@ -801,7 +801,7 @@ impl OpenCC {
     /// [`jieba_tag()`].
     ///
     /// The function first splits the input into non-delimiter ranges using
-    /// [`split_string_ranges()`], so punctuation, whitespace, and other delimiters
+    /// `split_string_ranges()`, so punctuation, whitespace, and other delimiters
     /// are handled separately from lexical analysis. Each non-delimiter chunk is
     /// then passed to the provided `tagger` function, which performs segmentation
     /// together with part-of-speech annotation.
@@ -825,7 +825,7 @@ impl OpenCC {
     /// # Notes
     /// - Returned token order is deterministic, including in parallel mode.
     /// - Delimiters are not tagged by Jieba; they are handled by
-    ///   [`split_string_ranges()`].
+    ///   `split_string_ranges()`.
     fn phrases_tag_impl<F>(
         &self,
         input: &str,
@@ -860,7 +860,7 @@ impl OpenCC {
     /// keyword filtering, grammar analysis, readability checks, and text mining.
     ///
     /// The input text is first divided into non-delimiter ranges using
-    /// [`split_string_ranges()`]. Each range is then processed by Jieba’s
+    /// `split_string_ranges()`. Each range is then processed by Jieba’s
     /// `tag()` function. Delimiters such as punctuation and whitespace are
     /// handled separately and are not tagged.
     ///
@@ -909,7 +909,7 @@ impl OpenCC {
 
     /// Segments input text using Jieba and joins the result into a single string.
     ///
-    /// Similar to [`jieba_cut`] but returns a space-separated string instead of a vector.
+    /// Similar to [`OpenCC::jieba_cut`] but returns a space-separated string instead of a vector.
     ///
     /// # Arguments
     ///
@@ -1905,3 +1905,4 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     }
     byte_count
 }
+
