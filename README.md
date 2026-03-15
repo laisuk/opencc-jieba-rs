@@ -11,17 +11,18 @@ High-performance Rust-based Chinese text converter using Jieba segmentation and 
 [![Build and Release](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml/badge.svg)](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml)
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust.yml/badge.svg)
 
-A Rust-based Chinese text converter that performs word segmentation using **Jieba**, powered by **OpenCC lexicons**.
+A Rust-based Chinese text converter powered by **OpenCC lexicons**, using **Jieba** for word segmentation to improve
+phrase-level accuracy.
 This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant)
 conversion.
 
 ## Features
 
 - 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
-- 🔍 Lexicon-driven segmentation using OpenCC dictionaries.
-- ⚡ Jieba-based word segmentation using a **combined Hans + Hant dictionary**
-  for accurate tokenization across Simplified and Traditional Chinese text.
-- 🛠️ Designed to be easily embedded as a Rust library or used standalone.
+- 🔍 Lexicon-driven phrase conversion using OpenCC dictionaries.
+- ⚡ Accurate segmentation powered by Jieba with a **combined Hans + Hant dictionary**.
+- 🔠 Works with both **Simplified (zh-Hans)** and **Traditional (zh-Hant)** Chinese text.
+- 🛠️ Designed to be embedded as a Rust library or used standalone.
 
 ### 🔽 Downloads
 
