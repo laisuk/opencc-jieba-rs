@@ -173,7 +173,7 @@ use jieba_rs::{KeywordExtract, TextRank};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::HashMap;
+use std::borrow::Cow;
 use std::io::BufReader;
 use std::io::Cursor;
 use std::ops::Range;
@@ -261,19 +261,6 @@ pub fn is_delimiter(c: char) -> bool {
 // Pre-compiled regexes using lazy static initialization
 static STRIP_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]").unwrap());
-static S2T_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[“”‘’]"#).unwrap());
-static T2S_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[「」『』]").unwrap());
-// Pre-built mapping tables
-static S2T_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
-    [('“', '「'), ('”', '」'), ('‘', '『'), ('’', '』')]
-        .into_iter()
-        .collect()
-});
-static T2S_MAP: Lazy<HashMap<char, char>> = Lazy::new(|| {
-    [('「', '“'), ('」', '”'), ('『', '‘'), ('』', '’')]
-        .into_iter()
-        .collect()
-});
 // Minimum input length (in chars) to trigger parallel processing
 const PARALLEL_THRESHOLD: usize = 1000;
 
@@ -425,65 +412,15 @@ impl OpenCC {
         let ranges = self.split_string_ranges(input, true);
         let use_parallel = input.len() >= PARALLEL_THRESHOLD;
 
-        #[inline(always)]
-        fn single_and_len(s: &str) -> (bool, Option<char>, u16) {
-            let mut it = s.chars();
-            match (it.next(), it.next()) {
-                (None, _) => (true, None, 0),          // empty
-                (Some(c), None) => (true, Some(c), 1), // exactly 1 char
-                (Some(_), Some(_)) => (false, None, 2 + it.count() as u16),
-            }
-        }
-
-        let process_range = |range: Range<usize>| {
-            let chunk = &input[range];
-            let tokens = self.jieba.cut(chunk, hmm);
-
-            // Heuristic: output ~= input in length
-            let mut out = String::with_capacity(chunk.len());
-
-            'tok: for phrase in tokens {
-                if phrase.is_empty() {
-                    continue 'tok;
-                }
-
-                // Get (is_single, optional_char, total_length)
-                let (is_single, single_char_opt, phrase_len) = single_and_len(phrase);
-
-                // Fast delimiter path
-                if is_single {
-                    if let Some(c) = single_char_opt {
-                        if is_delimiter(c) {
-                            out.push_str(phrase);
-                            continue 'tok;
-                        }
-                    }
-                    Self::convert_by_char(phrase, dictionaries, &mut out);
-                    continue 'tok;
-                }
-
-                // Precedence lookup across dicts
-                for dict in dictionaries {
-                    if !dict.has_key_len(phrase_len) {
-                        continue;
-                    }
-                    if let Some(t) = dict.get(phrase) {
-                        out.push_str(t);
-                        continue 'tok;
-                    }
-                }
-
-                // Fallback: char-by-char conversion, in-place
-                Self::convert_by_char(phrase, dictionaries, &mut out);
-            }
-
-            out
-        };
-
         if use_parallel {
             ranges
                 .into_par_iter()
-                .map(process_range)
+                .map(|range| {
+                    let chunk = &input[range];
+                    let mut out = String::with_capacity(chunk.len());
+                    self.append_converted_chunk(chunk, dictionaries, hmm, &mut out);
+                    out
+                })
                 .reduce(String::new, |mut a, b| {
                     a.reserve(b.len());
                     a.push_str(&b);
@@ -492,9 +429,79 @@ impl OpenCC {
         } else {
             let mut out = String::with_capacity(input.len() + (input.len() >> 6));
             for r in ranges {
-                out.push_str(&process_range(r));
+                self.append_converted_chunk(&input[r], dictionaries, hmm, &mut out);
             }
             out
+        }
+    }
+
+    /// Converts a single Jieba-produced chunk directly into the provided output buffer.
+    ///
+    /// This helper is shared by the serial and parallel paths in
+    /// [`OpenCC::phrases_cut_convert`] so both execution modes use the same
+    /// phrase lookup, delimiter fast-path, and character-fallback behavior.
+    ///
+    /// # Arguments
+    /// * `chunk` - A non-delimiter text slice to segment and convert.
+    /// * `dictionaries` - Conversion dictionaries in precedence order.
+    /// * `hmm` - Whether Jieba HMM mode is enabled.
+    /// * `out` - Destination buffer receiving converted output.
+    #[inline(always)]
+    fn append_converted_chunk(
+        &self,
+        chunk: &str,
+        dictionaries: &[&DictMap],
+        hmm: bool,
+        out: &mut String,
+    ) {
+        let tokens = self.jieba.cut(chunk, hmm);
+
+        'tok: for phrase in tokens {
+            if phrase.is_empty() {
+                continue 'tok;
+            }
+
+            let (is_single, single_char_opt, phrase_len) = Self::single_and_len(phrase);
+
+            if is_single {
+                if let Some(c) = single_char_opt {
+                    if is_delimiter(c) {
+                        out.push_str(phrase);
+                        continue 'tok;
+                    }
+                }
+                Self::convert_by_char(phrase, dictionaries, out);
+                continue 'tok;
+            }
+
+            for dict in dictionaries {
+                if !dict.has_key_len(phrase_len) {
+                    continue;
+                }
+                if let Some(t) = dict.get(phrase) {
+                    out.push_str(t);
+                    continue 'tok;
+                }
+            }
+
+            Self::convert_by_char(phrase, dictionaries, out);
+        }
+    }
+
+    /// Returns whether a string is a single scalar value together with its length.
+    ///
+    /// This avoids re-scanning short Jieba tokens in the hot path where delimiter
+    /// detection and dictionary length gating need to distinguish single-character
+    /// tokens from multi-character phrases.
+    ///
+    /// The tuple layout is `(is_single, single_char_if_any, char_len)`.
+    #[inline(always)]
+    fn single_and_len(s: &str) -> (bool, Option<char>, u16) {
+        let mut it = s.chars();
+        match (it.next(), it.next()) {
+            (None, _) => (true, None, 0),
+            (Some(c), None) => (true, Some(c), 1),
+            (Some(_), Some(_)) => (false, None, 2 + it.count() as u16),
         }
     }
 
@@ -1690,18 +1697,29 @@ impl OpenCC {
     ///
     /// A `String` with punctuation marks converted according to the specified variant.
     fn convert_punctuation(text: &str, config: &str) -> String {
-        let (regex, mapping) = if config.starts_with('s') {
-            (&*S2T_REGEX, &*S2T_MAP)
+        let mut out = String::with_capacity(text.len());
+        if config.starts_with('s') {
+            for ch in text.chars() {
+                out.push(match ch {
+                    '“' => '「',
+                    '”' => '」',
+                    '‘' => '『',
+                    '’' => '』',
+                    _ => ch,
+                });
+            }
         } else {
-            (&*T2S_REGEX, &*T2S_MAP)
-        };
-
-        regex
-            .replace_all(text, |caps: &regex::Captures| {
-                let ch = caps.get(0).unwrap().as_str().chars().next().unwrap();
-                mapping.get(&ch).copied().unwrap_or(ch).to_string()
-            })
-            .into_owned()
+            for ch in text.chars() {
+                out.push(match ch {
+                    '「' => '“',
+                    '」' => '”',
+                    '『' => '‘',
+                    '』' => '’',
+                    _ => ch,
+                });
+            }
+        }
+        out
     }
 
     /// Extracts top keywords using the TextRank algorithm.
@@ -1727,7 +1745,7 @@ impl OpenCC {
     /// ```
     pub fn keyword_extract_textrank(&self, input: &str, top_k: usize) -> Vec<String> {
         // Remove newline characters from the input
-        let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
+        let cleaned_input = strip_newlines_cow(input);
         let keyword_extractor = TextRank::default();
         let top_k = keyword_extractor.extract_keywords(
             &self.jieba,
@@ -1766,16 +1784,15 @@ impl OpenCC {
     /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_textrank(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         // Remove newline characters from the input
-        let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
+        let cleaned_input = strip_newlines_cow(input);
         let keyword_extractor = TextRank::default();
-        let top_k = keyword_extractor.extract_keywords(
+        keyword_extractor.extract_keywords(
             &self.jieba,
             &cleaned_input,
             top_k,
             // vec![String::from("ns"), String::from("n"), String::from("vn"), String::from("v")],
             vec![],
-        );
-        top_k
+        )
     }
 
     /// Extracts top keywords using the TF-IDF algorithm.
@@ -1800,7 +1817,7 @@ impl OpenCC {
     /// ```
     pub fn keyword_extract_tfidf(&self, input: &str, top_k: usize) -> Vec<String> {
         // Remove newline characters from the input
-        let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
+        let cleaned_input = strip_newlines_cow(input);
         let keyword_extractor = TfIdf::default();
         let top_k = keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![]);
         // Extract only the keyword strings from the Keyword struct
@@ -1835,11 +1852,9 @@ impl OpenCC {
     /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_tfidf(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         // Remove newline characters from the input
-        let cleaned_input = input.replace(|c| c == '\n' || c == '\r', "");
+        let cleaned_input = strip_newlines_cow(input);
         let keyword_extractor = TfIdf::default();
-        let top_k = keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![]);
-
-        top_k
+        keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![])
     }
 }
 
@@ -1906,3 +1921,16 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
     byte_count
 }
 
+/// Removes line-break characters only when present, borrowing otherwise.
+///
+/// Keyword extraction APIs normalize CR/LF before passing text into
+/// Jieba-based ranking. Returning [`Cow`] avoids allocating for the common
+/// case where the input is already single-line.
+#[inline]
+fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
+    if input.as_bytes().iter().any(|&b| b == b'\n' || b == b'\r') {
+        Cow::Owned(input.replace(['\n', '\r'], ""))
+    } else {
+        Cow::Borrowed(input)
+    }
+}

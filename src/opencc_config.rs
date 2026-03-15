@@ -36,7 +36,7 @@
 /// | 14      | `Hk2t` | Hong Kong → Traditional                    | ❌ (ignored)                |
 /// | 15      | `Jp2t` | Japanese (Kanji variants) → Traditional     | ❌ (ignored)                |
 /// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)     | ❌ (ignored)                |
-/// 
+///
 /// # Since
 /// v0.7.3
 #[repr(u32)]
@@ -158,7 +158,7 @@ impl OpenccConfig {
     /// assert_eq!(OpenccConfig::from_ffi(1), Some(OpenccConfig::S2t));
     /// assert_eq!(OpenccConfig::from_ffi(999), None);
     /// ```
-    /// 
+    ///
     /// # Since
     /// v0.7.3
     #[inline]
@@ -330,7 +330,7 @@ impl OpenccConfig {
     ///
     /// # Since
     /// v0.7.3
-    
+
     #[inline]
     pub fn is_valid_config(s: &str) -> bool {
         Self::parse(s).is_some()
@@ -357,4 +357,3 @@ impl OpenccConfig {
         Self::from_ffi(v).is_some()
     }
 }
-
