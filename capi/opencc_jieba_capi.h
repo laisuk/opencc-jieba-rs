@@ -11,6 +11,18 @@ extern "C" {
 #include <stdbool.h> // For bool type
 
 /**
+ * A Jieba token and its corresponding part-of-speech tag.
+ *
+ * Both `word` and `tag` are null-terminated UTF-8 strings.
+ * Arrays of this type returned by the API are terminated by a sentinel entry
+ * where both `word` and `tag` are NULL.
+ */
+typedef struct OpenccJiebaTag {
+    char *word;
+    char *tag;
+} OpenccJiebaTag;
+
+/**
  * Returns the C ABI version number.
  *
  * This value is intended for runtime compatibility checks.
@@ -103,12 +115,61 @@ void opencc_jieba_free_string(char *ptr);
 char **opencc_jieba_cut(const void *instance, const char *input, bool hmm);
 
 /**
- * Frees a NULL-terminated array of C strings returned by `opencc_jieba_cut`
- * or `opencc_jieba_keywords`.
+ * Performs full-mode segmentation on a UTF-8 input string using Jieba.
+ *
+ * @param instance A pointer to the OpenCC instance.
+ * @param input    The input UTF-8 string to segment.
+ *
+ * @return A NULL-terminated array of UTF-8 C strings.
+ *         Each element is a word segment.
+ *         Must be freed using `opencc_jieba_free_string_array()`.
+ */
+char **opencc_jieba_cut_all(const void *instance, const char *input);
+
+/**
+ * Performs search-mode segmentation on a UTF-8 input string using Jieba.
+ *
+ * @param instance A pointer to the OpenCC instance.
+ * @param input    The input UTF-8 string to segment.
+ * @param hmm      Whether to enable the HMM model.
+ *
+ * @return A NULL-terminated array of UTF-8 C strings.
+ *         Each element is a word segment.
+ *         Must be freed using `opencc_jieba_free_string_array()`.
+ */
+char **opencc_jieba_cut_for_search(const void *instance, const char *input, bool hmm);
+
+/**
+ * Performs part-of-speech tagging on a UTF-8 input string using Jieba.
+ *
+ * @param instance A pointer to the OpenCC instance.
+ * @param input    The input UTF-8 string to tag.
+ * @param hmm      Whether to enable the HMM model.
+ *
+ * @return A NULL-terminated array of `OpenccJiebaTag` entries.
+ *         The returned array is terminated by a sentinel entry where both
+ *         `word` and `tag` are NULL.
+ *         Must be freed using `opencc_jieba_free_tag_array()`.
+ */
+OpenccJiebaTag *opencc_jieba_tag(const void *instance, const char *input, bool hmm);
+
+/**
+ * Frees a NULL-terminated array of C strings returned by `opencc_jieba_cut`,
+ * `opencc_jieba_cut_all`, `opencc_jieba_cut_for_search`, or `opencc_jieba_keywords`.
  *
  * @param array A NULL-terminated array of strings to free.
  */
 void opencc_jieba_free_string_array(char **array);
+
+/**
+ * Frees a NULL-terminated array of `OpenccJiebaTag` returned by `opencc_jieba_tag`.
+ *
+ * The array must be terminated by a sentinel entry where both `word` and `tag` are NULL.
+ *
+ * @param array A tag array previously returned by `opencc_jieba_tag()`.
+ *              Passing NULL is safe and does nothing.
+ */
+void opencc_jieba_free_tag_array(OpenccJiebaTag *array);
 
 /**
  * Joins a NULL-terminated array of C strings into a single string using the given delimiter.

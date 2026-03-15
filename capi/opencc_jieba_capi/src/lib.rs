@@ -5,6 +5,12 @@ use std::ptr;
 
 const OPENCC_JIEBA_ABI_NUMBER: u32 = 1;
 
+#[repr(C)]
+pub struct OpenccJiebaTag {
+    pub word: *mut c_char,
+    pub tag: *mut c_char,
+}
+
 /// Returns the C ABI version number.
 /// This value changes ONLY when the C ABI is broken.
 #[no_mangle]
@@ -18,18 +24,7 @@ pub extern "C" fn opencc_jieba_abi_number() -> u32 {
 /// The returned pointer is valid for the lifetime of the program.
 #[no_mangle]
 pub extern "C" fn opencc_jieba_version_string() -> *const c_char {
-    // Compile-time version from Cargo.toml
-    static VERSION: &str = env!("CARGO_PKG_VERSION");
-
-    // Leak once, safe by design (process lifetime)
-    static mut CSTR: *const c_char = ptr::null();
-
-    unsafe {
-        if CSTR.is_null() {
-            CSTR = CString::new(VERSION).unwrap().into_raw();
-        }
-        CSTR
-    }
+    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
 }
 
 #[no_mangle]
@@ -50,42 +45,34 @@ pub extern "C" fn opencc_jieba_delete(instance: *mut OpenCC) {
 #[deprecated(note = "Use `opencc_jieba_delete` instead")]
 #[no_mangle]
 pub extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
-    if !instance.is_null() {
-        // Convert the raw pointer back into a Box and let it drop
-        unsafe {
-            let _ = Box::from_raw(instance);
-        };
-    }
+    opencc_jieba_delete(instance);
 }
 
 #[no_mangle]
 pub extern "C" fn opencc_jieba_convert(
     instance: *const OpenCC,
-    input: *const std::os::raw::c_char,
-    config: *const std::os::raw::c_char,
+    input: *const c_char,
+    config: *const c_char,
     punctuation: bool,
-) -> *mut std::os::raw::c_char {
+) -> *mut c_char {
     if instance.is_null() || input.is_null() || config.is_null() {
         return ptr::null_mut();
     }
-    // Convert the instance pointer back into a reference
+
     let opencc = unsafe { &*instance };
-    // Convert input from C string to Rust string
-    let config_str_slice = match unsafe { CStr::from_ptr(config) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return ptr::null_mut(),
-    };
-    let input_str_slice = match unsafe { CStr::from_ptr(input) }.to_str() {
+
+    let config_str = match unsafe { CStr::from_ptr(config) }.to_str() {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
 
-    let result = opencc.convert(input_str_slice, config_str_slice, punctuation);
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
 
-    match CString::new(result) {
-        Ok(c) => c.into_raw(),
-        Err(_) => ptr::null_mut(),
-    }
+    let result = opencc.convert(input_str, config_str, punctuation);
+    str_to_raw_c_char_strict(result)
 }
 
 #[no_mangle]
@@ -108,6 +95,70 @@ pub extern "C" fn opencc_jieba_cut(
 
     // malloc-based NULL-terminated char**
     vec_to_cstr_ptr(segments)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_cut_for_search(
+    instance: *const OpenCC,
+    input: *const c_char,
+    hmm: bool,
+) -> *mut *mut c_char {
+    if instance.is_null() || input.is_null() {
+        return ptr::null_mut();
+    }
+
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let opencc = unsafe { &*instance };
+    let segments = opencc.jieba_cut_for_search(input_str, hmm);
+
+    // malloc-based NULL-terminated char**
+    vec_to_cstr_ptr(segments)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_cut_all(
+    instance: *const OpenCC,
+    input: *const c_char,
+) -> *mut *mut c_char {
+    if instance.is_null() || input.is_null() {
+        return ptr::null_mut();
+    }
+
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let opencc = unsafe { &*instance };
+    let segments = opencc.jieba_cut_all(input_str);
+
+    // malloc-based NULL-terminated char**
+    vec_to_cstr_ptr(segments)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_tag(
+    instance: *const OpenCC,
+    input: *const c_char,
+    hmm: bool,
+) -> *mut OpenccJiebaTag {
+    if instance.is_null() || input.is_null() {
+        return ptr::null_mut();
+    }
+
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let opencc = unsafe { &*instance };
+    let tags = opencc.jieba_tag(input_str, hmm);
+
+    vec_pair_to_tag_ptr(tags)
 }
 
 //
@@ -140,7 +191,7 @@ pub extern "C" fn opencc_jieba_join_str(
 
             let part = match CStr::from_ptr(p).to_str() {
                 Ok(s) => s,
-                Err(_) => return ptr::null_mut(), // strict: invalid UTF-8 -> NULL
+                Err(_) => return ptr::null_mut(),
             };
 
             if i > 0 {
@@ -151,10 +202,7 @@ pub extern "C" fn opencc_jieba_join_str(
         }
     }
 
-    match CString::new(result) {
-        Ok(c) => c.into_raw(),
-        Err(_) => ptr::null_mut(), // should only happen if result contains '\0'
-    }
+    str_to_raw_c_char_strict(result)
 }
 
 #[no_mangle]
@@ -182,26 +230,22 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     let segments = opencc.jieba_cut(input_str, hmm);
     let joined = segments.join(delimiter_str);
 
-    match CString::new(joined) {
-        Ok(c) => c.into_raw(),
-        Err(_) => ptr::null_mut(), // joined contains '\0'
-    }
+    str_to_raw_c_char_strict(joined)
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_zho_check(
-    instance: *const OpenCC,
-    input: *const std::os::raw::c_char,
-) -> i32 {
+pub extern "C" fn opencc_jieba_zho_check(instance: *const OpenCC, input: *const c_char) -> i32 {
     if instance.is_null() || input.is_null() {
-        return -1; // Return an error code if the instance pointer is null
+        return -1;
     }
-    let opencc = unsafe { &*instance }; // Convert the instance pointer back into a reference
-                                        // Convert input from C string to Rust string
-    let c_str = unsafe { CStr::from_ptr(input) };
-    let str_slice = c_str.to_str().unwrap_or("");
-    // let input_str = str_slice.to_owned();
-    opencc.zho_check(str_slice)
+
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let opencc = unsafe { &*instance };
+    opencc.zho_check(input_str)
 }
 
 #[no_mangle]
@@ -371,7 +415,7 @@ pub extern "C" fn opencc_jieba_free_keywords_and_weights(
 }
 
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_string(ptr: *mut std::os::raw::c_char) {
+pub extern "C" fn opencc_jieba_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);
@@ -406,6 +450,35 @@ pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn opencc_jieba_free_tag_array(array: *mut OpenccJiebaTag) {
+    if array.is_null() {
+        return;
+    }
+
+    unsafe {
+        let mut i = 0usize;
+        loop {
+            let item = array.add(i);
+
+            if (*item).word.is_null() && (*item).tag.is_null() {
+                break;
+            }
+
+            if !(*item).word.is_null() {
+                let _ = CString::from_raw((*item).word);
+            }
+            if !(*item).tag.is_null() {
+                let _ = CString::from_raw((*item).tag);
+            }
+
+            i += 1;
+        }
+
+        libc::free(array as *mut libc::c_void);
+    }
+}
+
 //
 // Internal helpers: C-allocator based arrays
 //
@@ -421,36 +494,80 @@ unsafe fn c_malloc_array<T>(len: usize) -> *mut T {
     libc::malloc(bytes) as *mut T
 }
 
+#[inline]
+fn str_to_raw_c_char_lossy<T: AsRef<str>>(s: T) -> *mut c_char {
+    match CString::new(s.as_ref()) {
+        Ok(c) => c.into_raw(),
+        Err(_) => CString::new("").unwrap().into_raw(),
+    }
+}
+
+#[inline]
+fn str_to_raw_c_char_strict<T: AsRef<str>>(s: T) -> *mut c_char {
+    match CString::new(s.as_ref()) {
+        Ok(c) => c.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+unsafe fn fill_null_ptr_array(arr: *mut *mut c_char, len: usize) {
+    for i in 0..len {
+        *arr.add(i) = ptr::null_mut();
+    }
+}
+
+unsafe fn fill_null_tag_array(arr: *mut OpenccJiebaTag, len: usize) {
+    for i in 0..len {
+        *arr.add(i) = OpenccJiebaTag {
+            word: ptr::null_mut(),
+            tag: ptr::null_mut(),
+        };
+    }
+}
+
 /// Convert Vec<T: AsRef<str>> to a NULL-terminated `char**` allocated with `malloc`.
 /// Returns NULL on OOM.
 /// Any interior NUL in a string becomes an empty string (never panics).
 fn vec_to_cstr_ptr<T: AsRef<str>>(vec: Vec<T>) -> *mut *mut c_char {
     let n = vec.len();
-    let total = n + 1; // +1 for NULL terminator
+    let total = n + 1;
 
     let arr = unsafe { c_malloc_array::<*mut c_char>(total) };
     if arr.is_null() {
         return ptr::null_mut();
     }
 
-    // Pre-fill with NULL so free() is always safe on partial failure.
-    unsafe {
-        for i in 0..total {
-            *arr.add(i) = ptr::null_mut();
-        }
-    }
+    unsafe { fill_null_ptr_array(arr, total) };
 
     for (i, s) in vec.into_iter().enumerate() {
-        let c = match CString::new(s.as_ref()) {
-            Ok(c) => c.into_raw(),
-            Err(_) => CString::new("").unwrap().into_raw(), // interior NUL: fallback
-        };
         unsafe {
-            *arr.add(i) = c;
+            *arr.add(i) = str_to_raw_c_char_lossy(s);
         }
     }
 
-    // NULL terminator already set.
+    arr
+}
+
+fn vec_pair_to_tag_ptr<T1: AsRef<str>, T2: AsRef<str>>(vec: Vec<(T1, T2)>) -> *mut OpenccJiebaTag {
+    let n = vec.len();
+    let total = n + 1;
+
+    let arr = unsafe { c_malloc_array::<OpenccJiebaTag>(total) };
+    if arr.is_null() {
+        return ptr::null_mut();
+    }
+
+    unsafe { fill_null_tag_array(arr, total) };
+
+    for (i, (word, tag)) in vec.into_iter().enumerate() {
+        unsafe {
+            *arr.add(i) = OpenccJiebaTag {
+                word: str_to_raw_c_char_lossy(word),
+                tag: str_to_raw_c_char_lossy(tag),
+            };
+        }
+    }
+
     arr
 }
 
@@ -768,5 +885,54 @@ mod tests {
             .expect("Version string must be valid UTF-8");
 
         assert!(!ver.is_empty(), "Version string must not be empty");
+    }
+
+    #[test]
+    fn test_opencc_jieba_tag() {
+        let instance = opencc_jieba_new();
+        assert!(!instance.is_null());
+
+        let input = CString::new("我喜歡Rust程序語言").unwrap();
+
+        let arr = opencc_jieba_tag(instance, input.as_ptr(), true);
+        assert!(!arr.is_null());
+
+        let mut result = Vec::<(String, String)>::new();
+
+        unsafe {
+            let mut i = 0usize;
+            loop {
+                let item = arr.add(i);
+
+                // sentinel: both NULL
+                if (*item).word.is_null() && (*item).tag.is_null() {
+                    break;
+                }
+
+                assert!(!(*item).word.is_null());
+                assert!(!(*item).tag.is_null());
+
+                let word = CStr::from_ptr((*item).word).to_str().unwrap().to_string();
+                let tag = CStr::from_ptr((*item).tag).to_str().unwrap().to_string();
+
+                result.push((word, tag));
+                i += 1;
+            }
+        }
+
+        // Debug print first, so you can see actual jieba-rs output
+        println!("{result:?}");
+
+        // Stable assertions
+        assert!(!result.is_empty());
+        assert!(result.iter().any(|(w, _)| w == "我"));
+        assert!(result.iter().any(|(w, _)| w == "喜歡"));
+        assert!(result.iter().any(|(w, _)| w == "Rust"));
+
+        // all tags should be non-empty
+        assert!(result.iter().all(|(_, t)| !t.is_empty()));
+
+        opencc_jieba_free_tag_array(arr);
+        opencc_jieba_delete(instance);
     }
 }
