@@ -26,9 +26,9 @@ conversion.
 
 ### 🔽 Downloads
 
-- [Windows (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
-- [macOS (arm64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
-- [Linux (x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
+- [Windows (arm64/x64/x86)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
+- [macOS (arm64/x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
+- [Linux (arm64/x64)](https://github.com/laisuk/opencc-jieba-rs/releases/latest)
 
 ---
 
