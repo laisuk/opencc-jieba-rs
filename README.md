@@ -72,14 +72,15 @@ Options:
 ```
 opencc-jieba segment: Segment Chinese input text into words
 
-Usage: opencc-jieba segment [OPTIONS]
+Usage: opencc-jieba.exe segment [OPTIONS]
 
 Options:
   -i, --input <file>        Input file to segment
-      --in-enc <encoding>   Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -o, --output <file>       Write segmented result to file
-      --out-enc <encoding>  Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -d, --delim <character>   Delimiter character for segmented text [default: /]
+      --mode <mode>         Segmentation mode: cut | search | full [default: cut] [possible values: cut, search, full]
+      --in-enc <encoding>   Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>  Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -h, --help                Print help
 ```
 

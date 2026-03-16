@@ -221,6 +221,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .required(false)
                         .default_value("/"),
                 )
+                .arg(
+                    Arg::new("mode")
+                        .long("mode")
+                        .value_name("mode")
+                        .value_parser(["cut", "search", "full"])
+                        .default_value("cut")
+                        .help("Segmentation mode: cut | search | full"),
+                )
                 .args(enc_args()),
         )
         .get_matches();
@@ -400,6 +408,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let input_file = matches.get_one::<String>("input").map(String::as_str);
         let output_file = matches.get_one::<String>("output").map(String::as_str);
         let delimiter = matches.get_one::<String>("delimiter").unwrap().as_str();
+        let mode = matches.get_one::<String>("mode").unwrap().as_str();
         let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
         let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
 
@@ -413,13 +422,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             input_str = normalize_line_endings(&input_str);
         }
 
-        let output_str = OpenCC::new().jieba_cut_and_join(&input_str, true, delimiter);
+        let opencc = OpenCC::new();
+
+        let words = match mode {
+            "search" => opencc.jieba_cut_for_search(&input_str, true),
+            "full" => opencc.jieba_cut_all(&input_str),
+            _ => opencc.jieba_cut(&input_str, true),
+        };
+
+        let output_str = words.join(delimiter);
         write_output(output_file, out_enc, &output_str)?;
 
         eprintln!(
-            "{BLUE}Segmentation completed ({delimiter}): {} -> {}{RESET}",
-            input_file.unwrap_or(&"<stdin>".to_string()),
-            output_file.unwrap_or(&"stdout".to_string())
+            "{BLUE}Segmentation completed ({mode}, \"{delimiter}\"): {} -> {}{RESET}",
+            input_file.unwrap_or("<stdin>"),
+            output_file.unwrap_or("stdout")
         );
 
         Ok(())
