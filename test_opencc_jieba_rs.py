@@ -9,7 +9,8 @@ def main():
     opencc = OpenCC()
     converted = opencc.convert(input_text)
     text_code = opencc.zho_check(input_text)
-    cut_str = opencc.jieba_cut(input_text, True)
+    cut_str = opencc.jieba_cut_for_search(input_text, True)
+    cut_str2 = opencc.jieba_cut_for_search(input_text2, True)
     cut_str_join = opencc.jieba_cut_and_join(input_text2, True, "/ ")
     str_list = ['白日', '依山', '尽', '，', '黄河', '入海流']
     join_str_list = opencc.jieba_join_str(str_list, "; ")
@@ -19,6 +20,7 @@ def main():
     print(text_code)
     print(input_text[-2:])
     print(cut_str)
+    print(cut_str2)
     print(cut_str_join)
     print(join_str_list)
     print(keywords_textrank)
