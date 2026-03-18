@@ -539,24 +539,62 @@ fn remove_existing_file(path: &Path) -> io::Result<()> {
             fs::set_permissions(path, perms)?;
         }
     }
-    fs::remove_file(path)
+
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Write to a temp file then atomically replace the final path.
 ///
 /// Ensures no partial/corrupted output if interrupted.
+///
+/// On failure, the temp file is removed best-effort so stale
+/// `*.tmp.<ext>` files do not accumulate.
 fn replace_with_temp(
     final_out: &Path,
     write_zip: impl FnOnce(&mut ZipWriter<File>) -> io::Result<()>,
 ) -> io::Result<()> {
+    struct TempFileGuard {
+        path: PathBuf,
+        committed: bool,
+    }
+
+    impl TempFileGuard {
+        #[inline]
+        fn new(path: PathBuf) -> Self {
+            Self {
+                path,
+                committed: false,
+            }
+        }
+
+        #[inline]
+        fn commit(&mut self) {
+            self.committed = true;
+        }
+    }
+
+    impl Drop for TempFileGuard {
+        fn drop(&mut self) {
+            if !self.committed {
+                let _ = fs::remove_file(&self.path);
+            }
+        }
+    }
+
     let ext = final_out
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("zip");
     let tmp_out = final_out.with_extension(format!("tmp.{}", ext));
 
-    // Clean any stale temp file
+    // Clean any stale temp file from a previous failed run.
     let _ = remove_existing_file(&tmp_out);
+
+    let mut guard = TempFileGuard::new(tmp_out.clone());
 
     // Create and write temp zip
     {
@@ -568,5 +606,10 @@ fn replace_with_temp(
 
     // Atomic replace: remove existing -> rename temp to final
     remove_existing_file(final_out)?;
-    fs::rename(&tmp_out, final_out)
+    fs::rename(&tmp_out, final_out)?;
+
+    // Success: do not delete the temp path in Drop.
+    guard.commit();
+
+    Ok(())
 }
