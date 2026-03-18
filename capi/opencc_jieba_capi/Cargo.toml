@@ -10,11 +10,11 @@ revision = 0
 
 [dependencies]
 opencc-jieba-rs = {path = "../.."}
-libc = "0.2.183"
+libc = "0.2"
 
 [lib]
 crate-type = ["cdylib"]
 
 [build-dependencies]
-winres = "0.1.12"
-toml = "=0.8.23"
+winres = "0.1"
+toml = "=0.8"
