@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Update dictionary
+- Optimized CLI `opencc-jieba` and `opencc-clip-jieba`
 
 ---
 
