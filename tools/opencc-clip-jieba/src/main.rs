@@ -1,84 +1,37 @@
 extern crate copypasta;
 
-use clap::{Arg, ArgAction, Command};
+use clap::{
+    builder::{StringValueParser, TypedValueParser, ValueParser},
+    Arg, ArgAction, Command,
+};
 use copypasta::{ClipboardContext, ClipboardProvider};
-use opencc_jieba_rs::{find_max_utf8_length, OpenCC};
+use opencc_jieba_rs::{find_max_utf8_length, OpenCC, OpenccConfig};
 
-const CONFIG_LIST: [&str; 17] = [
-    "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "t2twp", "t2hk",
-    "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t", "auto",
-];
-
-#[derive(Debug, PartialEq)]
-enum ConversionType {
-    S2T,
-    T2S,
-    S2TW,
-    TW2S,
-    S2TWP,
-    TW2SP,
-    S2HK,
-    HK2S,
-    T2TW,
-    T2TWP,
-    T2HK,
-    TW2T,
-    TW2TP,
-    HK2T,
-    T2JP,
-    JP2T,
-    Auto,
-    None,
+fn config_value_parser() -> ValueParser {
+    ValueParser::new(StringValueParser::new().try_map(|s| {
+        if s.eq_ignore_ascii_case("auto") {
+            Ok(String::from("auto"))
+        } else {
+            OpenccConfig::try_from(s.as_str())
+                .map(OpenccConfig::as_str)
+                .map(str::to_owned)
+                .map_err(|_| format!("invalid config: {s}"))
+        }
+    }))
 }
 
-impl ConversionType {
-    fn from_str(s: &str) -> Self {
-        match s {
-            "s2t" => Self::S2T,
-            "t2s" => Self::T2S,
-            "s2tw" => Self::S2TW,
-            "tw2s" => Self::TW2S,
-            "s2twp" => Self::S2TWP,
-            "tw2sp" => Self::TW2SP,
-            "s2hk" => Self::S2HK,
-            "hk2s" => Self::HK2S,
-            "t2tw" => Self::T2TW,
-            "t2twp" => Self::T2TWP,
-            "t2hk" => Self::T2HK,
-            "tw2t" => Self::TW2T,
-            "tw2tp" => Self::TW2TP,
-            "hk2t" => Self::HK2T,
-            "t2jp" => Self::T2JP,
-            "jp2t" => Self::JP2T,
-            "auto" => Self::Auto,
-            _ => Self::None,
-        }
+#[inline]
+fn parse_config_or_auto(s: &str) -> Option<OpenccConfig> {
+    if s.eq_ignore_ascii_case("auto") {
+        None
+    } else {
+        OpenccConfig::parse(s)
     }
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::S2T => "s2t",
-            Self::T2S => "t2s",
-            Self::S2TW => "s2tw",
-            Self::TW2S => "tw2s",
-            Self::S2TWP => "s2twp",
-            Self::TW2SP => "tw2sp",
-            Self::S2HK => "s2hk",
-            Self::HK2S => "hk2s",
-            Self::T2TW => "t2tw",
-            Self::T2TWP => "t2twp",
-            Self::T2HK => "t2hk",
-            Self::TW2T => "tw2t",
-            Self::TW2TP => "tw2tp",
-            Self::HK2T => "hk2t",
-            Self::T2JP => "t2jp",
-            Self::JP2T => "jp2t",
-            Self::Auto => "auto",
-            Self::None => "none",
-        }
-    }
-    fn is_japanese(&self) -> bool {
-        matches!(self, Self::T2JP | Self::JP2T)
-    }
+}
+
+#[inline]
+fn is_japanese_config(config: OpenccConfig) -> bool {
+    matches!(config, OpenccConfig::T2jp | OpenccConfig::Jp2t)
 }
 
 fn main() {
@@ -94,7 +47,7 @@ fn main() {
             Arg::new("config")
                 .short('c')
                 .long("config")
-                .value_parser(CONFIG_LIST) // now includes "auto"
+                .value_parser(config_value_parser())
                 .default_value("auto")
                 .help("Conversion configuration (default: auto)"),
         )
@@ -115,7 +68,7 @@ fn main() {
         .get_matches();
 
     let cfg_str = matches.get_one::<String>("config").unwrap().as_str();
-    let mut conversion_type = ConversionType::from_str(cfg_str);
+    let mut conversion_type = parse_config_or_auto(cfg_str);
     let use_punctuation = matches.get_flag("punct");
 
     // Clipboard context
@@ -132,29 +85,33 @@ fn main() {
             let opencc = OpenCC::new();
             let input_code = opencc.zho_check(&contents);
 
-            if matches!(conversion_type, ConversionType::Auto) {
+            if conversion_type.is_none() {
                 conversion_type = match input_code {
-                    1 => ConversionType::T2S, // Traditional → Simplified
-                    2 => ConversionType::S2T, // Simplified → Traditional
-                    _ => ConversionType::None,
+                    1 => Some(OpenccConfig::T2s), // Traditional → Simplified
+                    2 => Some(OpenccConfig::S2t), // Simplified → Traditional
+                    _ => None,
                 };
             }
 
             let (display_input_code, display_output_code) =
-                if input_code == 0 || conversion_type.is_japanese() {
+                if input_code == 0 || conversion_type.is_some_and(is_japanese_config) {
                     ("Non-zho 其它", "Non-zho 其它")
-                } else if conversion_type.as_str().starts_with('s') {
+                } else if conversion_type
+                    .map(OpenccConfig::as_str)
+                    .is_some_and(|cfg| cfg.starts_with('s'))
+                {
                     ("Simplified Chinese 简体", "Traditional Chinese 繁体")
-                } else if conversion_type.as_str().ends_with('s')
-                    || conversion_type.as_str().ends_with("sp")
+                } else if conversion_type
+                    .map(OpenccConfig::as_str)
+                    .is_some_and(|cfg| cfg.ends_with('s') || cfg.ends_with("sp"))
                 {
                     ("Traditional Chinese 繁体", "Simplified Chinese 简体")
                 } else {
                     ("Traditional Chinese 繁体", "Traditional Chinese 繁体")
                 };
 
-            let output = if conversion_type != ConversionType::None {
-                opencc.convert(&contents, conversion_type.as_str(), use_punctuation)
+            let output = if let Some(config) = conversion_type {
+                opencc.convert_with_config(&contents, config, use_punctuation)
             } else {
                 contents.clone()
             };
@@ -172,12 +129,12 @@ fn main() {
             };
 
             eprintln!(
-                "opencc-clip-jieba Simplified/Traditional Chinese Text Converter © 2026 laisuk"
+                "opencc-clip-jieba Simplified/Traditional Chinese Text Converter © 2026 laisuk Lai"
             );
             eprintln!(
                 "Config: {}{}, punct: {}{}",
                 BLUE,
-                conversion_type.as_str(),
+                conversion_type.map(OpenccConfig::as_str).unwrap_or("auto"),
                 use_punctuation,
                 RESET
             );
@@ -209,14 +166,19 @@ fn main() {
 }
 
 pub fn format_thousand(n: usize) -> String {
-    let mut result_str = n.to_string();
-    let mut offset = result_str.len() % 3;
-    if offset == 0 {
-        offset = 3;
+    let s = n.to_string();
+    let mut out = String::with_capacity(s.len() + s.len() / 3);
+
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+
+    for (i, &b) in bytes.iter().enumerate() {
+        out.push(b as char);
+
+        let remaining = len - i - 1;
+        if remaining > 0 && remaining % 3 == 0 {
+            out.push(',');
+        }
     }
-    while offset < result_str.len() {
-        result_str.insert(offset, ',');
-        offset += 4; // Including the added comma
-    }
-    result_str
+    out
 }

@@ -1,19 +1,16 @@
+use clap::builder::{StringValueParser, TypedValueParser, ValueParser};
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
+use opencc_jieba_rs;
+use opencc_jieba_rs::{OpenCC, OpenccConfig};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, stdin, BufWriter, IsTerminal, Read, Write};
+use std::sync::OnceLock;
 
-use opencc_jieba_rs;
-use opencc_jieba_rs::OpenCC;
 mod office_converter;
 use office_converter::OfficeConverter;
-
-const CONFIG_LIST: [&str; 16] = [
-    "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "t2twp", "t2hk",
-    "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t",
-];
 
 const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
@@ -246,6 +243,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => unreachable!("Clap ensures only valid subcommands are passed"),
     }
 
+    fn get_supported_configs() -> &'static str {
+        static SUPPORTED: OnceLock<String> = OnceLock::new();
+        SUPPORTED.get_or_init(|| {
+            let mut s = String::with_capacity(128);
+            for (i, cfg) in OpenccConfig::ALL.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(" | ");
+                }
+                s.push_str(cfg.as_str());
+            }
+            s
+        })
+    }
+    fn config_value_parser() -> ValueParser {
+        ValueParser::new(StringValueParser::new().try_map(|s| {
+            OpenccConfig::try_from(s.as_str())
+                .map(OpenccConfig::as_str)
+                .map(str::to_owned)
+                .map_err(|_| format!("\nSupported configs: {}", get_supported_configs()))
+        }))
+    }
+
     fn common_args() -> Vec<Arg> {
         vec![
             Arg::new("input")
@@ -262,8 +281,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short('c')
                 .long("config")
                 .required(true)
-                .value_parser(CONFIG_LIST)
-                .help("Conversion configuration <config>"),
+                .value_name("config")
+                .value_parser(config_value_parser())
+                .help(format!(
+                    "Conversion configuration ({})",
+                    get_supported_configs()
+                )),
             Arg::new("punct")
                 .short('p')
                 .long("punct")
@@ -292,12 +315,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
         let input_file = matches.get_one::<String>("input").map(String::as_str);
         let output_file = matches.get_one::<String>("output").map(String::as_str);
-        let config = matches.get_one::<String>("config").unwrap().as_str();
-        if !CONFIG_LIST.contains(&config) {
-            eprintln!("Invalid config: {}", config);
-            eprintln!("Valid Config are: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]");
-            return Ok(());
-        }
+        let config = matches.get_one::<String>("config").unwrap();
         let punctuation = matches.get_flag("punct");
 
         let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
