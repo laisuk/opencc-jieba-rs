@@ -2,11 +2,11 @@ use clap::builder::{StringValueParser, TypedValueParser, ValueParser};
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use opencc_jieba_rs;
 use opencc_jieba_rs::{OpenCC, OpenccConfig};
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{self, stdin, BufWriter, IsTerminal, Read, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
+use std::path::Path;
 use std::sync::OnceLock;
 
 mod office_converter;
@@ -15,133 +15,18 @@ use office_converter::OfficeConverter;
 const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
 
-pub fn read_input(
-    input_file: Option<&str>,
-    in_enc: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let mut input_str = String::new();
+const PROMPT_CONVERT: &str = concat!(
+    "\x1B[1;34m",
+    "Input text to convert, <ctrl-z> or <ctrl-d> to submit:",
+    "\x1B[0m"
+);
 
-    // Use locked and buffered stdin
-    let stdin = stdin();
-    let mut handle = stdin.lock();
+const PROMPT_SEGMENT: &str = concat!(
+    "\x1B[1;34m",
+    "Input text to segment, <ctrl-z> or <ctrl-d> to submit:",
+    "\x1B[0m"
+);
 
-    match in_enc {
-        "UTF-8" => {
-            if let Some(file_name) = input_file {
-                // Read file directly into a String
-                File::open(file_name)?.read_to_string(&mut input_str)?;
-            } else {
-                // Terminal prompt only if input is from terminal
-                if stdin.is_terminal() {
-                    eprintln!(
-                        "{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}"
-                    );
-                }
-
-                // let stdin = stdin();
-                // let mut handle = stdin.lock();
-                let mut buffer = [0u8; 1024];
-
-                while let Ok(n) = handle.read(&mut buffer) {
-                    if n == 0 {
-                        break;
-                    }
-                    input_str.push_str(&String::from_utf8_lossy(&buffer[..n]));
-                }
-            }
-        }
-
-        _ => {
-            let mut bytes = Vec::new();
-
-            if let Some(file_name) = input_file {
-                File::open(file_name)?.read_to_end(&mut bytes)?;
-            } else {
-                if stdin.is_terminal() {
-                    eprintln!(
-                        "{BLUE}Input text to convert, <ctrl-z> or <ctrl-d> to submit:{RESET}"
-                    );
-                }
-
-                // let stdin = stdin();
-                // let mut handle = stdin.lock();
-                let mut buffer = [0u8; 1024];
-
-                while let Ok(n) = handle.read(&mut buffer) {
-                    if n == 0 {
-                        break;
-                    }
-                    bytes.extend_from_slice(&buffer[..n]);
-                }
-            }
-
-            let encoding = Encoding::for_label(in_enc.as_bytes()).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported input encoding: {}", in_enc),
-                )
-            })?;
-
-            let mut decoder = DecodeReaderBytesBuilder::new()
-                .encoding(Some(encoding))
-                .build(&*bytes);
-
-            decoder.read_to_string(&mut input_str)?;
-        }
-    }
-
-    Ok(input_str)
-}
-
-fn should_remove_bom(in_enc: &str, out_enc: &str) -> bool {
-    in_enc.eq_ignore_ascii_case("utf-8") && !out_enc.eq_ignore_ascii_case("utf-8")
-}
-
-fn remove_utf8_bom_str_inplace(s: &mut String) {
-    if s.starts_with('\u{FEFF}') {
-        s.drain(..1); // Remove first char (BOM) without reallocation
-    }
-}
-
-fn normalize_line_endings(s: &str) -> String {
-    s.replace("\r\n", "\n").replace('\r', "\n")
-}
-
-fn write_output(
-    output_file: Option<&str>,
-    out_enc: &str,
-    content: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let output: Box<dyn Write> = match output_file {
-        Some(file_name) => Box::new(File::create(file_name)?),
-        None => Box::new(io::stdout().lock()), // 🔒 important for proper redirection
-    };
-
-    let mut output_buf = BufWriter::new(output);
-
-    match out_enc {
-        "UTF-8" => {
-            write!(output_buf, "{}", content)?;
-            if output_file.is_none() && !content.ends_with('\n') {
-                write!(output_buf, "\n")?;
-            }
-        }
-
-        _ => {
-            let encoding = Encoding::for_label(out_enc.as_bytes())
-                .ok_or_else(|| format!("Unsupported output encoding: {}", out_enc))?;
-            let (encoded_bytes, _, _) = encoding.encode(content);
-            output_buf.write_all(&encoded_bytes)?;
-            if output_file.is_none() && !content.ends_with('\n') {
-                let (newline, _, _) = encoding.encode("\n");
-                output_buf.write_all(&newline)?;
-            }
-        }
-    }
-
-    output_buf.flush()?; // 🚿 Always flush to make sure it’s written!
-    Ok(())
-}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = Command::new("opencc-jieba")
         .about(format!(
@@ -154,11 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Command::new("convert")
                 .about(format!(
                     "{}opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC{}",
-                    BLUE,
-                    RESET
+                    BLUE, RESET
                 ))
                 .args(common_args())
-                .args(enc_args())
+                .args(enc_args()),
         )
         .subcommand(
             Command::new("office")
@@ -172,7 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .short('f')
                         .long("format")
                         .value_name("ext")
-                        .help("Force office document format <ext>: docx, xlsx, pptx odt, ods, odp, epub"),
+                        .help(
+                            "Force office document format <ext>: docx, xlsx, pptx, odt, ods, odp, epub",
+                        ),
                 )
                 .arg(
                     Arg::new("keep_font")
@@ -220,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .arg(
                     Arg::new("mode")
+                        .short('m')
                         .long("mode")
                         .value_name("mode")
                         .value_parser(["cut", "search", "full"])
@@ -231,234 +118,354 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get_matches();
 
     match matches.subcommand() {
-        Some(("convert", sub_matches)) => {
-            handle_convert(sub_matches)?;
-        }
-        Some(("office", sub_matches)) => {
-            handle_office(sub_matches)?;
-        }
-        Some(("segment", sub_matches)) => {
-            handle_segment(sub_matches)?;
-        }
+        Some(("convert", sub_matches)) => handle_convert(sub_matches)?,
+        Some(("office", sub_matches)) => handle_office(sub_matches)?,
+        Some(("segment", sub_matches)) => handle_segment(sub_matches)?,
         _ => unreachable!("Clap ensures only valid subcommands are passed"),
     }
 
-    fn get_supported_configs() -> &'static str {
-        static SUPPORTED: OnceLock<String> = OnceLock::new();
-        SUPPORTED.get_or_init(|| {
-            let mut s = String::with_capacity(128);
-            for (i, cfg) in OpenccConfig::ALL.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(" | ");
-                }
-                s.push_str(cfg.as_str());
+    Ok(())
+}
+
+fn get_supported_configs() -> &'static str {
+    static SUPPORTED: OnceLock<String> = OnceLock::new();
+    SUPPORTED.get_or_init(|| {
+        let mut s = String::with_capacity(128);
+        for (i, cfg) in OpenccConfig::ALL.iter().enumerate() {
+            if i > 0 {
+                s.push_str(" | ");
             }
-            s
-        })
-    }
-    fn config_value_parser() -> ValueParser {
-        ValueParser::new(StringValueParser::new().try_map(|s| {
-            OpenccConfig::try_from(s.as_str())
-                .map(OpenccConfig::as_str)
-                .map(str::to_owned)
-                .map_err(|_| format!("\nSupported configs: {}", get_supported_configs()))
-        }))
-    }
-
-    fn common_args() -> Vec<Arg> {
-        vec![
-            Arg::new("input")
-                .short('i')
-                .long("input")
-                .value_name("file")
-                .help("Input <file> (use stdin if omitted for non-office documents)"),
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .value_name("file")
-                .help("Output <file> (use stdout if omitted for non-office documents)"),
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .required(true)
-                .value_name("config")
-                .value_parser(config_value_parser())
-                .help(format!(
-                    "Conversion configuration ({})",
-                    get_supported_configs()
-                )),
-            Arg::new("punct")
-                .short('p')
-                .long("punct")
-                .action(clap::ArgAction::SetTrue)
-                .help("Enable punctuation conversion"),
-        ]
-    }
-
-    fn enc_args() -> Vec<Arg> {
-        vec![
-            Arg::new("in_enc")
-                .long("in-enc")
-                .value_name("encoding")
-                .default_value("UTF-8")
-                .global(true)
-                .help("Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5"),
-            Arg::new("out_enc")
-                .long("out-enc")
-                .value_name("encoding")
-                .default_value("UTF-8")
-                .global(true)
-                .help("Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5"),
-        ]
-    }
-
-    fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-        let input_file = matches.get_one::<String>("input").map(String::as_str);
-        let output_file = matches.get_one::<String>("output").map(String::as_str);
-        let config = matches.get_one::<String>("config").unwrap();
-        let punctuation = matches.get_flag("punct");
-
-        let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
-        let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
-
-        let mut input_str = read_input(input_file, in_enc)?;
-        if should_remove_bom(in_enc, out_enc) {
-            remove_utf8_bom_str_inplace(&mut input_str)
+            s.push_str(cfg.as_str());
         }
+        s
+    })
+}
 
-        let output_str = OpenCC::new().convert(&input_str, config, punctuation);
-        write_output(output_file, out_enc, &output_str)?;
+fn config_value_parser() -> ValueParser {
+    ValueParser::new(StringValueParser::new().try_map(|s| {
+        OpenccConfig::try_from(s.as_str())
+            .map(OpenccConfig::as_str)
+            .map(str::to_owned)
+            .map_err(|_| format!("\nSupported configs: {}", get_supported_configs()))
+    }))
+}
 
-        eprintln!(
-            "{BLUE}Conversion completed ({config}): {} -> {}{RESET}",
-            input_file.unwrap_or(&"<stdin>".to_string()),
-            output_file.unwrap_or(&"stdout".to_string())
-        );
+fn common_args() -> Vec<Arg> {
+    vec![
+        Arg::new("input")
+            .short('i')
+            .long("input")
+            .value_name("file")
+            .help("Input <file> (use stdin if omitted for non-office documents)"),
+        Arg::new("output")
+            .short('o')
+            .long("output")
+            .value_name("file")
+            .help("Output <file> (use stdout if omitted for non-office documents)"),
+        Arg::new("config")
+            .short('c')
+            .long("config")
+            .required(true)
+            .value_name("config")
+            .value_parser(config_value_parser())
+            .help(format!(
+                "Conversion configuration ({})",
+                get_supported_configs()
+            )),
+        Arg::new("punct")
+            .short('p')
+            .long("punct")
+            .action(clap::ArgAction::SetTrue)
+            .help("Enable punctuation conversion"),
+    ]
+}
 
-        Ok(())
+fn enc_args() -> Vec<Arg> {
+    vec![
+        Arg::new("in_enc")
+            .long("in-enc")
+            .value_name("encoding")
+            .default_value("UTF-8")
+            .global(true)
+            .help("Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5"),
+        Arg::new("out_enc")
+            .long("out-enc")
+            .value_name("encoding")
+            .default_value("UTF-8")
+            .global(true)
+            .help("Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5"),
+    ]
+}
+
+fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    let input_file = matches.get_one::<String>("input");
+    let output_file = matches.get_one::<String>("output");
+    let config = matches.get_one::<String>("config").unwrap();
+    let in_enc = matches.get_one::<String>("in_enc").unwrap();
+    let out_enc = matches.get_one::<String>("out_enc").unwrap();
+    let punctuation = matches.get_flag("punct");
+
+    let is_console = input_file.is_none();
+    let mut input: Box<dyn Read> = match input_file {
+        Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
+        None => {
+            if io::stdin().is_terminal() {
+                eprintln!("{PROMPT_CONVERT}");
+            }
+            Box::new(BufReader::new(io::stdin().lock()))
+        }
+    };
+
+    let mut buffer = read_input(&mut *input, is_console)?;
+    if should_remove_bom(in_enc, out_enc) {
+        remove_utf8_bom(&mut buffer);
     }
 
-    fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-        let office_extensions: HashSet<&'static str> =
-            ["docx", "xlsx", "pptx", "odt", "ods", "odp", "epub"].into();
+    let input_str = decode_input(&buffer, in_enc)?;
+    let output_str = OpenCC::new().convert(&input_str, config, punctuation);
 
-        let input_file = matches
-            .get_one::<String>("input")
-            .ok_or("❌  Input file is required for office mode")?;
+    let (is_console_output, mut output) = open_output(output_file)?;
 
-        let output_file = matches.get_one::<String>("output");
-        let config = matches.get_one::<String>("config").unwrap();
-        let punctuation = matches.get_flag("punct");
-        let keep_font = matches.get_flag("keep_font");
-        let auto_ext = matches.get_flag("auto_ext");
-        let format = matches.get_one::<String>("format").map(String::as_str);
+    let final_output = if is_console_output && !output_str.ends_with('\n') {
+        format!("{output_str}\n")
+    } else {
+        output_str
+    };
 
-        let office_format = match format {
-            Some(f) => f.to_lowercase(),
-            None => {
-                if auto_ext {
-                    let ext = std::path::Path::new(input_file)
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .ok_or("❌  Cannot infer file extension")?;
-                    if office_extensions.contains(ext) {
-                        ext.to_string()
-                    } else {
-                        return Err(format!("❌  Unsupported Office extension: .{ext}").into());
-                    }
+    encode_and_write_output(&final_output, out_enc, &mut *output)?;
+    output.flush()?;
+
+    Ok(())
+}
+
+fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    let office_extensions: HashSet<&'static str> =
+        ["docx", "xlsx", "pptx", "odt", "ods", "odp", "epub"].into();
+
+    let input_file = matches
+        .get_one::<String>("input")
+        .ok_or("❌  Input file is required for office mode")?;
+
+    let output_file = matches.get_one::<String>("output");
+    let config = matches.get_one::<String>("config").unwrap();
+    let punctuation = matches.get_flag("punct");
+    let keep_font = matches.get_flag("keep_font");
+    let auto_ext = matches.get_flag("auto_ext");
+    let format = matches.get_one::<String>("format").map(String::as_str);
+
+    let office_format = match format {
+        Some(f) => f.to_lowercase(),
+        None => {
+            if auto_ext {
+                let ext = Path::new(input_file)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .ok_or("❌  Cannot infer file extension")?;
+                if office_extensions.contains(ext) {
+                    ext.to_string()
                 } else {
-                    return Err("❌  Please provide --format or use --auto-ext".into());
+                    return Err(format!("❌  Unsupported Office extension: .{ext}").into());
                 }
-            }
-        };
-
-        let final_output = match output_file {
-            Some(path) => {
-                if auto_ext
-                    && std::path::Path::new(path).extension().is_none()
-                    && office_extensions.contains(office_format.as_str())
-                {
-                    format!("{path}.{}", office_format)
-                } else {
-                    path.clone()
-                }
-            }
-            None => {
-                let input_path = std::path::Path::new(input_file);
-                let file_stem = input_path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("converted");
-                let ext = office_format.as_str();
-                let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
-                parent
-                    .join(format!("{file_stem}_converted.{ext}"))
-                    .to_string_lossy()
-                    .to_string()
-            }
-        };
-
-        let helper = OpenCC::new();
-        match OfficeConverter::convert(
-            input_file,
-            &final_output,
-            &office_format,
-            &helper,
-            config,
-            punctuation,
-            keep_font,
-        ) {
-            Ok(result) if result.success => {
-                eprintln!("{}\n📁  Output saved to: {}", result.message, final_output);
-            }
-            Ok(result) => {
-                eprintln!("❌  Office document conversion failed: {}", result.message);
-            }
-            Err(e) => {
-                eprintln!("❌  Error: {}", e);
+            } else {
+                return Err("❌  Please provide --format or use --auto-ext".into());
             }
         }
+    };
 
-        Ok(())
-    }
+    let helper = OpenCC::new();
 
-    fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-        let input_file = matches.get_one::<String>("input").map(String::as_str);
-        let output_file = matches.get_one::<String>("output").map(String::as_str);
-        let delimiter = matches.get_one::<String>("delimiter").unwrap().as_str();
-        let mode = matches.get_one::<String>("mode").unwrap().as_str();
-        let in_enc = matches.get_one::<String>("in_enc").unwrap().as_str();
-        let out_enc = matches.get_one::<String>("out_enc").unwrap().as_str();
-
-        let mut input_str = read_input(input_file, in_enc)?;
-
-        if should_remove_bom(in_enc, out_enc) {
-            remove_utf8_bom_str_inplace(&mut input_str)
+    let final_output = match output_file {
+        Some(path) => {
+            if auto_ext
+                && Path::new(path).extension().is_none()
+                && office_extensions.contains(office_format.as_str())
+            {
+                format!("{path}.{}", office_format)
+            } else {
+                path.to_string()
+            }
         }
+        None => {
+            let input_path = Path::new(input_file);
+            let file_stem = input_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("converted");
+            let ext = office_format.as_str();
+            let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
 
-        if input_file.is_none() {
-            input_str = normalize_line_endings(&input_str);
+            let file_stem_converted = helper.convert(file_stem, config, punctuation);
+            let final_stem = if auto_ext {
+                format!("{file_stem_converted}_converted")
+            } else {
+                format!("{file_stem}_converted")
+            };
+
+            parent
+                .join(format!("{final_stem}.{ext}"))
+                .to_string_lossy()
+                .to_string()
         }
+    };
 
-        let opencc = OpenCC::new();
-
-        let words = match mode {
-            "search" => opencc.jieba_cut_for_search(&input_str, true),
-            "full" => opencc.jieba_cut_all(&input_str),
-            _ => opencc.jieba_cut(&input_str, true),
-        };
-
-        let output_str = words.join(delimiter);
-        write_output(output_file, out_enc, &output_str)?;
-
-        eprintln!(
-            "{BLUE}Segmentation completed ({mode}, \"{delimiter}\"): {} -> {}{RESET}",
-            input_file.unwrap_or("<stdin>"),
-            output_file.unwrap_or("stdout")
-        );
-
-        Ok(())
+    match OfficeConverter::convert(
+        input_file,
+        &final_output,
+        &office_format,
+        &helper,
+        config,
+        punctuation,
+        keep_font,
+    ) {
+        Ok(result) if result.success => {
+            eprintln!("{}\n📁  Output saved to: {}", result.message, final_output);
+        }
+        Ok(result) => {
+            eprintln!("❌  Office document conversion failed: {}", result.message);
+        }
+        Err(e) => {
+            eprintln!("❌  Error: {}", e);
+        }
     }
 
     Ok(())
+}
+
+fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    let input_file = matches.get_one::<String>("input");
+    let output_file = matches.get_one::<String>("output");
+    let delimiter = matches.get_one::<String>("delimiter").unwrap();
+    let mode = matches.get_one::<String>("mode").unwrap();
+    let in_enc = matches.get_one::<String>("in_enc").unwrap();
+    let out_enc = matches.get_one::<String>("out_enc").unwrap();
+
+    let is_console = input_file.is_none();
+    let mut input: Box<dyn Read> = match input_file {
+        Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
+        None => {
+            if io::stdin().is_terminal() {
+                eprintln!("{PROMPT_SEGMENT}");
+            }
+            Box::new(BufReader::new(io::stdin().lock()))
+        }
+    };
+
+    let mut buffer = read_input(&mut *input, is_console)?;
+    if should_remove_bom(in_enc, out_enc) {
+        remove_utf8_bom(&mut buffer);
+    }
+
+    let mut input_str = decode_input(&buffer, in_enc)?;
+    if is_console {
+        input_str = normalize_line_endings(&input_str);
+    }
+
+    let opencc = OpenCC::new();
+    let words = match mode.as_str() {
+        "search" => opencc.jieba_cut_for_search(&input_str, true),
+        "full" => opencc.jieba_cut_all(&input_str),
+        _ => opencc.jieba_cut(&input_str, true),
+    };
+
+    let output_str = words.join(delimiter);
+
+    let (is_console_output, mut output) = open_output(output_file)?;
+
+    let final_output = if is_console_output && !output_str.ends_with('\n') {
+        format!("{output_str}\n")
+    } else {
+        output_str
+    };
+
+    encode_and_write_output(&final_output, out_enc, &mut *output)?;
+    output.flush()?;
+
+    Ok(())
+}
+
+fn read_input(input: &mut dyn Read, is_console: bool) -> io::Result<Vec<u8>> {
+    if is_console {
+        let mut reader = BufReader::new(input);
+        let mut text = String::new();
+        let mut line = String::new();
+
+        loop {
+            line.clear();
+            let n = reader.read_line(&mut line)?;
+            if n == 0 {
+                break;
+            }
+            text.push_str(&line);
+        }
+
+        Ok(text.into_bytes())
+    } else {
+        let mut buffer = Vec::new();
+        input.read_to_end(&mut buffer)?;
+        Ok(buffer)
+    }
+}
+
+fn decode_input(buffer: &[u8], enc: &str) -> io::Result<String> {
+    if enc.eq_ignore_ascii_case("UTF-8") {
+        return Ok(String::from_utf8_lossy(buffer).into_owned());
+    }
+
+    let encoding = Encoding::for_label(enc.as_bytes()).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Unsupported encoding: {enc}"),
+        )
+    })?;
+
+    let mut reader = DecodeReaderBytesBuilder::new()
+        .encoding(Some(encoding))
+        .build(buffer);
+
+    let mut decoded = String::new();
+    reader.read_to_string(&mut decoded)?;
+    Ok(decoded)
+}
+
+fn open_output(output_file: Option<&String>) -> io::Result<(bool, Box<dyn Write>)> {
+    let is_console_output = output_file.is_none();
+
+    let output: Box<dyn Write> = match output_file {
+        Some(file_name) => Box::new(BufWriter::new(File::create(file_name)?)),
+        None => Box::new(BufWriter::new(io::stdout().lock())),
+    };
+
+    Ok((is_console_output, output))
+}
+
+fn encode_and_write_output(output_str: &str, enc: &str, output: &mut dyn Write) -> io::Result<()> {
+    if enc.eq_ignore_ascii_case("UTF-8") {
+        output.write_all(output_str.as_bytes())?;
+        return Ok(());
+    }
+
+    let encoding = Encoding::for_label(enc.as_bytes()).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Unsupported output encoding: {enc}"),
+        )
+    })?;
+
+    let (encoded, _, _) = encoding.encode(output_str);
+    output.write_all(&encoded)?;
+    Ok(())
+}
+
+fn should_remove_bom(in_enc: &str, out_enc: &str) -> bool {
+    in_enc.eq_ignore_ascii_case("UTF-8") && !out_enc.eq_ignore_ascii_case("UTF-8")
+}
+
+fn remove_utf8_bom(input: &mut Vec<u8>) {
+    if input.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        input.drain(..3);
+    }
+}
+
+fn normalize_line_endings(s: &str) -> String {
+    s.replace("\r\n", "\n").replace('\r', "\n")
 }
