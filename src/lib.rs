@@ -168,8 +168,7 @@
 //! These utilities can be used independently of Chinese variant conversion,
 //! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
 //! as indexing, text analysis, and keyword extraction.
-use jieba_rs::{Jieba, Keyword, TfIdf};
-use jieba_rs::{KeywordExtract, TextRank};
+use jieba_rs::{Jieba, Keyword};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
@@ -181,7 +180,10 @@ use std::sync::Arc;
 use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::{DictMap, Dictionary};
+use crate::keyword::keyword_extract_internal;
 pub mod dictionary_lib;
+mod keyword;
+pub use keyword::{KeywordMethod, POS_KEYWORDS};
 mod opencc_config;
 pub use opencc_config::OpenccConfig;
 
@@ -1744,18 +1746,72 @@ impl OpenCC {
     /// println!("{:?}", keywords);
     /// ```
     pub fn keyword_extract_textrank(&self, input: &str, top_k: usize) -> Vec<String> {
-        // Remove newline characters from the input
-        let cleaned_input = strip_newlines_cow(input);
-        let keyword_extractor = TextRank::default();
-        let top_k = keyword_extractor.extract_keywords(
+        keyword_extract_internal(&self.jieba, input, top_k, KeywordMethod::TextRank, None)
+    }
+
+    /// Extracts top keywords using the TextRank algorithm with optional POS filtering.
+    ///
+    /// This method performs word segmentation and applies the TextRank algorithm
+    /// to rank keywords based on co-occurrence relationships. It optionally filters
+    /// candidate words by part-of-speech (POS) tags before ranking.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Input text to extract keywords from.
+    /// * `top_k` - Maximum number of keywords to return.
+    /// * `allowed_pos` - Optional slice of POS tags used to filter candidates.
+    ///   For example: `Some(&["n", "nr", "ns", "v"])`.
+    ///   - `None` means no POS filtering (all words are considered).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` containing the top keywords sorted by importance.
+    ///
+    /// # Example
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let opencc = OpenCC::new();
+    ///
+    /// let keywords = opencc.keyword_extract_textrank_pos(
+    ///     "自然语言处理和机器学习",
+    ///     5,
+    ///     Some(&["n", "nr", "v"]),
+    /// );
+    ///
+    /// println!("{:?}", keywords);
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - POS tags follow the Jieba tagging scheme.
+    /// - Common useful tags include:
+    ///   - `"n"`  (noun)
+    ///   - `"nr"` (person name)
+    ///   - `"ns"` (place name)
+    ///   - `"nt"` (organization)
+    ///   - `"v"`  (verb)
+    ///
+    /// - For best results, restrict to content words (e.g., nouns and verbs).
+    ///
+    /// # See also
+    ///
+    /// - [`keyword_extract_textrank`](Self::keyword_extract_textrank)
+    /// - [`keyword_weight_textrank`](Self::keyword_weight_textrank)
+    /// - [`keyword_weight_textrank_pos`](Self::keyword_weight_textrank_pos)
+    pub fn keyword_extract_textrank_pos(
+        &self,
+        input: &str,
+        top_k: usize,
+        allowed_pos: Option<&[&str]>,
+    ) -> Vec<String> {
+        keyword_extract_internal(
             &self.jieba,
-            &cleaned_input,
+            input,
             top_k,
-            // vec![String::from("ns"), String::from("n"), String::from("vn"), String::from("v")],
-            vec![],
-        );
-        // Extract only the keyword strings from the Keyword struct
-        top_k.into_iter().map(|k| k.keyword).collect()
+            KeywordMethod::TextRank,
+            allowed_pos,
+        )
     }
 
     /// Returns weighted keywords using the TextRank algorithm.
@@ -1783,16 +1839,43 @@ impl OpenCC {
     ///
     /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_textrank(&self, input: &str, top_k: usize) -> Vec<Keyword> {
-        // Remove newline characters from the input
-        let cleaned_input = strip_newlines_cow(input);
-        let keyword_extractor = TextRank::default();
-        keyword_extractor.extract_keywords(
-            &self.jieba,
-            &cleaned_input,
-            top_k,
-            // vec![String::from("ns"), String::from("n"), String::from("vn"), String::from("v")],
-            vec![],
-        )
+        keyword::keyword_weight_textrank_internal(&self.jieba, input, top_k, None)
+    }
+
+    /// Returns weighted keywords using the TextRank algorithm with optional POS filtering.
+    ///
+    /// This method behaves the same as [`keyword_weight_textrank`], but allows filtering
+    /// by part-of-speech (POS) tags.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to analyze.
+    /// * `topk` - Number of top keywords to return.
+    /// * `allowed_pos` - Optional slice of POS tags (e.g. `Some(&["n", "nr", "v"])`).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Keyword>` — each keyword has `.keyword` and `.weight` fields.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let weighted = opencc.keyword_weight_textrank_pos(
+    ///     "自然语言处理和机器学习",
+    ///     5,
+    ///     Some(&["n", "nr", "v"]),
+    /// );
+    /// for kw in weighted {
+    ///     println!("{}: {}", kw.keyword, kw.weight);
+    /// }
+    /// ```
+    pub fn keyword_weight_textrank_pos(
+        &self,
+        input: &str,
+        top_k: usize,
+        allowed_pos: Option<&[&str]>,
+    ) -> Vec<Keyword> {
+        keyword::keyword_weight_textrank_internal(&self.jieba, input, top_k, allowed_pos)
     }
 
     /// Extracts top keywords using the TF-IDF algorithm.
@@ -1816,12 +1899,68 @@ impl OpenCC {
     /// println!("{:?}", keywords);
     /// ```
     pub fn keyword_extract_tfidf(&self, input: &str, top_k: usize) -> Vec<String> {
-        // Remove newline characters from the input
-        let cleaned_input = strip_newlines_cow(input);
-        let keyword_extractor = TfIdf::default();
-        let top_k = keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![]);
-        // Extract only the keyword strings from the Keyword struct
-        top_k.into_iter().map(|k| k.keyword).collect()
+        keyword_extract_internal(&self.jieba, input, top_k, KeywordMethod::TfIdf, None)
+    }
+
+    /// Extracts top keywords using the TF-IDF algorithm with optional POS filtering.
+    ///
+    /// This method performs word segmentation and ranks keywords based on their
+    /// TF-IDF (Term Frequency–Inverse Document Frequency) scores. It optionally
+    /// filters candidate words by part-of-speech (POS) tags before ranking.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Input text to extract keywords from.
+    /// * `top_k` - Maximum number of keywords to return.
+    /// * `allowed_pos` - Optional slice of POS tags used to filter candidates.
+    ///   For example: `Some(&["n", "nr", "ns", "v"])`.
+    ///   - `None` means no POS filtering (all words are considered).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<String>` containing the top keywords sorted by importance.
+    ///
+    /// # Example
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let opencc = OpenCC::new();
+    ///
+    /// let keywords = opencc.keyword_extract_tfidf_pos(
+    ///     "深度学习正在改变人工智能",
+    ///     5,
+    ///     Some(&["n", "nr", "v"]),
+    /// );
+    ///
+    /// println!("{:?}", keywords);
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - POS tags follow the Jieba tagging scheme.
+    /// - Common useful tags include:
+    ///   - `"n"`  (noun)
+    ///   - `"nr"` (person name)
+    ///   - `"ns"` (place name)
+    ///   - `"nt"` (organization)
+    ///   - `"v"`  (verb)
+    ///
+    /// - TF-IDF favors words that are frequent in the input text but less common
+    ///   across the corpus, making it suitable for keyword extraction in
+    ///   domain-specific or technical text.
+    ///
+    /// # See also
+    ///
+    /// - [`keyword_extract_tfidf`](Self::keyword_extract_tfidf)
+    /// - [`keyword_weight_tfidf`](Self::keyword_weight_tfidf)
+    /// - [`keyword_weight_tfidf_pos`](Self::keyword_weight_tfidf_pos)
+    pub fn keyword_extract_tfidf_pos(
+        &self,
+        input: &str,
+        top_k: usize,
+        allowed_pos: Option<&[&str]>,
+    ) -> Vec<String> {
+        keyword_extract_internal(&self.jieba, input, top_k, KeywordMethod::TfIdf, allowed_pos)
     }
 
     /// Returns weighted keywords using the TF-IDF algorithm.
@@ -1851,10 +1990,45 @@ impl OpenCC {
     ///
     /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
     pub fn keyword_weight_tfidf(&self, input: &str, top_k: usize) -> Vec<Keyword> {
-        // Remove newline characters from the input
-        let cleaned_input = strip_newlines_cow(input);
-        let keyword_extractor = TfIdf::default();
-        keyword_extractor.extract_keywords(&self.jieba, &cleaned_input, top_k, vec![])
+        keyword::keyword_weight_tfidf_internal(&self.jieba, input, top_k, None)
+    }
+
+    /// Returns weighted keywords using the TF-IDF algorithm with optional POS filtering.
+    ///
+    /// This method behaves the same as [`keyword_weight_tfidf`], but allows filtering
+    /// by part-of-speech (POS) tags.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The input text to analyze.
+    /// * `topk` - Number of top keywords to return.
+    /// * `allowed_pos` - Optional slice of POS tags (e.g. `Some(&["n", "nr", "v"])`).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<jieba_rs::Keyword>`, each with:
+    /// - `keyword`: The extracted word.
+    /// - `weight`: The TF-IDF score representing word importance.
+    ///
+    /// # Example
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// let weighted = opencc.keyword_weight_tfidf_pos(
+    ///     "深度学习正在改变人工智能",
+    ///     5,
+    ///     Some(&["n", "nr", "v"]),
+    /// );
+    /// for kw in weighted {
+    ///     println!("{}: {}", kw.keyword, kw.weight);
+    /// }
+    /// ```
+    pub fn keyword_weight_tfidf_pos(
+        &self,
+        input: &str,
+        top_k: usize,
+        allowed_pos: Option<&[&str]>,
+    ) -> Vec<Keyword> {
+        keyword::keyword_weight_tfidf_internal(&self.jieba, input, top_k, allowed_pos)
     }
 }
 

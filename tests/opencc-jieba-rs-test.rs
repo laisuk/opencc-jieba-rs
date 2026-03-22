@@ -191,6 +191,43 @@ mod tests {
     }
 
     #[test]
+    fn test_keyword_extract_textrank_pos() {
+        let input = include_str!("../src/OneDay.txt");
+        let opencc = OpenCC::new();
+
+        // Common content POS (nouns + verbs)
+        let allowed_pos = ["n", "nr", "ns", "nt", "v"];
+
+        let output = opencc.keyword_extract_textrank_pos(input, 10, Some(&allowed_pos));
+
+        println!("TextRank (POS filtered): {:?}", output);
+
+        // Basic sanity checks
+        assert!(!output.is_empty());
+        assert!(output.len() <= 10);
+    }
+
+    #[test]
+    fn test_keyword_extract_textrank_pos_vs_all() {
+        let input = include_str!("../src/OneDay.txt");
+        let opencc = OpenCC::new();
+
+        let all = opencc.keyword_extract_textrank(input, 10);
+
+        let filtered =
+            opencc.keyword_extract_textrank_pos(input, 10, Some(&["n", "nr", "ns", "nt", "v"]));
+
+        println!("All:      {:?}", all);
+        println!("Filtered: {:?}", filtered);
+
+        assert!(!filtered.is_empty());
+        assert!(filtered.len() <= 10);
+
+        // Usually filtered result differs (not guaranteed, but often true)
+        assert_ne!(all, filtered);
+    }
+
+    #[test]
     fn test_keyword_weight_textrank() {
         let input = include_str!("../src/OneDay.txt");
         let opencc = OpenCC::new();
@@ -204,6 +241,43 @@ mod tests {
         let opencc = OpenCC::new();
         let output = opencc.keyword_extract_tfidf(input, 10);
         println!("TF-IDF: {:?}", output);
+    }
+
+    #[test]
+    fn test_keyword_extract_tfidf_pos() {
+        let input = include_str!("../src/OneDay.txt");
+        let opencc = OpenCC::new();
+
+        // Common content POS (nouns + verbs)
+        let allowed_pos = ["n", "nr", "ns", "nt", "v"];
+
+        let output = opencc.keyword_extract_tfidf_pos(input, 10, Some(&allowed_pos));
+
+        println!("TF-IDF (POS filtered): {:?}", output);
+
+        // Basic sanity checks
+        assert!(!output.is_empty());
+        assert!(output.len() <= 10);
+    }
+
+    #[test]
+    fn test_keyword_extract_tfidf_pos_vs_all() {
+        let input = include_str!("../src/OneDay.txt");
+        let opencc = OpenCC::new();
+
+        let all = opencc.keyword_extract_tfidf(input, 10);
+
+        let filtered =
+            opencc.keyword_extract_tfidf_pos(input, 10, Some(&["n", "nr", "ns", "nt", "v"]));
+
+        println!("All:      {:?}", all);
+        println!("Filtered: {:?}", filtered);
+
+        assert!(!filtered.is_empty());
+        assert!(filtered.len() <= 10);
+
+        // Usually filtered result differs (not guaranteed, but often true)
+        assert_ne!(all, filtered);
     }
 
     #[test]
