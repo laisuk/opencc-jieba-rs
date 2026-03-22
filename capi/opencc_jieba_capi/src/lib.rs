@@ -227,33 +227,6 @@ pub extern "C" fn opencc_jieba_join_str(
 
 // === Public FFI: keyword extraction ===
 
-// #[no_mangle]
-// pub extern "C" fn opencc_jieba_keywords(
-//     instance: *const OpenCC,
-//     input: *const c_char,
-//     top_k: usize,
-//     method: *const c_char,
-// ) -> *mut *mut c_char {
-//     let opencc = match borrow_opencc(instance) {
-//         Some(opencc) => opencc,
-//         None => return ptr::null_mut(),
-//     };
-//     let input_str = match cstr_to_str(input) {
-//         Some(input_str) => input_str,
-//         None => return ptr::null_mut(),
-//     };
-//     let method = match KeywordMethod::parse(method) {
-//         Some(method) => method,
-//         None => return ptr::null_mut(),
-//     };
-//
-//     let keywords = match method {
-//         KeywordMethod::TextRank => opencc.keyword_extract_textrank(input_str, top_k),
-//         KeywordMethod::TfIdf => opencc.keyword_extract_tfidf(input_str, top_k),
-//     };
-//
-//     vec_to_cstr_ptr(keywords)
-// }
 #[no_mangle]
 pub extern "C" fn opencc_jieba_keywords(
     instance: *const OpenCC,
@@ -602,6 +575,7 @@ fn vec_pair_to_tag_ptr<TWord: AsRef<str>, TTag: AsRef<str>>(
 
 // ------ POS ------ //
 
+#[inline]
 fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {
     if pos.is_null() {
         return None;
@@ -615,6 +589,7 @@ fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {
     Some(pos_str.split_whitespace().map(|s| s.to_string()).collect())
 }
 
+#[inline]
 fn keyword_extract_ffi(
     opencc: &OpenCC,
     input_str: &str,
@@ -630,6 +605,7 @@ fn keyword_extract_ffi(
     }
 }
 
+#[inline]
 fn keyword_weight_ffi(
     opencc: &OpenCC,
     input_str: &str,
@@ -722,6 +698,7 @@ fn keyword_weights_ffi_impl(
     0
 }
 
+#[inline]
 fn with_allowed_pos_refs<R>(allowed_pos: *const c_char, f: impl FnOnce(Option<&[&str]>) -> R) -> R {
     let storage = parse_allowed_pos(allowed_pos);
     let refs = storage
