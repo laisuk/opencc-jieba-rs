@@ -401,7 +401,6 @@ version = "0.7.4"
 dependencies = [
  "clap",
  "opencc-jieba-rs",
- "rustls-webpki",
  "serde_json",
  "ureq",
 ]
