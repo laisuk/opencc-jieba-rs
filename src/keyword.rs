@@ -1,3 +1,62 @@
+//! Keyword extraction utilities based on Jieba.
+//!
+//! This module provides internal implementations and supporting types for
+//! keyword extraction using the following algorithms:
+//!
+//! - **TextRank** — a graph-based ranking algorithm based on word co-occurrence
+//! - **TF-IDF** — a statistical method based on term frequency and inverse document frequency
+//!
+//! These implementations are used by the public [`OpenCC`](crate::OpenCC) API
+//! to provide keyword extraction with optional part-of-speech (POS) filtering.
+//!
+//! # Features
+//!
+//! - Unified internal implementation for multiple keyword extraction methods
+//! - Optional POS filtering to improve keyword quality
+//! - Support for both plain (`Vec<String>`) and weighted (`Vec<Keyword>`) outputs
+//!
+//! # POS Filtering
+//!
+//! Keyword extraction functions in this crate support optional filtering by
+//! part-of-speech (POS) tags. This helps remove low-information tokens such as
+//! adverbs and particles, improving the quality of extracted keywords.
+//!
+//! A recommended preset is provided:
+//!
+//! - [`POS_KEYWORDS`] — common nouns and verbs for general-purpose keyword extraction
+//!
+//! # Usage
+//!
+//! Most users should use the high-level methods provided by [`OpenCC`](crate::OpenCC):
+//!
+//! ```
+//! use opencc_jieba_rs::{OpenCC, POS_KEYWORDS};
+//!
+//! let opencc = OpenCC::new();
+//!
+//! let keywords = opencc.keyword_extract_textrank_pos(
+//!     "自然语言处理和机器学习",
+//!     5,
+//!     Some(POS_KEYWORDS),
+//! );
+//!
+//! println!("{:?}", keywords);
+//! ```
+//!
+//! # Design Notes
+//!
+//! - This module centralizes keyword extraction logic to avoid duplication.
+//! - Internal functions are marked `pub(crate)` and are not part of the public API.
+//! - POS filters are accepted as `&[&str]` for zero-allocation input at the API level,
+//!   and converted internally to match the `jieba-rs` interface.
+//!
+//! # See also
+//!
+//! - [`KeywordMethod`] — selects the extraction algorithm
+//! - [`POS_KEYWORDS`] — recommended POS filter preset
+//! - [`OpenCC::keyword_extract_textrank`](crate::OpenCC::keyword_extract_textrank)
+//! - [`OpenCC::keyword_extract_tfidf`](crate::OpenCC::keyword_extract_tfidf)
+
 use jieba_rs::{Keyword, KeywordExtract, TextRank, TfIdf};
 
 /// Keyword extraction algorithm.
@@ -44,6 +103,9 @@ use jieba_rs::{Keyword, KeywordExtract, TextRank, TfIdf};
 /// - [`OpenCC::keyword_extract_textrank`](crate::OpenCC::keyword_extract_textrank)
 /// - [`OpenCC::keyword_extract_tfidf`](crate::OpenCC::keyword_extract_tfidf)
 /// - [`POS_KEYWORDS`](POS_KEYWORDS)
+///
+/// # Since
+/// v0.7.4
 #[derive(Debug, Clone, Copy)]
 pub enum KeywordMethod {
     /// Graph-based keyword ranking using word co-occurrence.
@@ -101,6 +163,9 @@ pub enum KeywordMethod {
 ///
 /// - [`keyword_extract_textrank_pos`](crate::OpenCC::keyword_extract_textrank_pos)
 /// - [`keyword_extract_tfidf_pos`](crate::OpenCC::keyword_extract_tfidf_pos)
+///
+/// # Since
+/// v0.7.4
 pub const POS_KEYWORDS: &[&str] = &["n", "nr", "ns", "nt", "nz", "v", "vn"];
 
 /// Internal keyword extraction implementation shared by all public APIs.
@@ -140,6 +205,9 @@ pub const POS_KEYWORDS: &[&str] = &["n", "nr", "ns", "nt", "nz", "v", "vn"];
 /// - [`OpenCC::keyword_extract_textrank_pos`](crate::OpenCC::keyword_extract_textrank_pos)
 /// - [`OpenCC::keyword_extract_tfidf`](crate::OpenCC::keyword_extract_tfidf)
 /// - [`OpenCC::keyword_extract_tfidf_pos`](crate::OpenCC::keyword_extract_tfidf_pos)
+///
+/// # Since
+/// v0.7.4
 pub(crate) fn keyword_extract_internal(
     jieba: &jieba_rs::Jieba,
     input: &str,
@@ -206,6 +274,9 @@ pub(crate) fn keyword_extract_internal(
 /// - [`OpenCC::keyword_weight_textrank_pos`](crate::OpenCC::keyword_weight_textrank_pos)
 ///
 /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
+///
+/// # Since
+/// v0.7.4
 pub(crate) fn keyword_weight_textrank_internal(
     jieba: &jieba_rs::Jieba,
     input: &str,
@@ -261,6 +332,9 @@ pub(crate) fn keyword_weight_textrank_internal(
 /// - [`OpenCC::keyword_weight_tfidf_pos`](crate::OpenCC::keyword_weight_tfidf_pos)
 ///
 /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
+///
+/// # Since
+/// v0.7.4
 pub(crate) fn keyword_weight_tfidf_internal(
     jieba: &jieba_rs::Jieba,
     input: &str,

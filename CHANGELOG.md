@@ -6,12 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.4-beta1] - 2026-03-20
+## [0.7.4-beta1] - 2026-03-23
+
+### Added
+
+- Added POS-aware keyword extraction:
+    - `keyword_extract_textrank_pos`
+    - `keyword_extract_tfidf_pos`
+    - `keyword_weight_textrank_pos`
+    - `keyword_weight_tfidf_pos`
+- Added `KeywordMethod` enum for unified keyword extraction backend
+- Added `POS_KEYWORDS` preset for recommended POS filtering
 
 ### Changed
 
-- Update dictionary
-- Optimized CLI `opencc-jieba` and `opencc-clip-jieba`
+- Refactored keyword extraction into unified internal module (`keyword.rs`)
+- Improved API consistency across TextRank and TF-IDF methods
+- Optimized CLI tools `opencc-jieba` and `opencc-clip-jieba`
+- Updated dictionary data
+
+### Improved
+
+- Improved keyword extraction quality using POS filtering (better semantic relevance)
+- Reduced API duplication via shared internal implementation
+- Enhanced documentation (docs.rs) with POS usage and examples
 
 ---
 
@@ -22,8 +40,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Introduced `OpenccConfig` enum as the conversion configuration.
 - Added `convert_with_config()`.
 - Added Jieba segmentation APIs:
-  - `jieba_cut_for_search()` — segmentation optimized for search indexing.
-  - `jieba_cut_all()` — full segmentation mode.
+    - `jieba_cut_for_search()` — segmentation optimized for search indexing.
+    - `jieba_cut_all()` — full segmentation mode.
 - Added `jieba_tag()` — part-of-speech (POS) tagging API returning `(token, tag)` pairs.
 
 ### Changed
@@ -32,8 +50,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Code optimizations and internal refactoring.
 - Refactored Jieba segmentation pipeline with a shared internal implementation.
 - C API:
-  - Improved memory management.
-  - Added `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
+    - Improved memory management.
+    - Added `opencc_jieba_abi_number()` and `opencc_jieba_version_string()`.
 
 ---
 

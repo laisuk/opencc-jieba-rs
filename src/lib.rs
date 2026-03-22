@@ -1799,6 +1799,9 @@ impl OpenCC {
     /// - [`keyword_extract_textrank`](Self::keyword_extract_textrank)
     /// - [`keyword_weight_textrank`](Self::keyword_weight_textrank)
     /// - [`keyword_weight_textrank_pos`](Self::keyword_weight_textrank_pos)
+    ///
+    /// # Since
+    /// v0.7.4
     pub fn keyword_extract_textrank_pos(
         &self,
         input: &str,
@@ -1869,6 +1872,9 @@ impl OpenCC {
     ///     println!("{}: {}", kw.keyword, kw.weight);
     /// }
     /// ```
+    ///
+    /// # Since
+    /// v0.7.4
     pub fn keyword_weight_textrank_pos(
         &self,
         input: &str,
@@ -1954,6 +1960,9 @@ impl OpenCC {
     /// - [`keyword_extract_tfidf`](Self::keyword_extract_tfidf)
     /// - [`keyword_weight_tfidf`](Self::keyword_weight_tfidf)
     /// - [`keyword_weight_tfidf_pos`](Self::keyword_weight_tfidf_pos)
+    ///
+    /// # Since
+    /// v0.7.4
     pub fn keyword_extract_tfidf_pos(
         &self,
         input: &str,
@@ -2022,6 +2031,9 @@ impl OpenCC {
     ///     println!("{}: {}", kw.keyword, kw.weight);
     /// }
     /// ```
+    ///
+    /// # Since
+    /// v0.7.4
     pub fn keyword_weight_tfidf_pos(
         &self,
         input: &str,
