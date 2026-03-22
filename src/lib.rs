@@ -168,7 +168,7 @@
 //! These utilities can be used independently of Chinese variant conversion,
 //! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
 //! as indexing, text analysis, and keyword extraction.
-use jieba_rs::{Jieba, Keyword};
+use jieba_rs::Jieba;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
@@ -186,6 +186,7 @@ mod keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 mod opencc_config;
 pub use opencc_config::OpenccConfig;
+pub use jieba_rs::Keyword;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 

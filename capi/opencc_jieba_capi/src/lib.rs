@@ -227,6 +227,33 @@ pub extern "C" fn opencc_jieba_join_str(
 
 // === Public FFI: keyword extraction ===
 
+// #[no_mangle]
+// pub extern "C" fn opencc_jieba_keywords(
+//     instance: *const OpenCC,
+//     input: *const c_char,
+//     top_k: usize,
+//     method: *const c_char,
+// ) -> *mut *mut c_char {
+//     let opencc = match borrow_opencc(instance) {
+//         Some(opencc) => opencc,
+//         None => return ptr::null_mut(),
+//     };
+//     let input_str = match cstr_to_str(input) {
+//         Some(input_str) => input_str,
+//         None => return ptr::null_mut(),
+//     };
+//     let method = match KeywordMethod::parse(method) {
+//         Some(method) => method,
+//         None => return ptr::null_mut(),
+//     };
+//
+//     let keywords = match method {
+//         KeywordMethod::TextRank => opencc.keyword_extract_textrank(input_str, top_k),
+//         KeywordMethod::TfIdf => opencc.keyword_extract_tfidf(input_str, top_k),
+//     };
+//
+//     vec_to_cstr_ptr(keywords)
+// }
 #[no_mangle]
 pub extern "C" fn opencc_jieba_keywords(
     instance: *const OpenCC,
@@ -247,10 +274,34 @@ pub extern "C" fn opencc_jieba_keywords(
         None => return ptr::null_mut(),
     };
 
-    let keywords = match method {
-        KeywordMethod::TextRank => opencc.keyword_extract_textrank(input_str, top_k),
-        KeywordMethod::TfIdf => opencc.keyword_extract_tfidf(input_str, top_k),
+    let keywords = keyword_extract_ffi(opencc, input_str, top_k, method, None);
+    vec_to_cstr_ptr(keywords)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_keywords_pos(
+    instance: *const OpenCC,
+    input: *const c_char,
+    top_k: usize,
+    method: *const c_char,
+    allowed_pos: *const c_char,
+) -> *mut *mut c_char {
+    let opencc = match borrow_opencc(instance) {
+        Some(opencc) => opencc,
+        None => return ptr::null_mut(),
     };
+    let input_str = match cstr_to_str(input) {
+        Some(input_str) => input_str,
+        None => return ptr::null_mut(),
+    };
+    let method = match KeywordMethod::parse(method) {
+        Some(method) => method,
+        None => return ptr::null_mut(),
+    };
+
+    let keywords = with_allowed_pos_refs(allowed_pos, |allowed_pos_refs| {
+        keyword_extract_ffi(opencc, input_str, top_k, method, allowed_pos_refs)
+    });
 
     vec_to_cstr_ptr(keywords)
 }
@@ -265,10 +316,6 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
     out_keywords: *mut *mut *mut c_char,
     out_weights: *mut *mut f64,
 ) -> i32 {
-    if out_len.is_null() || out_keywords.is_null() || out_weights.is_null() {
-        return -1;
-    }
-
     let opencc = match borrow_opencc(instance) {
         Some(opencc) => opencc,
         None => return -1,
@@ -282,70 +329,54 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
         None => return -1,
     };
 
-    let keywords = match method {
-        KeywordMethod::TextRank => opencc.keyword_weight_textrank(input_str, top_k),
-        KeywordMethod::TfIdf => opencc.keyword_weight_tfidf(input_str, top_k),
+    keyword_weights_ffi_impl(
+        opencc,
+        input_str,
+        top_k,
+        method,
+        None,
+        out_len,
+        out_keywords,
+        out_weights,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_keywords_and_weights_pos(
+    instance: *const OpenCC,
+    input: *const c_char,
+    top_k: usize,
+    method: *const c_char,
+    allowed_pos: *const c_char,
+    out_len: *mut usize,
+    out_keywords: *mut *mut *mut c_char,
+    out_weights: *mut *mut f64,
+) -> i32 {
+    let opencc = match borrow_opencc(instance) {
+        Some(opencc) => opencc,
+        None => return -1,
+    };
+    let input_str = match cstr_to_str(input) {
+        Some(input_str) => input_str,
+        None => return -1,
+    };
+    let method = match KeywordMethod::parse(method) {
+        Some(method) => method,
+        None => return -1,
     };
 
-    let len = keywords.len();
-    unsafe {
-        *out_len = len;
-        *out_keywords = ptr::null_mut();
-        *out_weights = ptr::null_mut();
-    }
-
-    if len == 0 {
-        return 0;
-    }
-
-    let keyword_array = unsafe { c_malloc_array::<*mut c_char>(len) };
-    let weight_array = unsafe { c_malloc_array::<f64>(len) };
-    if keyword_array.is_null() || weight_array.is_null() {
-        unsafe {
-            if !keyword_array.is_null() {
-                libc::free(keyword_array as *mut libc::c_void);
-            }
-            if !weight_array.is_null() {
-                libc::free(weight_array as *mut libc::c_void);
-            }
-        }
-        return -1;
-    }
-
-    unsafe {
-        fill_null_ptr_array(keyword_array, len);
-    }
-
-    for (index, keyword) in keywords.into_iter().enumerate() {
-        let c_keyword = match CString::new(keyword.keyword) {
-            Ok(c_keyword) => c_keyword.into_raw(),
-            Err(_) => {
-                unsafe {
-                    for cleanup_index in 0..index {
-                        let ptr = *keyword_array.add(cleanup_index);
-                        if !ptr.is_null() {
-                            let _ = CString::from_raw(ptr);
-                        }
-                    }
-                    libc::free(keyword_array as *mut libc::c_void);
-                    libc::free(weight_array as *mut libc::c_void);
-                }
-                return -1;
-            }
-        };
-
-        unsafe {
-            *keyword_array.add(index) = c_keyword;
-            *weight_array.add(index) = keyword.weight;
-        }
-    }
-
-    unsafe {
-        *out_keywords = keyword_array;
-        *out_weights = weight_array;
-    }
-
-    0
+    with_allowed_pos_refs(allowed_pos, |allowed_pos_refs| {
+        keyword_weights_ffi_impl(
+            opencc,
+            input_str,
+            top_k,
+            method,
+            allowed_pos_refs,
+            out_len,
+            out_keywords,
+            out_weights,
+        )
+    })
 }
 
 // === Public FFI: memory management ===
@@ -569,6 +600,138 @@ fn vec_pair_to_tag_ptr<TWord: AsRef<str>, TTag: AsRef<str>>(
     array
 }
 
+// ------ POS ------ //
+
+fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {
+    if pos.is_null() {
+        return None;
+    }
+
+    let pos_str = cstr_to_str(pos)?.trim();
+    if pos_str.is_empty() {
+        return None;
+    }
+
+    Some(pos_str.split_whitespace().map(|s| s.to_string()).collect())
+}
+
+fn keyword_extract_ffi(
+    opencc: &OpenCC,
+    input_str: &str,
+    top_k: usize,
+    method: KeywordMethod,
+    allowed_pos: Option<&[&str]>,
+) -> Vec<String> {
+    match method {
+        KeywordMethod::TextRank => {
+            opencc.keyword_extract_textrank_pos(input_str, top_k, allowed_pos)
+        }
+        KeywordMethod::TfIdf => opencc.keyword_extract_tfidf_pos(input_str, top_k, allowed_pos),
+    }
+}
+
+fn keyword_weight_ffi(
+    opencc: &OpenCC,
+    input_str: &str,
+    top_k: usize,
+    method: KeywordMethod,
+    allowed_pos: Option<&[&str]>,
+) -> Vec<opencc_jieba_rs::Keyword> {
+    match method {
+        KeywordMethod::TextRank => {
+            opencc.keyword_weight_textrank_pos(input_str, top_k, allowed_pos)
+        }
+        KeywordMethod::TfIdf => opencc.keyword_weight_tfidf_pos(input_str, top_k, allowed_pos),
+    }
+}
+
+fn keyword_weights_ffi_impl(
+    opencc: &OpenCC,
+    input_str: &str,
+    top_k: usize,
+    method: KeywordMethod,
+    allowed_pos: Option<&[&str]>,
+    out_len: *mut usize,
+    out_keywords: *mut *mut *mut c_char,
+    out_weights: *mut *mut f64,
+) -> i32 {
+    if out_len.is_null() || out_keywords.is_null() || out_weights.is_null() {
+        return -1;
+    }
+
+    let keywords = keyword_weight_ffi(opencc, input_str, top_k, method, allowed_pos);
+
+    let len = keywords.len();
+    unsafe {
+        *out_len = len;
+        *out_keywords = ptr::null_mut();
+        *out_weights = ptr::null_mut();
+    }
+
+    if len == 0 {
+        return 0;
+    }
+
+    let keyword_array = unsafe { c_malloc_array::<*mut c_char>(len) };
+    let weight_array = unsafe { c_malloc_array::<f64>(len) };
+    if keyword_array.is_null() || weight_array.is_null() {
+        unsafe {
+            if !keyword_array.is_null() {
+                libc::free(keyword_array as *mut libc::c_void);
+            }
+            if !weight_array.is_null() {
+                libc::free(weight_array as *mut libc::c_void);
+            }
+        }
+        return -1;
+    }
+
+    unsafe {
+        fill_null_ptr_array(keyword_array, len);
+    }
+
+    for (index, keyword) in keywords.into_iter().enumerate() {
+        let c_keyword = match CString::new(keyword.keyword) {
+            Ok(c_keyword) => c_keyword.into_raw(),
+            Err(_) => {
+                unsafe {
+                    for cleanup_index in 0..index {
+                        let ptr = *keyword_array.add(cleanup_index);
+                        if !ptr.is_null() {
+                            let _ = CString::from_raw(ptr);
+                        }
+                    }
+                    libc::free(keyword_array as *mut libc::c_void);
+                    libc::free(weight_array as *mut libc::c_void);
+                }
+                return -1;
+            }
+        };
+
+        unsafe {
+            *keyword_array.add(index) = c_keyword;
+            *weight_array.add(index) = keyword.weight;
+        }
+    }
+
+    unsafe {
+        *out_keywords = keyword_array;
+        *out_weights = weight_array;
+    }
+
+    0
+}
+
+fn with_allowed_pos_refs<R>(allowed_pos: *const c_char, f: impl FnOnce(Option<&[&str]>) -> R) -> R {
+    let storage = parse_allowed_pos(allowed_pos);
+    let refs = storage
+        .as_ref()
+        .map(|v| v.iter().map(String::as_str).collect::<Vec<&str>>());
+
+    f(refs.as_deref())
+}
+
+// ------ Tests ------ //
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,6 +911,109 @@ mod tests {
     }
 
     #[test]
+    fn test_opencc_jieba_keyword_extract_textrank_pos() {
+        let opencc = OpenCC::new();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
+        let method = raw_cstring("textrank");
+        let allowed_pos = raw_cstring("n nr ns nt nz v vn");
+
+        let result =
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        assert!(!result.is_null());
+
+        let out = unsafe { cstr_array_to_vec_str(result) };
+        assert!(!out.is_empty());
+
+        unsafe {
+            opencc_jieba_free_string_array(result);
+            reclaim_raw_cstring(input);
+            reclaim_raw_cstring(method);
+            reclaim_raw_cstring(allowed_pos);
+        }
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_extract_tfidf_pos() {
+        let opencc = OpenCC::new();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
+        let method = raw_cstring("tfidf");
+        let allowed_pos = raw_cstring("n nr ns nt nz v vn");
+
+        let result =
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        assert!(!result.is_null());
+
+        let out = unsafe { cstr_array_to_vec_str(result) };
+        assert!(!out.is_empty());
+
+        unsafe {
+            opencc_jieba_free_string_array(result);
+            reclaim_raw_cstring(input);
+            reclaim_raw_cstring(method);
+            reclaim_raw_cstring(allowed_pos);
+        }
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_extract_textrank_pos_empty_equivalent() {
+        let opencc = OpenCC::new();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
+        let method = raw_cstring("textrank");
+        let allowed_pos = raw_cstring("");
+
+        let result =
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        assert!(!result.is_null());
+
+        let out = unsafe { cstr_array_to_vec_str(result) };
+        assert!(!out.is_empty());
+
+        unsafe {
+            opencc_jieba_free_string_array(result);
+            reclaim_raw_cstring(input);
+            reclaim_raw_cstring(method);
+            reclaim_raw_cstring(allowed_pos);
+        }
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_extract_textrank_pos_compare() {
+        let opencc = OpenCC::new();
+        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+            .unwrap()
+            .into_raw();
+        let method_all = raw_cstring("textrank");
+        let method_pos = raw_cstring("textrank");
+        let allowed_pos = raw_cstring("n nr ns nt nz v vn");
+
+        let result_all = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_all);
+        assert!(!result_all.is_null());
+        let out_all = unsafe { cstr_array_to_vec_str(result_all) };
+        assert!(!out_all.is_empty());
+
+        let result_pos =
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method_pos, allowed_pos);
+        assert!(!result_pos.is_null());
+        let out_pos = unsafe { cstr_array_to_vec_str(result_pos) };
+        assert!(!out_pos.is_empty());
+
+        unsafe {
+            opencc_jieba_free_string_array(result_all);
+            opencc_jieba_free_string_array(result_pos);
+            reclaim_raw_cstring(input);
+            reclaim_raw_cstring(method_all);
+            reclaim_raw_cstring(method_pos);
+            reclaim_raw_cstring(allowed_pos);
+        }
+    }
+
+    #[test]
     fn test_opencc_jieba_keyword_weight_textrank() {
         let opencc = OpenCC::new();
         let input = CString::new("这是一个测试文本，关键词提取演示。").unwrap();
@@ -769,21 +1035,101 @@ mod tests {
         assert_eq!(result, 0);
         assert!(keyword_count > 0);
 
-        let keyword_vec: Vec<String> = unsafe {
-            (0..keyword_count)
+        let (keyword_vec, weight_vec) =
+            collect_keywords_and_weights(keywords, weights, keyword_count);
+
+        assert_eq!(keyword_vec.len(), keyword_count);
+        assert!(weight_vec.iter().all(|w| *w >= 0.0));
+
+        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_weight_textrank_pos() {
+        let opencc = OpenCC::new();
+        let input = CString::new("这是一个测试文本，关键词提取演示。").unwrap();
+        let method = CString::new("textrank").unwrap();
+        let allowed_pos = CString::new("n nr ns nt nz v vn").unwrap();
+
+        let mut keyword_count = 0usize;
+        let mut keywords: *mut *mut c_char = ptr::null_mut();
+        let mut weights: *mut f64 = ptr::null_mut();
+
+        let result = opencc_jieba_keywords_and_weights_pos(
+            &opencc as *const OpenCC,
+            input.as_ptr(),
+            5,
+            method.as_ptr(),
+            allowed_pos.as_ptr(),
+            &mut keyword_count,
+            &mut keywords,
+            &mut weights,
+        );
+
+        assert_eq!(result, 0);
+        assert!(keyword_count > 0);
+
+        let (keyword_vec, weight_vec) =
+            collect_keywords_and_weights(keywords, weights, keyword_count);
+
+        assert_eq!(keyword_vec.len(), keyword_count);
+        assert!(weight_vec.iter().all(|w| *w >= 0.0));
+
+        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+    }
+
+    #[test]
+    fn test_opencc_jieba_keyword_weight_tfidf_pos() {
+        let opencc = OpenCC::new();
+        let input = CString::new("这是一个测试文本，关键词提取演示。").unwrap();
+        let method = CString::new("tfidf").unwrap();
+        let allowed_pos = CString::new("n nr ns nt nz v vn").unwrap();
+
+        let mut keyword_count = 0usize;
+        let mut keywords: *mut *mut c_char = ptr::null_mut();
+        let mut weights: *mut f64 = ptr::null_mut();
+
+        let result = opencc_jieba_keywords_and_weights_pos(
+            &opencc as *const OpenCC,
+            input.as_ptr(),
+            5,
+            method.as_ptr(),
+            allowed_pos.as_ptr(),
+            &mut keyword_count,
+            &mut keywords,
+            &mut weights,
+        );
+
+        assert_eq!(result, 0);
+        assert!(keyword_count > 0);
+
+        let (keyword_vec, weight_vec) =
+            collect_keywords_and_weights(keywords, weights, keyword_count);
+
+        assert_eq!(keyword_vec.len(), keyword_count);
+        assert!(weight_vec.iter().all(|w| *w >= 0.0));
+
+        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+    }
+
+    fn collect_keywords_and_weights(
+        keywords: *mut *mut c_char,
+        weights: *mut f64,
+        keyword_count: usize,
+    ) -> (Vec<String>, Vec<f64>) {
+        unsafe {
+            let keyword_vec: Vec<String> = (0..keyword_count)
                 .map(|i| {
                     CStr::from_ptr(*keywords.add(i))
                         .to_string_lossy()
                         .into_owned()
                 })
-                .collect()
-        };
-        let weight_slice = unsafe { std::slice::from_raw_parts(weights, keyword_count) };
+                .collect();
 
-        assert_eq!(keyword_vec.len(), keyword_count);
-        assert!(weight_slice.iter().all(|weight| *weight >= 0.0));
+            let weight_vec: Vec<f64> = std::slice::from_raw_parts(weights, keyword_count).to_vec();
 
-        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+            (keyword_vec, weight_vec)
+        }
     }
 
     #[test]
