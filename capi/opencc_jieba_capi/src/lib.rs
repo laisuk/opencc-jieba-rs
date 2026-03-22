@@ -1,4 +1,4 @@
-use opencc_jieba_rs::OpenCC;
+use opencc_jieba_rs::{KeywordMethod, OpenCC};
 use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
 use std::ptr;
@@ -9,21 +9,6 @@ const OPENCC_JIEBA_ABI_NUMBER: u32 = 1;
 pub struct OpenccJiebaTag {
     pub word: *mut c_char,
     pub tag: *mut c_char,
-}
-
-enum KeywordMethod {
-    TextRank,
-    TfIdf,
-}
-
-impl KeywordMethod {
-    fn parse(method: *const c_char) -> Option<Self> {
-        match cstr_to_str(method)? {
-            "textrank" => Some(Self::TextRank),
-            "tfidf" => Some(Self::TfIdf),
-            _ => None,
-        }
-    }
 }
 
 // === Public FFI: metadata ===
@@ -242,7 +227,7 @@ pub extern "C" fn opencc_jieba_keywords(
         Some(input_str) => input_str,
         None => return ptr::null_mut(),
     };
-    let method = match KeywordMethod::parse(method) {
+    let method = match parse_keyword_method(method) {
         Some(method) => method,
         None => return ptr::null_mut(),
     };
@@ -267,7 +252,7 @@ pub extern "C" fn opencc_jieba_keywords_pos(
         Some(input_str) => input_str,
         None => return ptr::null_mut(),
     };
-    let method = match KeywordMethod::parse(method) {
+    let method = match parse_keyword_method(method) {
         Some(method) => method,
         None => return ptr::null_mut(),
     };
@@ -297,7 +282,7 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
         Some(input_str) => input_str,
         None => return -1,
     };
-    let method = match KeywordMethod::parse(method) {
+    let method = match parse_keyword_method(method) {
         Some(method) => method,
         None => return -1,
     };
@@ -333,7 +318,7 @@ pub extern "C" fn opencc_jieba_keywords_and_weights_pos(
         Some(input_str) => input_str,
         None => return -1,
     };
-    let method = match KeywordMethod::parse(method) {
+    let method = match parse_keyword_method(method) {
         Some(method) => method,
         None => return -1,
     };
@@ -574,6 +559,10 @@ fn vec_pair_to_tag_ptr<TWord: AsRef<str>, TTag: AsRef<str>>(
 }
 
 // ------ POS ------ //
+#[inline]
+fn parse_keyword_method(method: *const c_char) -> Option<KeywordMethod> {
+    KeywordMethod::parse_str(cstr_to_str(method)?)
+}
 
 #[inline]
 fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {

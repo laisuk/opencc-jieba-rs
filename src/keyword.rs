@@ -106,13 +106,65 @@ use jieba_rs::{Keyword, KeywordExtract, TextRank, TfIdf};
 ///
 /// # Since
 /// v0.7.4
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordMethod {
     /// Graph-based keyword ranking using word co-occurrence.
     TextRank,
-
     /// Statistical keyword ranking based on TF-IDF scores.
     TfIdf,
+}
+
+impl KeywordMethod {
+    /// Parses a string into a [`KeywordMethod`].
+    ///
+    /// This function maps string identifiers (commonly used in CLI or FFI)
+    /// to the corresponding keyword extraction method.
+    ///
+    /// Supported values (case-insensitive):
+    /// - `"textrank"` → [`KeywordMethod::TextRank`]
+    /// - `"tfidf"` → [`KeywordMethod::TfIdf`]
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The method name as a string slice.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(KeywordMethod)` if the input matches a supported method
+    /// - `None` if the input is invalid or unsupported
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use opencc_jieba_rs::KeywordMethod;
+    ///
+    /// assert_eq!(
+    ///     KeywordMethod::parse_str("textrank"),
+    ///     Some(KeywordMethod::TextRank)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     KeywordMethod::parse_str("TextRank"),
+    ///     Some(KeywordMethod::TextRank)
+    /// );
+    ///
+    /// assert_eq!(
+    ///     KeywordMethod::parse_str("TFIDF"),
+    ///     Some(KeywordMethod::TfIdf)
+    /// );
+    ///
+    /// assert_eq!(KeywordMethod::parse_str("unknown"), None);
+    /// ```
+    #[inline]
+    pub fn parse_str(method: &str) -> Option<Self> {
+        if method.eq_ignore_ascii_case("textrank") {
+            Some(Self::TextRank)
+        } else if method.eq_ignore_ascii_case("tfidf") {
+            Some(Self::TfIdf)
+        } else {
+            None
+        }
+    }
 }
 
 /// Recommended part-of-speech (POS) tags for keyword extraction.
