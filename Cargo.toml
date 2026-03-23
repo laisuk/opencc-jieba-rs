@@ -24,7 +24,7 @@ include = [
     "src/dictionary_lib/dicts/*.zst",
     "Cargo.toml",
     "README.md",
-    "LICENSE"
+    "/LICENSE"
 ]
 
 [dependencies]
