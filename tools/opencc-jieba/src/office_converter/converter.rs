@@ -605,3 +605,114 @@ fn replace_with_temp(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+    use zip::{
+        write::{ExtendedFileOptions, FileOptions},
+        CompressionMethod, ZipArchive, ZipWriter,
+    };
+
+    #[test]
+    fn test_convert_bytes_xlsx_inline_string_cells() {
+        let mut input_cursor = Cursor::new(Vec::<u8>::new());
+        {
+            let mut zip = ZipWriter::new(&mut input_cursor);
+            let opts: FileOptions<'_, ExtendedFileOptions> =
+                FileOptions::default().compression_method(CompressionMethod::Deflated);
+
+            zip.start_file("[Content_Types].xml", opts.clone()).unwrap();
+            zip.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>"#)
+                .unwrap();
+
+            zip.start_file("xl/worksheets/sheet1.xml", opts).unwrap();
+            zip.write_all("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>汉语</t></is></c></row></sheetData></worksheet>".as_bytes())
+                .unwrap();
+
+            zip.finish().unwrap();
+        }
+
+        let opencc = OpenCC::new();
+
+        let (out_bytes, converted_count) = OfficeConverter::convert_bytes(
+            input_cursor.get_ref(),
+            "xlsx",
+            &opencc,
+            "s2t",
+            true,
+            true,
+        )
+            .expect("convert_bytes failed");
+
+        assert_eq!(
+            converted_count, 1,
+            "Expected the worksheet inline-string XML to be converted"
+        );
+
+        let cursor = Cursor::new(out_bytes);
+        let mut zip = ZipArchive::new(cursor).expect("Output is not a valid ZIP archive");
+        let mut sheet = zip
+            .by_name("xl/worksheets/sheet1.xml")
+            .expect("Converted xlsx is missing xl/worksheets/sheet1.xml");
+        let mut content = String::new();
+        sheet.read_to_string(&mut content).unwrap();
+
+        assert!(
+            content.contains("漢語"),
+            "Expected inline string content to be converted, got: {content}"
+        );
+    }
+
+    #[test]
+    fn test_convert_bytes_xlsx_formula_untouched() {
+        let mut input_cursor = Cursor::new(Vec::<u8>::new());
+        {
+            let mut zip = ZipWriter::new(&mut input_cursor);
+            let opts: FileOptions<'_, ExtendedFileOptions> =
+                FileOptions::default().compression_method(CompressionMethod::Deflated);
+
+            zip.start_file("[Content_Types].xml", opts.clone()).unwrap();
+            zip.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>"#)
+                .unwrap();
+
+            zip.start_file("xl/worksheets/sheet1.xml", opts).unwrap();
+            zip.write_all(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+                 <worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\
+                 <sheetData><row r=\"1\">\
+                 <c r=\"A1\" t=\"inlineStr\"><is><t>汉语</t></is></c>\
+                 <c r=\"B1\"><f>CONCAT(\"汉语\", \"A\")</f></c>\
+                 </row></sheetData></worksheet>"
+                    .as_bytes(),
+            )
+                .unwrap();
+
+            zip.finish().unwrap();
+        }
+
+        let opencc = OpenCC::new();
+
+        let (out_bytes, _) = OfficeConverter::convert_bytes(
+            input_cursor.get_ref(),
+            "xlsx",
+            &opencc,
+            "s2t",
+            true,
+            true,
+        )
+            .expect("convert_bytes failed");
+
+        let cursor = Cursor::new(out_bytes);
+        let mut zip = ZipArchive::new(cursor).expect("Output is not a valid ZIP archive");
+        let mut sheet = zip
+            .by_name("xl/worksheets/sheet1.xml")
+            .expect("Converted xlsx is missing xl/worksheets/sheet1.xml");
+        let mut content = String::new();
+        sheet.read_to_string(&mut content).unwrap();
+
+        assert!(content.contains("漢語"));
+        assert!(content.contains(r#"<f>CONCAT("汉语", "A")</f>"#));
+    }
+}
