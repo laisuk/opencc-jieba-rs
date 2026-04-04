@@ -18,7 +18,9 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Dict, IO, List, Match, Optional, Protocol, Tuple
+from typing import Dict, IO, List, Match, Optional, Tuple
+
+from opencc_jieba_rs import OpenCC
 
 # Global list of supported Office document formats
 OFFICE_FORMATS: List[str] = [
@@ -30,12 +32,6 @@ OFFICE_FORMATS: List[str] = [
     "odp",  # OpenDocument Presentation
     "epub",  # eBook (XHTML-based)
 ]
-
-
-class OpenCCLike(Protocol):
-    def convert(self, text: str, punctuation: bool = False) -> str:
-        ...
-
 
 _XLSX_INLINE_STRING_CELL_RE: re.Pattern[str] = re.compile(
     r"<c\b(?=[^>]*\bt=(?:\"inlineStr\"|'inlineStr'))[^>]*>.*?</c>",
@@ -52,7 +48,7 @@ def convert_office_doc(
         input_path: str,
         output_path: str,
         office_format: str,
-        converter: OpenCCLike,
+        converter: OpenCC,
         punctuation: bool = False,
         keep_font: bool = False,
 ) -> Tuple[bool, str]:
@@ -266,7 +262,7 @@ def _should_mask_fonts(office_format: str, relative_path: Path) -> bool:
         return True
 
     normalized = relative_path.as_posix()
-    return normalized.lower() == "xl/sharedStrings.xml"
+    return normalized.lower() == "xl/sharedstrings.xml"
 
 
 def _is_xlsx_worksheet_path(relative_path: Path) -> bool:
@@ -277,7 +273,7 @@ def _is_xlsx_worksheet_path(relative_path: Path) -> bool:
 def _convert_xlsx_xml_part(
         xml_content: str,
         relative_path: Path,
-        converter: OpenCCLike,
+        converter: OpenCC,
         punctuation: bool,
 ) -> str:
     """
@@ -288,7 +284,7 @@ def _convert_xlsx_xml_part(
     """
     normalized = relative_path.as_posix()
 
-    if normalized.lower() == "xl/sharedStrings.xml":
+    if normalized.lower() == "xl/sharedstrings.xml":
         return converter.convert(xml_content, punctuation=punctuation)
 
     if _is_xlsx_worksheet_path(relative_path):
