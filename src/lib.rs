@@ -169,14 +169,13 @@
 //! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
 //! as indexing, text analysis, and keyword extraction.
 use jieba_rs::Jieba;
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
 use std::io::BufReader;
 use std::io::Cursor;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::{DictMap, Dictionary};
@@ -185,85 +184,117 @@ pub mod dictionary_lib;
 mod keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 mod opencc_config;
-pub use opencc_config::OpenccConfig;
 pub use jieba_rs::Keyword;
+pub use opencc_config::OpenccConfig;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
-/// Master delimiter string containing all punctuation and whitespace
-/// considered as token boundaries by OpenCC-Jieba.
+/// Master delimiter string containing all punctuation and whitespace treated
+/// as token boundaries by OpenCC-Jieba.
 ///
 /// This includes:
-/// - ASCII whitespace (`' '`, `\t`, `\n`, `\r`) and symbols (`! " # $ …`).
-/// - Common CJK punctuation (、 。 「 」 『 』 《 》 【 】, etc.).
-/// - Fullwidth variants of Latin punctuation (e.g., `，；：？！～`).
 ///
-/// It is used at build/initialization time to precompute the delimiter bitmap.
+/// - ASCII whitespace such as space, tab, carriage return, and line feed
+/// - ASCII punctuation and symbols
+/// - Common CJK punctuation such as `、。『』「」《》【】`
+/// - Fullwidth punctuation such as `，；：？！～`
 ///
-/// You generally should not use this constant directly—prefer
-/// [`is_delimiter()`](fn.is_delimiter.html) for fast lookup.
-const DELIMITER_STR: &str = " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
-/// 65,536 bits for the BMP (U+0000..=U+FFFF) → 1024 * u64
-static DELIM_BMP: Lazy<[u64; 1024]> = Lazy::new(|| {
-    let mut bm = [0u64; 1024];
-    for ch in DELIMITER_STR.chars() {
-        let u = ch as u32;
-        if u <= 0x_FFFF {
-            let idx = (u >> 6) as usize; // which u64
-            let bit = u & 63; // which bit
-            bm[idx] |= 1u64 << bit;
-        }
-    }
-    bm
-});
+/// The string is used to build a compact bitmap for fast delimiter checks.
+/// Most callers should use [`is_delimiter`] instead of referencing this
+/// constant directly.
+const DELIMITER_STR: &str =
+    " \t\n\r!\"#$%&'()*+,-./:;<=>?@[\\]^_{}|~＝、。“”‘’『』「」﹁﹂—－（）《》〈〉？！…／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼　～．，；：";
 
-/// Tests whether a character is a delimiter.
+/// Lazily initialized delimiter bitmap for all BMP code points
+/// (`U+0000..=U+FFFF`).
 ///
-/// This function performs a **constant-time bitmap lookup** for any BMP
-/// character (`U+0000..=U+FFFF`), using the precomputed delimiter bitmap table.
-/// For non-BMP code points, it currently always returns `false`
-/// (extend this if you need astral punctuation).
+/// The bitmap contains 65,536 bits stored as 1024 `u64` words. A set bit
+/// means the corresponding character is treated as a delimiter by
+/// [`is_delimiter`].
+static DELIM_BMP: OnceLock<[u64; 1024]> = OnceLock::new();
+
+/// Returns the global delimiter bitmap, initializing it on first use.
+///
+/// Initialization is performed once for the lifetime of the program.
+/// Subsequent calls return a shared reference to the precomputed bitmap.
+#[inline(always)]
+fn delim_bmp() -> &'static [u64; 1024] {
+    DELIM_BMP.get_or_init(|| {
+        let mut bm = [0u64; 1024];
+        for ch in DELIMITER_STR.chars() {
+            let u = ch as u32;
+            if u <= 0x_FFFF {
+                let idx = (u >> 6) as usize;
+                let bit = u & 63;
+                bm[idx] |= 1u64 << bit;
+            }
+        }
+        bm
+    })
+}
+
+/// Returns `true` if `c` is treated as a delimiter.
+///
+/// This function performs a constant-time bitmap lookup for any BMP character
+/// (`U+0000..=U+FFFF`). Non-BMP code points currently return `false`, since
+/// the delimiter table only covers the BMP.
 ///
 /// # Arguments
 ///
-/// * `c` – A [`char`] to test.
+/// * `c` - The character to test.
 ///
 /// # Returns
 ///
-/// * `true` if `c` is considered a delimiter (whitespace, punctuation, etc.).
-/// * `false` otherwise.
+/// - `true` if `c` is considered a delimiter
+/// - `false` otherwise
 ///
 /// # Performance
 ///
-/// - Single array access + bit test (branch-free in the hot path).
-/// - Much faster than [`HashSet<char>`](std::collections::HashSet) lookup.
-/// - Table fits in L1 cache (~8 KB).
+/// This is a very fast hot-path check:
+///
+/// - one bitmap access
+/// - one bit test
+/// - no hashing or heap allocation
+///
+/// The bitmap is initialized once and then reused for the rest of the
+/// process lifetime.
 ///
 /// # Examples
 ///
 /// ```
 /// use opencc_jieba_rs::is_delimiter;
 ///
-/// assert!(is_delimiter('。')); // ideographic full stop
-/// assert!(is_delimiter(' '));  // ASCII space
-/// assert!(!is_delimiter('你')); // normal character
+/// assert!(is_delimiter('。'));
+/// assert!(is_delimiter(' '));
+/// assert!(!is_delimiter('你'));
 /// ```
 #[inline(always)]
 pub fn is_delimiter(c: char) -> bool {
     let u = c as u32;
     if u <= 0x_FFFF {
-        // SAFETY: array is fixed-size, index is 0..1023 for BMP
-        let word = unsafe { *DELIM_BMP.get_unchecked((u >> 6) as usize) };
+        let bm = delim_bmp();
+        let word = unsafe { *bm.get_unchecked((u >> 6) as usize) };
         ((word >> (u & 63)) & 1) != 0
     } else {
-        // Most CJK punctuation is BMP; add astral checks if needed them later.
         false
     }
 }
 
-// Pre-compiled regexes using lazy static initialization
-static STRIP_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]").unwrap());
+/// Lazily initialized regex used by [`OpenCC::zho_check`] to strip
+/// non-Chinese content before heuristic classification.
+///
+/// This regex is compiled once on first use and then reused for the lifetime
+/// of the program.
+static STRIP_REGEX: OnceLock<Regex> = OnceLock::new();
+
+#[inline]
+fn strip_regex() -> &'static Regex {
+    STRIP_REGEX.get_or_init(|| {
+        Regex::new(r"[!-/:-@\[-`{-~\t\n\v\f\r 0-9A-Za-z_著]")
+            .expect("STRIP_REGEX must be a valid regex")
+    })
+}
+
 // Minimum input length (in chars) to trigger parallel processing
 const PARALLEL_THRESHOLD: usize = 1000;
 
@@ -1669,7 +1700,7 @@ impl OpenCC {
             return 0;
         }
         let check_length = find_max_utf8_length(input, 1000);
-        let _strip_text = STRIP_REGEX.replace_all(&input[..check_length], "");
+        let _strip_text = strip_regex().replace_all(&input[..check_length], "");
         let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
         let strip_text = &_strip_text[..max_bytes];
         let code;

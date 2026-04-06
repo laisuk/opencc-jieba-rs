@@ -861,7 +861,6 @@ dependencies = [
  "include-flate",
  "jieba-rs",
  "libflate",
- "once_cell",
  "rayon",
  "rayon-core",
  "regex",
