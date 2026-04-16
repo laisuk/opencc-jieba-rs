@@ -39,6 +39,7 @@ rayon = "=1.10"
 rayon-core = "=1.12"
 include-flate = "=0.3.0"
 libflate = "=2.1"
+# Security patch
 rand = "=0.9.4"
 
 [profile.release]
