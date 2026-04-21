@@ -9,3 +9,4 @@ edition = "2021"
 opencc-jieba-rs = {path = "../.."}
 copypasta = "0.10"
 clap = "=4.5"
+clap_lex = "=1.0"
