@@ -6,11 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.5-bata1] - 2026-04-06
+## [0.7.5-bata1] - 2026-04-21
 
 ### Changed
 
 - Replaced `once_cell` with std `OnceLock`
+- Update conversion dictionary data.
 
 ---
 
