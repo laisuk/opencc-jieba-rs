@@ -75,13 +75,15 @@ opencc-jieba segment: Segment Chinese input text into words
 Usage: opencc-jieba.exe segment [OPTIONS]
 
 Options:
-  -i, --input <file>        Input file to segment
-  -o, --output <file>       Write segmented result to file
-  -d, --delim <character>   Delimiter character for segmented text [default: /]
-      --mode <mode>         Segmentation mode: cut | search | full [default: cut] [possible values: cut, search, full]
-      --in-enc <encoding>   Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-      --out-enc <encoding>  Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -h, --help                Print help
+  -i, --input <file>           Input file to segment
+  -o, --output <file>          Write segmented result to file
+  -d, --delim <character>      Delimiter character for segmented text (use " " for space) [default: /]
+  -s, --separator <character>  Separator character for segmented mode=tag (use " " for space) [default: /]
+  -m, --mode <mode>            Segmentation mode: cut | search | all | tag [default: cut] [possible values: cut, search, all, tag]
+      --no-hmm                 Disable HMM for segmentation and tagging
+      --in-enc <encoding>      Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>     Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -h, --help                   Print help
 ```
 
 ## Usage: `opencc-jieba office`
@@ -118,6 +120,12 @@ opencc-jieba office -i input.docx -o output.docx --config tw2sp --punct --format
 
 # Segment text file contents then output to new file
 opencc-jieba segment -i input.txt -o output.txt --delim ","
+
+# Segment with POS tagging (format: word:tag)
+opencc-jieba segment -i input.txt -o output.txt --mode tag --delim " " --separator ":"
+
+# Segment from console input with POS tagging
+opencc-jieba segment --mode tag --delim " " --separator ":"
 ```
 
 - Supported conversions:

@@ -6,12 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.5-bata1] - 2026-04-21
+## [0.7.5-bata1] - 2026-04-22
 
 ### Changed
 
 - Replaced `once_cell` with std `OnceLock`
 - Update conversion dictionary data.
+- CLI: `opencc-jieba`
+    - Added segment mode: `tag`
 
 ---
 

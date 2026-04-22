@@ -100,7 +100,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .short('d')
                         .long("delim")
                         .value_name("character")
-                        .help("Delimiter character for segmented text")
+                        .help("Delimiter character for segmented text (use \" \" for space)")
+                        .required(false)
+                        .default_value("/"),
+                )
+                .arg(
+                    Arg::new("separator")
+                        .short('s')
+                        .long("separator")
+                        .value_name("character")
+                        .help("Separator character for segmented mode=tag (use \" \" for space)")
                         .required(false)
                         .default_value("/"),
                 )
@@ -109,9 +118,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .short('m')
                         .long("mode")
                         .value_name("mode")
-                        .value_parser(["cut", "search", "full"])
+                        .value_parser(["cut", "search", "all", "tag"])
                         .default_value("cut")
-                        .help("Segmentation mode: cut | search | full"),
+                        .help("Segmentation mode: cut | search | all | tag"),
+                )
+                .arg(
+                    Arg::new("no_hmm")
+                        .long("no-hmm")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Disable HMM for segmentation and tagging"),
                 )
                 .args(enc_args()),
         )
@@ -335,9 +350,11 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     let input_file = matches.get_one::<String>("input");
     let output_file = matches.get_one::<String>("output");
     let delimiter = matches.get_one::<String>("delimiter").unwrap();
+    let separator = matches.get_one::<String>("separator").unwrap();
     let mode = matches.get_one::<String>("mode").unwrap();
     let in_enc = matches.get_one::<String>("in_enc").unwrap();
     let out_enc = matches.get_one::<String>("out_enc").unwrap();
+    let hmm = !matches.get_flag("no_hmm");
 
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
@@ -358,16 +375,32 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     let mut input_str = decode_input(&buffer, in_enc)?;
     if is_console {
         input_str = normalize_line_endings(&input_str);
+        // Remove trailing submit newline from interactive console input
+        input_str = input_str.trim_end_matches('\n').to_string();
     }
 
     let opencc = OpenCC::new();
-    let words = match mode.as_str() {
-        "search" => opencc.jieba_cut_for_search(&input_str, true),
-        "full" => opencc.jieba_cut_all(&input_str),
-        _ => opencc.jieba_cut(&input_str, true),
-    };
 
-    let output_str = words.join(delimiter);
+    let output_str = match mode.as_str() {
+        "search" => opencc.jieba_cut_for_search(&input_str, hmm).join(delimiter),
+        "all" => opencc.jieba_cut_all(&input_str).join(delimiter),
+        "tag" => {
+            let pairs = opencc.jieba_tag(&input_str, hmm);
+            let mut out = String::new();
+
+            for (i, (w, t)) in pairs.into_iter().enumerate() {
+                if i > 0 {
+                    out.push_str(delimiter);
+                }
+                out.push_str(&w);
+                out.push_str(&separator);
+                out.push_str(&t);
+            }
+
+            out
+        }
+        _ => opencc.jieba_cut(&input_str, hmm).join(delimiter),
+    };
 
     let (is_console_output, mut output) = open_output(output_file)?;
 
@@ -467,5 +500,23 @@ fn remove_utf8_bom(input: &mut Vec<u8>) {
 }
 
 fn normalize_line_endings(s: &str) -> String {
-    s.replace("\r\n", "\n").replace('\r', "\n")
+    if !s.contains('\r') {
+        return s.to_string(); // fast path
+    }
+
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\r' {
+            if matches!(chars.peek(), Some('\n')) {
+                chars.next();
+            }
+            out.push('\n');
+        } else {
+            out.push(c);
+        }
+    }
+
+    out
 }
