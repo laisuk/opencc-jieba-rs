@@ -220,6 +220,8 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     let out_enc = matches.get_one::<String>("out_enc").unwrap();
     let punctuation = matches.get_flag("punct");
 
+    let opencc = OpenCC::new();
+
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
         Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
@@ -237,7 +239,7 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     }
 
     let input_str = decode_input(&buffer, in_enc)?;
-    let output_str = OpenCC::new().convert(&input_str, config, punctuation);
+    let output_str= opencc.convert(&input_str, config, punctuation);
 
     let (is_console_output, mut output) = open_output(output_file)?;
 
@@ -356,6 +358,8 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     let out_enc = matches.get_one::<String>("out_enc").unwrap();
     let hmm = !matches.get_flag("no_hmm");
 
+    let opencc = OpenCC::new();
+
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
         Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
@@ -378,8 +382,6 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
         // Remove trailing submit newline from interactive console input
         input_str = input_str.trim_end_matches('\n').to_string();
     }
-
-    let opencc = OpenCC::new();
 
     let output_str = match mode.as_str() {
         "search" => opencc.jieba_cut_for_search(&input_str, hmm).join(delimiter),
