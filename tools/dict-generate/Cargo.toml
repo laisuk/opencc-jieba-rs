@@ -4,7 +4,9 @@ version = "0.7.5"
 edition = "2021"
 
 [dependencies]
-opencc-jieba-rs = {path = "../.."}
+opencc-jieba-rs = { path = "../.." }
 clap = "=4.5"
 serde_json = "1.0"
+# Exact dependency pins to preserve MSRV (rustc 1.75.0):
+# clap_lex@1.0.1
 clap_lex = "=1.0"

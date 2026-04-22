@@ -9,4 +9,6 @@ edition = "2021"
 opencc-jieba-rs = {path = "../.."}
 copypasta = "0.10"
 clap = "=4.5"
+# Exact dependency pins to preserve MSRV (rustc 1.75.0):
+# clap_lex@1.0.1
 clap_lex = "=1.0"
