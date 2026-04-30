@@ -173,8 +173,8 @@ use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
 use std::fs::File;
-use std::io::BufReader;
 use std::io::Cursor;
+use std::io::{BufRead, BufReader};
 use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -515,7 +515,10 @@ impl OpenCC {
         let mut new_jieba = (*self.jieba).clone();
 
         let file = File::open(path).map_err(OpenccError::UserDictIo)?;
-        let mut reader = BufReader::new(file);
+        let reader = BufReader::new(file);
+
+        let validated = validate_user_dict_format(reader)?;
+        let mut reader = BufReader::new(validated.as_bytes());
 
         // 2. apply changes to clone
         new_jieba
@@ -2399,4 +2402,97 @@ fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(input)
     }
+}
+
+/// Validates and normalizes a Jieba user dictionary according to the
+/// `opencc-jieba-rs` format contract.
+///
+/// This function enforces a strict line format before passing data to
+/// the underlying Jieba loader.
+///
+/// # Format
+///
+/// Each non-empty line must follow:
+///
+/// ```text
+/// word freq [tag]
+/// ```
+///
+/// - `word`: the token to insert into the dictionary
+/// - `freq`: a required integer frequency
+/// - `tag`: an optional part-of-speech tag
+///
+/// # Behavior
+///
+/// - Empty lines are ignored
+/// - Leading/trailing whitespace is trimmed
+/// - Lines are normalized into a newline-separated `String`
+/// - The returned string is safe to pass into `jieba-rs`
+///
+/// # Errors
+///
+/// Returns [`OpenccError::UserDictParse`] if:
+///
+/// - a line does not contain 2 or 3 whitespace-separated fields
+/// - the `freq` field is not a valid integer
+///
+/// Returns [`OpenccError::UserDictIo`] if:
+///
+/// - reading from the input fails
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::io::Cursor;
+///
+/// # use opencc_jieba_rs::OpenCC;
+/// # use opencc_jieba_rs::OpenccError;
+///
+/// let data = "云计算 100000 n\n区块链 10 nz\n";
+/// let reader = Cursor::new(data);
+///
+/// let validated = opencc_jieba_rs::validate_user_dict_format(reader)?;
+///
+/// assert!(validated.contains("云计算"));
+/// # Ok::<(), OpenccError>(())
+/// ```
+///
+/// # Notes
+///
+/// This function intentionally enforces a stricter format than `jieba-rs`,
+/// which may accept incomplete entries. This ensures predictable behavior
+/// and avoids silent parsing issues.
+fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccError> {
+    let mut validated = String::new();
+
+    for (idx, line) in reader.lines().enumerate() {
+        let line = line.map_err(OpenccError::UserDictIo)?;
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+
+        if parts.len() != 2 && parts.len() != 3 {
+            return Err(OpenccError::UserDictParse(format!(
+                "line {} invalid format: expected `word freq [tag]`",
+                idx + 1
+            )));
+        }
+
+        if parts[1].parse::<usize>().is_err() {
+            return Err(OpenccError::UserDictParse(format!(
+                "line {} invalid frequency `{}`",
+                idx + 1,
+                parts[1]
+            )));
+        }
+
+        validated.push_str(trimmed);
+        validated.push('\n');
+    }
+
+    Ok(validated)
 }
