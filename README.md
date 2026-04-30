@@ -295,10 +295,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### User dictionary format
 
-The user dictionary must follow the `jieba-rs` dictionary format:
+The user dictionary must follow the `jieba-rs` format:
 
 ```text
-word freq tag
+word freq [tag]
 ```
 
 Example:
@@ -309,11 +309,15 @@ Example:
 区块链 10 nz
 Palantir 100000 nz
 帕兰提尔 100000 nz
-OpenAI 100000 n
-ChatGPT 100000 n
+OpenAI 100000
+ChatGPT 100000
 ```
 
-The `freq` field is required when a `tag` is provided. For example, use:
+> Note:
+> - `freq` is required
+> - `freq` must be a valid integer
+> - `tag` is optional
+> - lines containing only `word` are not supported
 
 ```text
 帕兰提尔 100000 nz
@@ -325,7 +329,8 @@ not:
 帕兰提尔 nz
 ```
 
-User dictionaries are loaded into the current tokenizer in order. Conflict handling follows `jieba-rs` behavior.
+User dictionaries are loaded into the current tokenizer in order.  
+Conflict handling follows `jieba-rs` behavior.
 
 ---
 

@@ -452,20 +452,7 @@ impl OpenCC {
     /// let opencc = OpenCC::new();
     /// ```
     pub fn new() -> Self {
-        let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
-        let decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
-
-        // Decoder: Read, so wrap it to become BufRead
-        let mut buf = BufReader::new(decoder);
-
-        let jieba = Arc::new(
-            Jieba::with_dict(&mut buf).expect("embedded Jieba dictionary is invalid or corrupted"),
-        );
-
-        OpenCC {
-            jieba,
-            dictionary: Dictionary::new(),
-        }
+        Self::try_new_internal().expect("failed to init OpenCC")
     }
 
     /// Loads a Jieba user dictionary into the current [`OpenCC`] instance.
@@ -524,20 +511,70 @@ impl OpenCC {
     /// # }
     /// ```
     pub fn load_user_dict<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OpenccError> {
-        let jieba = Arc::get_mut(&mut self.jieba).ok_or_else(|| {
-            OpenccError::JiebaInit(
-                "cannot load user dictionary because Jieba tokenizer is already shared".into(),
-            )
-        })?;
+        // 1. clone current jieba (cheap enough, done rarely)
+        let mut new_jieba = (*self.jieba).clone();
 
         let file = File::open(path).map_err(OpenccError::UserDictIo)?;
         let mut reader = BufReader::new(file);
 
-        jieba
+        // 2. apply changes to clone
+        new_jieba
             .load_dict(&mut reader)
             .map_err(|e| OpenccError::UserDictParse(e.to_string()))?;
 
+        // 3. swap only if success
+        self.jieba = Arc::new(new_jieba);
+
         Ok(())
+    }
+
+    /// Internal fallible constructor for [`OpenCC`].
+    ///
+    /// This method initializes the embedded Jieba tokenizer from the compressed
+    /// dictionary bundled with the crate. It performs all setup without panicking
+    /// and returns a [`Result`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// - the embedded zstd dictionary cannot be decoded
+    /// - the embedded Jieba dictionary is invalid or fails to initialize
+    ///
+    /// # Notes
+    ///
+    /// This is an internal helper used by fallible constructors such as
+    /// [`OpenCC::try_new_with_user_dict_path`]. Most users should call
+    /// [`OpenCC::new`] or other public constructors instead.
+    ///
+    /// The returned instance contains only the built-in dictionary. User
+    /// dictionaries can be loaded later via [`OpenCC::load_user_dict`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// // Normally not called directly; shown here for completeness
+    /// let cc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn try_new_internal() -> Result<Self, OpenccError> {
+        let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
+
+        let decoder = Decoder::new(cursor).map_err(|e| OpenccError::ZstdDecode(e.to_string()))?;
+
+        let mut buf = BufReader::new(decoder);
+
+        let jieba =
+            Jieba::with_dict(&mut buf).map_err(|e| OpenccError::JiebaInit(e.to_string()))?;
+
+        Ok(OpenCC {
+            jieba: Arc::new(jieba),
+            dictionary: Dictionary::new(),
+        })
     }
 
     /// Creates a new [`OpenCC`] instance and loads a user dictionary from the given path.
@@ -572,7 +609,7 @@ impl OpenCC {
     /// # }
     /// ```
     pub fn try_new_with_user_dict_path<P: AsRef<Path>>(path: P) -> Result<Self, OpenccError> {
-        let mut opencc = Self::new();
+        let mut opencc = Self::try_new_internal()?;
         opencc.load_user_dict(path)?;
         Ok(opencc)
     }
