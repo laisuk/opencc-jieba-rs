@@ -154,7 +154,7 @@ cargo add opencc-jieba-rs
 Or add the following line to your `Cargo.toml`:
 
 ```toml
-opencc-jieba-rs = "0.7.4"
+opencc-jieba-rs = "0.7.5"
 ```
 
 Use `opencc-jieba-rs` as a library:
@@ -248,6 +248,84 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 > These .txt files are used for development only.  
 > The runtime uses .zst files generated with zstd.  
 > These are included in the crate, but the .txt source files are not.
+
+---
+
+## User dictionary
+
+`opencc-jieba-rs` supports loading Jieba user dictionaries without directly using the lower-level `jieba-rs` API.
+
+### Default user dictionary path
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Loads dicts/user_dict.txt
+    let opencc = OpenCC::new_with_user_dict()?;
+    Ok(())
+}
+```
+
+### Custom user dictionary path
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let opencc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+    Ok(())
+}
+```
+
+### Load multiple user dictionaries
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut opencc = OpenCC::new();
+
+    opencc.load_user_dict("dicts/user_dict.txt")?;
+    opencc.load_user_dict("dicts/user_cantonese_dict.txt")?;
+
+    Ok(())
+}
+```
+
+### User dictionary format
+
+The user dictionary must follow the `jieba-rs` dictionary format:
+
+```text
+word freq tag
+```
+
+Example:
+
+```text
+云计算 100000 n
+人工智能 100000 n
+区块链 10 nz
+Palantir 100000 nz
+帕兰提尔 100000 nz
+OpenAI 100000 n
+ChatGPT 100000 n
+```
+
+The `freq` field is required when a `tag` is provided. For example, use:
+
+```text
+帕兰提尔 100000 nz
+```
+
+not:
+
+```text
+帕兰提尔 nz
+```
+
+User dictionaries are loaded into the current tokenizer in order. Conflict handling follows `jieba-rs` behavior.
 
 ---
 

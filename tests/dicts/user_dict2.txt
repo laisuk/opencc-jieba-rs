@@ -1,0 +1,3 @@
+OpenAI 100000 n
+ChatGPT 100000 n
+Palantir 100000 nz

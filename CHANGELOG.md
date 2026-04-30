@@ -6,14 +6,24 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.5-bata1] - 2026-04-22
+## [0.7.5-beta1] - 2026-05-01
+
+### Added
+
+- Added `load_user_dict()` to load Jieba user dictionaries at runtime.
+- Added `try_new_with_user_dict_path()` for fallible initialization with a user dictionary.
+- Added `new_with_user_dict()` to load user dictionary from default path `dicts/user_dict.txt`.
+- Support for loading multiple user dictionaries sequentially.
 
 ### Changed
 
-- Replaced `once_cell` with std `OnceLock`
-- Update conversion dictionary data.
-- CLI: `opencc-jieba`
-    - Added segment mode: `tag`
+- Replaced `once_cell` with standard library `OnceLock`.
+- Updated conversion dictionary data.
+
+### CLI
+
+- `opencc-jieba`:
+  - Added segment mode: `tag`.
 
 ---
 

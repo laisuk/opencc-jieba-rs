@@ -172,10 +172,13 @@ use jieba_rs::Jieba;
 use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
+use std::fs::File;
 use std::io::BufReader;
 use std::io::Cursor;
 use std::ops::Range;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
+use std::{fmt, io};
 use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::{DictMap, Dictionary};
@@ -334,6 +337,72 @@ type DictRefs<'a> = &'a [&'a DictMap];
 /// multi-pass dictionary pipelines like `s2twp`, `tw2sp`, and `hk2s`.
 type DictRounds<'a> = &'a [DictRefs<'a>];
 
+/// Error type returned by fallible [`OpenCC`] constructors and dictionary-loading APIs.
+///
+/// This error currently covers:
+///
+/// - embedded Jieba dictionary initialization
+/// - embedded zstd dictionary decoding
+/// - user dictionary file I/O
+/// - user dictionary parsing
+///
+/// # Examples
+///
+/// ```no_run
+/// use opencc_jieba_rs::OpenCC;
+///
+/// let opencc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Debug)]
+pub enum OpenccError {
+    /// Failed to create or read the zstd decoder for the embedded Jieba dictionary.
+    ZstdDecode(String),
+
+    /// Failed to initialize the embedded Jieba tokenizer.
+    JiebaInit(String),
+
+    /// Failed to open or read a Jieba user dictionary file.
+    UserDictIo(io::Error),
+
+    /// Failed to parse a Jieba user dictionary entry.
+    ///
+    /// User dictionaries should use the jieba-rs format:
+    ///
+    /// ```text
+    /// word freq tag
+    /// ```
+    ///
+    /// Example:
+    ///
+    /// ```text
+    /// 云计算 100000 n
+    /// 蓝翔 100000 nz
+    /// 区块链 10 nz
+    /// ```
+    UserDictParse(String),
+}
+
+impl fmt::Display for OpenccError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZstdDecode(e) => write!(f, "zstd decode error: {e}"),
+            Self::JiebaInit(e) => write!(f, "jieba initialization error: {e}"),
+            Self::UserDictIo(e) => write!(f, "user dictionary I/O error: {e}"),
+            Self::UserDictParse(e) => write!(f, "user dictionary parse error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for OpenccError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::UserDictIo(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 /// The main struct for performing Chinese text conversion and segmentation.
 ///
 /// `OpenCC` combines a [`Jieba`] tokenizer with OpenCC-style dictionaries,
@@ -397,6 +466,148 @@ impl OpenCC {
             jieba,
             dictionary: Dictionary::new(),
         }
+    }
+
+    /// Loads a Jieba user dictionary into the current [`OpenCC`] instance.
+    ///
+    /// This method mutates the internal Jieba tokenizer by merging entries from
+    /// the provided user dictionary file. Newly loaded entries may override or
+    /// influence segmentation behavior.
+    ///
+    /// # Lifecycle
+    ///
+    /// This method requires exclusive access to the internal tokenizer and must be
+    /// called **before** the [`OpenCC`] instance is shared (e.g. wrapped in [`Arc`]
+    /// or used across threads).
+    ///
+    /// # User dictionary format
+    ///
+    /// The file must follow the `jieba-rs` format:
+    ///
+    /// ```text
+    /// word freq tag
+    /// ```
+    ///
+    /// Example:
+    ///
+    /// ```text
+    /// 云计算 100000 n
+    /// 蓝翔 100000 nz
+    /// 区块链 10 nz
+    /// ```
+    ///
+    /// > Note: The `freq` field is required when a `tag` is provided.
+    /// > Formats like `word tag` are **not supported**.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// - the file cannot be opened
+    /// - the dictionary format is invalid
+    /// - the internal tokenizer is already shared
+    ///
+    /// # Notes
+    ///
+    /// This method must be called before the instance is shared across threads.
+    /// After sharing, the tokenizer becomes immutable.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    /// cc.load_user_dict("dicts/user_dict.txt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn load_user_dict<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OpenccError> {
+        let jieba = Arc::get_mut(&mut self.jieba).ok_or_else(|| {
+            OpenccError::JiebaInit(
+                "cannot load user dictionary because Jieba tokenizer is already shared".into(),
+            )
+        })?;
+
+        let file = File::open(path).map_err(OpenccError::UserDictIo)?;
+        let mut reader = BufReader::new(file);
+
+        jieba
+            .load_dict(&mut reader)
+            .map_err(|e| OpenccError::UserDictParse(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Creates a new [`OpenCC`] instance and loads a user dictionary from the given path.
+    ///
+    /// This is a convenience constructor equivalent to:
+    ///
+    /// ```no_run
+    /// # use opencc_jieba_rs::OpenCC;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    /// cc.load_user_dict("dicts/user_dict.txt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// - the embedded Jieba dictionary fails to initialize
+    /// - the user dictionary file cannot be opened
+    /// - the user dictionary format is invalid
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let cc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_new_with_user_dict_path<P: AsRef<Path>>(path: P) -> Result<Self, OpenccError> {
+        let mut opencc = Self::new();
+        opencc.load_user_dict(path)?;
+        Ok(opencc)
+    }
+
+    /// Creates a new [`OpenCC`] instance and loads a user dictionary from the
+    /// default path `dicts/user_dict.txt`.
+    ///
+    /// This is a convenience wrapper around
+    /// [`OpenCC::try_new_with_user_dict_path`].
+    ///
+    /// # Behavior
+    ///
+    /// - If the file exists, it will be loaded
+    /// - If the file is missing or invalid, an error is returned
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// - the embedded Jieba dictionary fails to initialize
+    /// - the default user dictionary cannot be opened
+    /// - the user dictionary format is invalid
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let cc = OpenCC::new_with_user_dict()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_with_user_dict() -> Result<Self, OpenccError> {
+        Self::try_new_with_user_dict_path("dicts/user_dict.txt")
     }
 
     /// Performs dictionary-based phrase-level conversion with character-level fallback.

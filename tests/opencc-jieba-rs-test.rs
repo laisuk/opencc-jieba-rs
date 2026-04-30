@@ -5,6 +5,7 @@ mod tests {
     use super::*;
     use opencc_jieba_rs::dictionary_lib::Dictionary;
     use std::fs;
+    use std::sync::Arc;
 
     #[test]
     fn zho_check_test() {
@@ -286,5 +287,77 @@ mod tests {
         let opencc = OpenCC::new();
         let output = opencc.keyword_weight_tfidf(input, 10);
         println!("TF-IDF: {:?}", output);
+    }
+
+    #[test]
+    fn test_add_word() {
+        let input = "云计算";
+
+        let mut opencc = OpenCC::new();
+
+        let jieba = Arc::get_mut(&mut opencc.jieba).expect("Jieba instance is shared");
+
+        jieba.add_word("云计算", Some(3), Some("n"));
+
+        let result = jieba.cut(input, false);
+        println!("{:?}", result);
+
+        assert!(result.contains(&"云计算"));
+    }
+
+    #[test]
+    fn test_user_dict_loading() {
+        let input = "云计算和区块链技术在帕兰提尔学习";
+
+        let opencc = OpenCC::try_new_with_user_dict_path("tests/dicts/user_dict.txt")
+            .unwrap_or_else(|e| panic!("failed to initialize OpenCC with user dictionary: {e}"));
+
+        let result = opencc.jieba.cut(input, false);
+
+        println!("{:?}", result);
+
+        assert_eq!(
+            result,
+            vec!["云计算", "和", "区块链", "技术", "在", "帕兰提尔", "学习"]
+        );
+    }
+
+    #[test]
+    fn test_load_multiple_user_dicts() {
+        let input = "OpenAI和ChatGPT正在研究云计算和区块链技术";
+
+        let mut opencc = OpenCC::new();
+
+        opencc
+            .load_user_dict("tests/dicts/user_dict.txt")
+            .unwrap_or_else(|e| panic!("failed to load first user dictionary: {e}"));
+
+        opencc
+            .load_user_dict("tests/dicts/user_dict2.txt")
+            .unwrap_or_else(|e| panic!("failed to load second user dictionary: {e}"));
+
+        let result = opencc.jieba.cut(input, false);
+
+        println!("{:?}", result);
+
+        assert!(result.contains(&"云计算"));
+        assert!(result.contains(&"区块链"));
+        assert!(result.contains(&"OpenAI"));
+        assert!(result.contains(&"ChatGPT"));
+
+        assert_eq!(
+            result,
+            vec![
+                "OpenAI",
+                "和",
+                "ChatGPT",
+                "正在",
+                "研究",
+                "云计算",
+                "和",
+                "区块链",
+                "技术"
+            ]
+        );
     }
 }
