@@ -370,7 +370,7 @@ pub enum OpenccError {
     /// User dictionaries should use the jieba-rs format:
     ///
     /// ```text
-    /// word freq tag
+    /// word freq [tag]
     /// ```
     ///
     /// Example:
@@ -472,7 +472,7 @@ impl OpenCC {
     /// The file must follow the `jieba-rs` format:
     ///
     /// ```text
-    /// word freq tag
+    /// word freq [tag]
     /// ```
     ///
     /// Example:
@@ -483,8 +483,8 @@ impl OpenCC {
     /// 区块链 10 nz
     /// ```
     ///
-    /// > Note: The `freq` field is required when a `tag` is provided.
-    /// > Formats like `word tag` are **not supported**.
+    /// > Note: `freq` is always required and must be a valid integer.
+    /// > `tag` is optional. Formats like `word` or `word tag` are **not supported**.
     ///
     /// # Errors
     ///
@@ -2407,7 +2407,7 @@ fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
 /// Validates and normalizes a Jieba user dictionary according to the
 /// `opencc-jieba-rs` format contract.
 ///
-/// This function enforces a strict line format before passing data to
+/// This function enforces the crate's line format before passing data to
 /// the underlying Jieba loader.
 ///
 /// # Format
@@ -2440,28 +2440,11 @@ fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
 ///
 /// - reading from the input fails
 ///
-/// # Examples
-///
-/// ```no_run
-/// use std::io::Cursor;
-///
-/// # use opencc_jieba_rs::OpenCC;
-/// # use opencc_jieba_rs::OpenccError;
-///
-/// let data = "云计算 100000 n\n区块链 10 nz\n";
-/// let reader = Cursor::new(data);
-///
-/// let validated = opencc_jieba_rs::validate_user_dict_format(reader)?;
-///
-/// assert!(validated.contains("云计算"));
-/// # Ok::<(), OpenccError>(())
-/// ```
-///
 /// # Notes
 ///
-/// This function intentionally enforces a stricter format than `jieba-rs`,
-/// which may accept incomplete entries. This ensures predictable behavior
-/// and avoids silent parsing issues.
+/// This function intentionally requires an explicit integer frequency even
+/// though `jieba-rs` may accept incomplete entries. This ensures predictable
+/// behavior and avoids silent parsing issues.
 fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccError> {
     let mut validated = String::new();
 

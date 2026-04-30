@@ -319,15 +319,19 @@ ChatGPT 100000
 > - `tag` is optional
 > - lines containing only `word` are not supported
 
+For tagged entries, use:
+
 ```text
 帕兰提尔 100000 nz
 ```
 
-not:
+For untagged entries, use:
 
 ```text
-帕兰提尔 nz
+OpenAI 100000
 ```
+
+Do not omit the frequency or put the tag in the frequency field.
 
 User dictionaries are loaded into the current tokenizer in order.  
 Conflict handling follows `jieba-rs` behavior.
