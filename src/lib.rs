@@ -9,6 +9,8 @@
 //! - Simplified ↔ Traditional Chinese conversion (including Taiwan, Hong Kong, Japanese variants)
 //! - Multi-pass dictionary-based phrase replacement
 //! - Fast and accurate word segmentation using Jieba
+//! - Jieba user dictionary loading with [`OpenCC::load_user_dict`],
+//!   [`OpenCC::try_new_with_user_dict_path`], and [`OpenCC::new_with_user_dict`]
 //! - Keyword extraction using TF-IDF or TextRank
 //! - Optional punctuation conversion (e.g., 「」 ↔ “”)
 //!
@@ -144,6 +146,45 @@
 //! - disable punctuation conversion
 //! - run custom dictionary pipelines
 //! - integrate with your own segmentation logic
+//!
+//! ## User Dictionaries
+//!
+//! Jieba user dictionaries can be loaded during construction or added later to
+//! an existing [`OpenCC`] instance. Entries use the format:
+//!
+//! ```text
+//! word freq [tag]
+//! ```
+//!
+//! The `freq` field is required and must be a valid integer. The POS `tag`
+//! field is optional. Lines containing only `word`, or `word tag` without an
+//! integer frequency, are rejected before data is passed to `jieba-rs`.
+//!
+//! ```no_run
+//! use opencc_jieba_rs::OpenCC;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let cc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+//! let words = cc.jieba_cut("OpenAI和云计算", false);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! To load several dictionaries in order:
+//!
+//! ```no_run
+//! use opencc_jieba_rs::OpenCC;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut cc = OpenCC::new();
+//! cc.load_user_dict("dicts/user_dict.txt")?;
+//! cc.load_user_dict("dicts/domain_terms.txt")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! `new_with_user_dict()` is a convenience wrapper that loads
+//! `dicts/user_dict.txt`.
 //!
 //! ## When to Use What?
 //!
