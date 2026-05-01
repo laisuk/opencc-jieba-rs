@@ -552,14 +552,14 @@ impl OpenCC {
     /// # }
     /// ```
     pub fn load_user_dict<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OpenccError> {
-        // 1. clone current jieba (cheap enough, done rarely)
-        let mut new_jieba = (*self.jieba).clone();
-
         let file = File::open(path).map_err(OpenccError::UserDictIo)?;
         let reader = BufReader::new(file);
 
         let validated = validate_user_dict_format(reader)?;
         let mut reader = BufReader::new(validated.as_bytes());
+
+        // 1. clone current jieba (cheap enough, done rarely)
+        let mut new_jieba = (*self.jieba).clone();
 
         // 2. apply changes to clone
         new_jieba
