@@ -19,11 +19,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 - Replaced `once_cell` with standard library `OnceLock`.
 - Updated conversion dictionary data.
+- Dependency strategy refined:
+  - Pinned critical dependencies (`jieba-rs`, `rayon`) to preserve MSRV and behavior.
+  - Allowed transitive dependencies (e.g. `libflate`) to float for ecosystem compatibility.
 
 ### CLI
 
 - `opencc-jieba`:
   - Added segment mode: `tag`.
+
+### Notes
+
+- This release improves compatibility with newer Rust toolchains (1.81+) by allowing dependency resolution that avoids yanked crates (e.g. `core2`).
+- Users targeting older toolchains (e.g. Rust 1.75) may refer to:
+  - `MSRV-1.75.0-GUIDE.md`
 
 ---
 
