@@ -338,6 +338,19 @@ Conflict handling follows `jieba-rs` behavior.
 
 ---
 
+## 📦 Dependency Notes
+
+- Core dependencies (`jieba-rs`, `rayon`) are pinned for stability.
+- Other dependencies are allowed to float to benefit from upstream fixes.
+
+> ⚠️ MSRV note: This crate is developed with Rust 1.75.0 in mind.
+> Most users on modern Rust do not need special setup.
+>
+> For older toolchains, see:
+> [MSRV-1.75.0-GUIDE.md](./MSRV-1.75.0-GUIDE.md)
+
+---
+
 ## Credits
 
 - [OpenCC](https://github.com/BYVoid/OpenCC) – Lexicon source.

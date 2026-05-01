@@ -863,7 +863,6 @@ version = "0.7.5"
 dependencies = [
  "include-flate",
  "jieba-rs",
- "libflate",
  "rayon",
  "rayon-core",
  "regex",
