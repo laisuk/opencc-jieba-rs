@@ -24,6 +24,7 @@ include = [
     "src/dictionary_lib/dicts/*.zst",
     "Cargo.toml",
     "README.md",
+    "MSRV-1.75.0-GUIDE.md",
     "/LICENSE"
 ]
 
@@ -33,14 +34,16 @@ regex = "1.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 zstd = "0.13"
-# Exact dependency pins to preserve MSRV (rustc 1.75.0):
-# rayon@1.10.0, rayon-core@1.12.1, include-flate@0.3.0, libflate@2.1.0
+
+# Exact direct dependency pins to preserve behavior and Rust 2021/MSRV compatibility.
+# Older toolchains may require a locked dependency graph; see MSRV-1.75.0-GUIDE.md.
 rayon = "=1.10"
 rayon-core = "=1.12"
+
+# Keep include-flate at 0.3.0 for Edition 2021 / MSRV compatibility.
+# Do not pin libflate directly; include-flate depends on libflate ^2.0,
+# allowing modern toolchains to resolve newer libflate versions that avoid yanked core2.
 include-flate = "=0.3.0"
-#libflate = "=2.1"
-# Security fixed
-#rand = "=0.8.6"
 
 [profile.release]
 opt-level = 3              # Maximize speed (better suited for C API performance)
