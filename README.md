@@ -154,7 +154,7 @@ cargo add opencc-jieba-rs
 Or add the following line to your `Cargo.toml`:
 
 ```toml
-opencc-jieba-rs = "0.7.5"
+opencc-jieba-rs = "0.7.6"
 ```
 
 Use `opencc-jieba-rs` as a library:

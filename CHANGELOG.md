@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.6] - 2026-05-06
+
+### Changed
+
+- Updated conversion dictionary data.
+- Re-enabled default `jieba-rs` features for improved compatibility and easier access to low-level Jieba functionality.
+- Retained `tfidf` and `textrank` feature support from `jieba-rs`.
+
+---
+
 ## [0.7.5] - 2026-05-01
 
 ### Added

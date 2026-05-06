@@ -385,7 +385,7 @@ dependencies = [
 
 [[package]]
 name = "dict-generate"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "clap",
  "clap_lex",
@@ -836,7 +836,7 @@ checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
 name = "opencc-clip-jieba"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "clap",
  "clap_lex",
@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "opencc-jieba"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "clap",
  "clap_lex",
@@ -859,7 +859,7 @@ dependencies = [
 
 [[package]]
 name = "opencc-jieba-rs"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "include-flate",
  "jieba-rs",
@@ -873,7 +873,7 @@ dependencies = [
 
 [[package]]
 name = "opencc_jieba_capi"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "libc",
  "opencc-jieba-rs",
