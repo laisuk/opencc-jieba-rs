@@ -11,8 +11,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Updated conversion dictionary data.
-- Re-enabled default `jieba-rs` features for improved compatibility and easier access to low-level Jieba functionality.
-- Retained `tfidf` and `textrank` feature support from `jieba-rs`.
+- Re-enabled default `jieba-rs` features while retaining explicit `tfidf` and `textrank` support.
+    - This restores easier access to low-level `jieba-rs` APIs such as `Jieba::new()`,
+      `Jieba::default()`, and `load_default_dict()` for downstream crates.
+    - `OpenCC::new()` behavior is unchanged: it still initializes Jieba with
+      `opencc-jieba-rs`'s bundled Hans/Hant dictionary via `Jieba::with_dict(...)`.
+    - User dictionaries loaded through `OpenCC::load_user_dict()` continue to be
+      merged into the existing tokenizer and follow `jieba-rs` conflict behavior.
+
+### Notes
+
+- Re-enabling `jieba-rs` defaults also enables its `default-dict` feature. This improves
+  Cargo feature unification for downstream users, but may retain `jieba-rs`'s embedded
+  default dictionary support in size-sensitive binaries even when `OpenCC` itself uses
+  the bundled Hans/Hant dictionary.
+  In release builds, the current LTO-oriented profile (`lto = "fat"`,
+  `codegen-units = 1`, `panic = "abort"`, `strip = "symbols"`) can allow unused
+  static dictionary data to be optimized out when the low-level default dictionary
+  APIs are not used. This has been verified in real downstream builds, though exact
+  results may vary by target, linker, and build profile.
+- `jieba-rs` remains exactly pinned to `=0.7.4` to preserve stable segmentation behavior,
+  API compatibility, and MSRV-oriented dependency resolution.
 
 ---
 

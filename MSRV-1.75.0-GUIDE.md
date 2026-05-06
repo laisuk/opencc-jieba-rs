@@ -1,18 +1,23 @@
 # MSRV 1.75.0 Guide
 
-This guide is for users who want to use **opencc-jieba-rs** with **Rust 1.75.0**.
+This guide is for users who want to use **opencc-jieba-rs** with Rust 1.75.x
+or other older Cargo/toolchain setups.
 
-Most users on modern Rust (1.81+) do NOT need this guide.
+Most users on modern Rust/Cargo with a fresh dependency resolution do NOT need
+this guide.
 
 ---
 
 ## Background
 
-Some older dependency chains (e.g. `libflate <= 2.1.x`) depend on the crate `core2`,
-which has been **yanked** from crates.io.
+Some older or locked dependency graphs can resolve `libflate <= 2.1.x`.
+Those versions depend on the crate `core2`, which has been **yanked** from
+crates.io.
 
-- Modern Rust (1.81+) resolves newer versions (e.g. `libflate >= 2.2`) → ✅ no issue
-- Rust 1.75 may still resolve older versions → ⚠️ may require manual fixes
+- Modern fresh resolution usually selects newer versions such as
+  `libflate >= 2.2` -> no special action needed
+- Older toolchains, existing `Cargo.lock` files, or constrained dependency
+  graphs may retain older versions -> manual fixes may be needed
 
 ---
 
@@ -24,7 +29,7 @@ Check if `core2` exists:
 cargo tree -i core2
 ```
 
-If nothing is shown, you are already fine.
+If nothing is shown, this guide does not apply to your current dependency graph.
 
 ---
 
@@ -58,8 +63,9 @@ core2 = { git = "https://github.com/bbqsrc/core2", rev = "545e84bcb0f235b12e2135
 
 ## Notes
 
-- This is only needed for **older toolchains (Rust 1.75)**.
-- Modern Rust users do NOT need to do anything.
+- This is only needed for older toolchains or dependency graphs that still
+  resolve `core2`.
+- Modern fresh dependency resolutions usually do not need any special setup.
 - Applications (not libraries) should commit `Cargo.lock`.
 
 ---
@@ -72,4 +78,5 @@ If possible, upgrade Rust:
 rustup update
 ```
 
-Using Rust 1.81+ provides a cleaner dependency graph with no yanked crates.
+Using a modern Rust/Cargo toolchain usually provides a cleaner dependency graph
+with no yanked crates.
