@@ -23,7 +23,10 @@ def subcommand_convert(args):
 
     in_from = args.input if args.input else "<stdin>"
     out_to = args.output if args.output else "<stdout>"
-    print(f"Conversion completed ({args.config}): {in_from} -> {out_to}", file=sys.stderr)
+    if sys.stderr.isatty():
+        if output_str and not output_str.endswith("\n"):
+            print()
+        print(f"Conversion completed ({args.config}): {in_from} -> {out_to}", file=sys.stderr)
     return 0
 
 
@@ -106,30 +109,61 @@ def subcommand_office(args):
 
 
 def subcommand_segment(args):
+    import io
     opencc = OpenCC()  # Default config if not needed for segmentation
+
+    # Prompt only if reading from stdin, and it's interactive (i.e., not piped or redirected)
+    if args.input is None and sys.stdin.isatty():
+        print(
+            "Input text to segment, <Ctrl+Z> (Windows) or <Ctrl+D> (Unix) then Enter to submit:",
+            file=sys.stderr
+        )
 
     with io.open(args.input if args.input else 0, encoding=args.in_enc) as f:
         input_str = f.read()
 
-    if args.mode == "cut":
-        segments = opencc.jieba_cut(input_str, True)
-    elif args.mode == "search":
-        segments = opencc.jieba_cut_for_search(input_str, True)
-    elif args.mode == "full":
-        segments = opencc.jieba_cut_all(input_str)
+    mode = args.mode
+    delim = args.delim if args.delim not in (None, "", "/") else " "
+    separator = args.separator if args.separator not in (None, "") else "/"
+    hmm = not args.no_hmm
+
+    if mode == "cut":
+        segments = opencc.jieba_cut(input_str, hmm)
+        output_str = delim.join(segments)
+
+    elif mode == "search":
+        segments = opencc.jieba_cut_for_search(input_str, hmm)
+        output_str = delim.join(segments)
+
+    elif mode == "full":
+        # Prefer explicit full-mode API if your binding exposes one
+        if hasattr(opencc, "jieba_cut_all"):
+            segments = opencc.jieba_cut_all(input_str)
+        elif hasattr(opencc, "jieba_cut_full"):
+            segments = opencc.jieba_cut_full(input_str)
+        else:
+            print("❌  Full mode is not available in this build of opencc_jieba_pyo3.", file=sys.stderr)
+            return 1
+        output_str = delim.join(segments)
+
+    elif mode == "tag":
+        tagged = opencc.jieba_tag(input_str, hmm)
+        output_str = delim.join(f"{word}{separator}{tag}" for word, tag in tagged)
+
     else:
-        print(f"Unknown segmentation mode: {args.mode}", file=sys.stderr)
+        print(f"❌  Invalid segmentation mode: {mode}", file=sys.stderr)
         return 1
 
-    delim = args.delim if args.delim is not None else " "
-    output_str = delim.join(segments)
-
-    with io.open(args.output if args.output else 1, 'w', encoding=args.out_enc) as f:
+    with io.open(args.output if args.output else 1, "w", encoding=args.out_enc) as f:
         f.write(output_str)
 
     in_from = args.input if args.input else "<stdin>"
     out_to = args.output if args.output else "<stdout>"
-    print(f"Segmentation completed ({args.mode}): {in_from} -> {out_to}", file=sys.stderr)
+    if sys.stderr.isatty():
+        if output_str and not output_str.endswith("\n"):
+            print()
+        print(f"Segmentation completed ({mode}, HMM:{hmm if mode != 'full' else 'None'}): {in_from} -> {out_to}",
+              file=sys.stderr)
     return 0
 
 
@@ -140,7 +174,9 @@ def main():
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
 
+    # ------------------
     # Convert subcommand
+    # ------------------
     parser_convert = subparsers.add_parser('convert', help='Convert text using OpenCC + Jieba',
                                            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_convert.add_argument('-i', '--input', metavar='<file>',
@@ -212,21 +248,34 @@ def main():
     )
     parser_office.set_defaults(func=subcommand_office)
 
+    # ------------------
     # Segment subcommand
-    parser_segment = subparsers.add_parser('segment', help='Segment text using Jieba',
-                                           formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser_segment.add_argument('-i', '--input', metavar='<file>',
-                                help='Read input text from <file>.')
-    parser_segment.add_argument('-o', '--output', metavar='<file>',
-                                help='Write segmented text to <file>.')
-    parser_segment.add_argument('-d', '--delim', metavar='<char>', default=' ',
-                                help='Delimiter to join segments')
-    parser_segment.add_argument('--mode', choices=['cut', 'search', 'full'], default='cut',
-                                help='Segmentation mode')
-    parser_segment.add_argument('--in-enc', metavar='<encoding>', default='UTF-8',
-                                help='Encoding for input')
-    parser_segment.add_argument('--out-enc', metavar='<encoding>', default='UTF-8',
-                                help='Encoding for output')
+    # ------------------
+    parser_segment = subparsers.add_parser(
+        "segment",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        help="Segment Chinese text using Jieba"
+    )
+    parser_segment.add_argument("-i", "--input", metavar="<file>",
+                                help="Read input text from <file>.")
+    parser_segment.add_argument("-o", "--output", metavar="<file>",
+                                help="Write segmented text to <file>.")
+    parser_segment.add_argument("-d", "--delim", metavar="<char>", default=" ",
+                                help="Delimiter to join segments")
+    parser_segment.add_argument("-s", "--separator", metavar="<char>", default="/",
+                                help="Separator for segment mode: tag")
+    parser_segment.add_argument('--no-hmm', action='store_true', default=False,
+                                help='Disable HMM')
+    parser_segment.add_argument(
+        "-m", "--mode",
+        choices=["cut", "search", "full", "tag"],
+        default="cut",
+        help="Segmentation mode"
+    )
+    parser_segment.add_argument("--in-enc", metavar="<encoding>", default="UTF-8",
+                                help="Encoding for input")
+    parser_segment.add_argument("--out-enc", metavar="<encoding>", default="UTF-8",
+                                help="Encoding for output")
     parser_segment.set_defaults(func=subcommand_segment)
 
     args = parser.parse_args()

@@ -2,7 +2,7 @@ import ctypes
 import os
 import sys
 import platform
-from typing import List
+from typing import List, Tuple
 
 # Determine the DLL file based on the operating system
 if platform.system() == 'Windows':
@@ -15,6 +15,13 @@ else:
     raise OSError("Unsupported operating system")
 
 
+class OpenccJiebaTag(ctypes.Structure):
+    _fields_ = [
+        ("word", ctypes.c_char_p),
+        ("tag", ctypes.c_char_p),
+    ]
+
+
 class OpenCC:
     config_list = [
         "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "tw2t", "t2twp", "tw2t", "tw2tp",
@@ -24,7 +31,7 @@ class OpenCC:
     def __init__(self, config=None):
         self.config = config if config in self.config_list else "s2t"
         # Load the DLL
-        dll_path = os.path.join(os.path.dirname(__file__), DLL_FILE)
+        dll_path = os.path.join(str(os.path.dirname(__file__)), DLL_FILE)
         self.lib = ctypes.CDLL(dll_path)
 
         # Define function prototypes
@@ -52,6 +59,10 @@ class OpenCC:
         self.lib.opencc_jieba_join_str.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_char_p]
         self.lib.opencc_jieba_keywords.restype = ctypes.POINTER(ctypes.c_char_p)
         self.lib.opencc_jieba_keywords.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p]
+        self.lib.opencc_jieba_tag.restype = ctypes.POINTER(OpenccJiebaTag)
+        self.lib.opencc_jieba_tag.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_bool]
+        self.lib.opencc_jieba_free_tag_array.restype = None
+        self.lib.opencc_jieba_free_tag_array.argtypes = [ctypes.POINTER(OpenccJiebaTag)]
 
         # Create and store the C instance
         self.opencc_instance = self.lib.opencc_jieba_new()
@@ -172,6 +183,35 @@ class OpenCC:
         result = ctypes.string_at(result_ptr).decode('utf-8')
         self.lib.opencc_jieba_free_string(result_ptr)
         return result
+
+    def jieba_tag(self, text, hmm=False) -> List[Tuple[str, str]]:
+        if self.opencc_instance is None:
+            print("Error: OpenCC instance not available for jieba_tag.", file=sys.stderr)
+            return [(text, "x")]
+
+        result_ptr = self.lib.opencc_jieba_tag(self.opencc_instance, text.encode('utf-8'), hmm)
+        if result_ptr is None:
+            return [(text, "x")]
+
+        result = []
+        i = 0
+        try:
+            while True:
+                item = result_ptr[i]
+                if not item.word and not item.tag:  # Sentinel terminator
+                    break
+
+                word = ctypes.string_at(item.word).decode('utf-8') if item.word else ""
+                tag = ctypes.string_at(item.tag).decode('utf-8') if item.tag else ""
+                result.append((word, tag))
+                i += 1
+        finally:
+            self.lib.opencc_jieba_free_tag_array(result_ptr)
+
+        return result
+
+    def jieba_tag_as_string(self, text, hmm=False, delimiter=" ", separator="/") -> str:
+        return delimiter.join(f"{word}{separator}{tag}" for word, tag in self.jieba_tag(text, hmm))
 
     def jieba_keyword_extract_textrank(self, text, top_k=10):
         if self.opencc_instance is None:
