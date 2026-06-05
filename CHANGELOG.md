@@ -6,6 +6,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.7] - Unrelease
+
+### Changed
+
+- Added two new slot `hk_variants_phrasee` and `tw_variants_phrases`.
+- Update `JSON schema` to `3` with backward compatibility.
+
+---
+
 ## [0.7.6] - 2026-05-06
 
 ### Changed
