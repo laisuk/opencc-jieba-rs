@@ -12,7 +12,7 @@ use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
 use zstd::Encoder;
 
-pub const SCHEMA_VERSION: u16 = 2;
+pub const SCHEMA_VERSION: u16 = 3;
 
 /// Represents a collection of various Chinese character and phrase mappings
 /// used for conversion between Simplified, Traditional, Taiwanese, Hong Kong,
@@ -33,12 +33,18 @@ pub struct Dictionary {
     pub tw_phrases: DictMap,
     /// Reverse Taiwanese phrase mappings.
     pub tw_phrases_rev: DictMap,
+    /// Taiwanese variant phrase mappings.
+    #[serde(default)]
+    pub tw_variants_phrases: DictMap,
     /// Taiwanese variant mappings.
     pub tw_variants: DictMap,
     /// Reverse Taiwanese variant mappings.
     pub tw_variants_rev: DictMap,
     /// Reverse Taiwanese variant phrase mappings.
     pub tw_variants_rev_phrases: DictMap,
+    /// Hong Kong variant phrase mappings.
+    #[serde(default)]
+    pub hk_variants_phrases: DictMap,
     /// Hong Kong variant mappings.
     pub hk_variants: DictMap,
     /// Reverse Hong Kong variant mappings.
@@ -66,9 +72,11 @@ impl Default for Dictionary {
             ts_phrases: DictMap::default(),
             tw_phrases: DictMap::default(),
             tw_phrases_rev: DictMap::default(),
+            tw_variants_phrases: DictMap::default(),
             tw_variants: DictMap::default(),
             tw_variants_rev: DictMap::default(),
             tw_variants_rev_phrases: DictMap::default(),
+            hk_variants_phrases: DictMap::default(),
             hk_variants: DictMap::default(),
             hk_variants_rev: DictMap::default(),
             hk_variants_rev_phrases: DictMap::default(),
@@ -126,17 +134,15 @@ impl Dictionary {
             .read_to_string(&mut json_data)
             .expect("Failed to decompress dictionary.json");
 
-        let dict = serde_json::from_str(&json_data).unwrap_or_else(|_| {
-            eprintln!(
-                "Error: Failed to deserialize JSON data. (missing fields or wrong schema version)"
-            );
+        let dict: Dictionary = serde_json::from_str(&json_data).unwrap_or_else(|e| {
+            eprintln!("Error: Failed to deserialize dictionary JSON: {e}");
             Dictionary::default()
         });
 
         // Optional sanity check
-        assert_eq!(
-            dict.schema_version, SCHEMA_VERSION,
-            "Unsupported dictionary schema_version"
+        assert!(
+            dict.schema_version <= SCHEMA_VERSION,
+            "Unsupported future dictionary schema_version"
         );
 
         dict
@@ -149,8 +155,8 @@ impl Dictionary {
     ///
     /// The following files must exist under the `dicts/` directory:
     /// - STCharacters.txt, STPhrases.txt, TSCharacters.txt, TSPhrases.txt
-    /// - TWPhrases.txt, TWPhrasesRev.txt, TWVariants.txt, TWVariantsRev.txt, TWVariantsRevPhrases.txt
-    /// - HKVariants.txt, HKVariantsRev.txt, HKVariantsRevPhrases.txt
+    /// - TWPhrases.txt, TWPhrasesRev.txt, TWVariantsPhrases.txt, TWVariants.txt, TWVariantsRev.txt, TWVariantsRevPhrases.txt
+    /// - HKVariantsPhrases.txt, HKVariants.txt, HKVariantsRev.txt, HKVariantsRevPhrases.txt
     /// - JPShinjitaiCharacters.txt, JPShinjitaiPhrases.txt, JPVariants.txt, JPVariantsRev.txt
     ///
     /// # Note
@@ -177,9 +183,11 @@ impl Dictionary {
             "dicts/TSPhrases.txt",
             "dicts/TWPhrases.txt",
             "dicts/TWPhrasesRev.txt",
+            "dicts/TWVariantsPhrases.txt",
             "dicts/TWVariants.txt",
             "dicts/TWVariantsRev.txt",
             "dicts/TWVariantsRevPhrases.txt",
+            "dicts/HKVariantsPhrases.txt",
             "dicts/HKVariants.txt",
             "dicts/HKVariantsRev.txt",
             "dicts/HKVariantsRevPhrases.txt",
@@ -196,9 +204,11 @@ impl Dictionary {
         ts_phrases,
         tw_phrases,
         tw_phrases_rev,
+        tw_variants_phrases,
         tw_variants,
         tw_variants_rev,
         tw_variants_rev_phrases,
+        hk_variants_phrases,
         hk_variants,
         hk_variants_rev,
         hk_variants_rev_phrases,
@@ -206,7 +216,7 @@ impl Dictionary {
         jps_phrases,
         jp_variants,
         jp_variants_rev,
-        ]: [DictMap; 16] = files
+        ]: [DictMap; 18] = files
             .into_iter()
             .map(|f| load(f).unwrap())
             .collect::<Vec<_>>()
@@ -221,9 +231,11 @@ impl Dictionary {
             ts_phrases,
             tw_phrases,
             tw_phrases_rev,
+            tw_variants_phrases,
             tw_variants,
             tw_variants_rev,
             tw_variants_rev_phrases,
+            hk_variants_phrases,
             hk_variants,
             hk_variants_rev,
             hk_variants_rev_phrases,

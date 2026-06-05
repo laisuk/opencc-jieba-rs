@@ -103,9 +103,9 @@
 //! | Tw → T         | [`OpenCC::tw2t`]   | Taiwan variants → Standard Traditional.                  |
 //! | Tw → T (phr.)  | [`OpenCC::tw2tp`]  | Tw→T with additional reverse phrase normalization.       |
 //!
-//! - `t2tw` uses `tw_variants` for Taiwan-specific character/word forms.
+//! - `t2tw` uses `tw_variants_phrases` + `tw_variants` for Taiwan-specific forms.
 //! - `t2twp` performs **two rounds**: phrases first (`tw_phrases`), then
-//!   variants (`tw_variants`).
+//!   variants (`tw_variants_phrases` + `tw_variants`).
 //! - `tw2t` and `tw2tp` are reverse directions, using `*_rev` dictionaries
 //!   to normalize back to standard Traditional.
 //!
@@ -116,7 +116,7 @@
 //! | T → HK    | [`OpenCC::t2hk`]   | Standard Traditional → Hong Kong Traditional.    |
 //! | HK → T    | [`OpenCC::hk2t`]   | Hong Kong Traditional → Standard Traditional.    |
 //!
-//! - `t2hk` applies `hk_variants` (HK-specific variants and preferences).
+//! - `t2hk` applies `hk_variants_phrases` + `hk_variants` (HK-specific variants and preferences).
 //! - `hk2t` uses `hk_variants_rev_phrases` + `hk_variants_rev` to normalize
 //!   back to standard Traditional.
 //!
@@ -1341,7 +1341,10 @@ impl OpenCC {
     /// ```
     pub fn s2tw(&self, input: &str, punctuation: bool) -> String {
         let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let round2 = [&self.dictionary.tw_variants];
+        let round2 = [
+            &self.dictionary.tw_variants_phrases,
+            &self.dictionary.tw_variants,
+        ];
 
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
@@ -1406,7 +1409,10 @@ impl OpenCC {
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
         let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let round2 = [&self.dictionary.tw_phrases];
-        let round3 = [&self.dictionary.tw_variants];
+        let round3 = [
+            &self.dictionary.tw_variants_phrases,
+            &self.dictionary.tw_variants,
+        ];
 
         let result = self.convert_rounds(input, &[&round1, &round2, &round3], true);
 
@@ -1472,7 +1478,10 @@ impl OpenCC {
     /// ```
     pub fn s2hk(&self, input: &str, punctuation: bool) -> String {
         let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let round2 = [&self.dictionary.hk_variants];
+        let round2 = [
+            &self.dictionary.hk_variants_phrases,
+            &self.dictionary.hk_variants,
+        ];
 
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
@@ -1522,7 +1531,7 @@ impl OpenCC {
     ///
     /// The conversion performs:
     /// - Phrase-level segmentation via Jieba
-    /// - Dictionary-based replacements using **`tw_variants`**
+    /// - Dictionary-based replacements using **`tw_variants_phrases`** before **`tw_variants`**
     /// - Optional punctuation conversion (enabled)
     ///
     /// # Arguments
@@ -1537,7 +1546,10 @@ impl OpenCC {
     /// let out = opencc.t2tw("繁體字");
     /// ```
     pub fn t2tw(&self, input: &str) -> String {
-        let dict_refs = [&self.dictionary.tw_variants];
+        let dict_refs = [
+            &self.dictionary.tw_variants_phrases,
+            &self.dictionary.tw_variants,
+        ];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
@@ -1548,7 +1560,7 @@ impl OpenCC {
     /// **two-round dictionary application**:
     ///
     /// 1. **Round 1** — apply Taiwan phrase dictionary (`tw_phrases`)
-    /// 2. **Round 2** — apply Taiwan variant dictionary (`tw_variants`)
+    /// 2. **Round 2** — apply Taiwan variant dictionaries (`tw_variants_phrases`, then `tw_variants`)
     ///
     /// Phrase-level Jieba segmentation is applied before each round to ensure
     /// correct multi-character phrase matching.
@@ -1569,7 +1581,10 @@ impl OpenCC {
     /// ```
     pub fn t2twp(&self, input: &str) -> String {
         let round1 = [&self.dictionary.tw_phrases];
-        let round2 = [&self.dictionary.tw_variants];
+        let round2 = [
+            &self.dictionary.tw_variants_phrases,
+            &self.dictionary.tw_variants,
+        ];
 
         self.convert_rounds(input, &[&round1, &round2], true)
     }
@@ -1663,7 +1678,10 @@ impl OpenCC {
     /// Phrase-level segmentation is used internally, and punctuation conversion is
     /// enabled.
     pub fn t2hk(&self, input: &str) -> String {
-        let dict_refs = [&self.dictionary.hk_variants];
+        let dict_refs = [
+            &self.dictionary.hk_variants_phrases,
+            &self.dictionary.hk_variants,
+        ];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
@@ -2393,6 +2411,94 @@ impl OpenCC {
 impl Default for OpenCC {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dict(entries: &[(&str, &str)]) -> DictMap {
+        let mut map = DictMap::default();
+        for (from, to) in entries {
+            map.insert_with_len(
+                (*from).to_string(),
+                (*to).to_string(),
+                from.chars().count() as u16,
+            );
+        }
+        map
+    }
+
+    fn opencc_with_dictionary(dictionary: Dictionary, words: &[&str]) -> OpenCC {
+        let mut jieba = Jieba::new();
+        for word in words {
+            jieba.add_word(word, Some(100_000), Some("n"));
+        }
+
+        OpenCC {
+            jieba: Arc::new(jieba),
+            dictionary,
+        }
+    }
+
+    #[test]
+    fn tw_forward_variants_apply_phrases_before_characters() {
+        let mut dictionary = Dictionary::default();
+        dictionary.tw_variants_phrases = dict(&[("純喫茶", "純喫茶")]);
+        dictionary.tw_variants = dict(&[("喫", "吃")]);
+        let opencc = opencc_with_dictionary(dictionary, &["純喫茶"]);
+
+        assert_eq!(opencc.t2tw("純喫茶"), "純喫茶");
+        assert_eq!(opencc.t2tw("喫"), "吃");
+    }
+
+    #[test]
+    fn hk_forward_variants_apply_phrases_before_characters() {
+        let mut dictionary = Dictionary::default();
+        dictionary.hk_variants_phrases = dict(&[("無線新聞", "無綫新聞")]);
+        dictionary.hk_variants = dict(&[("線", "綫")]);
+        let opencc = opencc_with_dictionary(dictionary, &["無線新聞"]);
+
+        assert_eq!(opencc.t2hk("無線新聞"), "無綫新聞");
+        assert_eq!(opencc.t2hk("線"), "綫");
+    }
+
+    #[test]
+    fn older_dictionary_json_defaults_new_forward_variant_phrase_slots() {
+        let json = r#"{
+            "schema_version": 2,
+            "st_characters": {},
+            "st_phrases": {},
+            "ts_characters": {},
+            "ts_phrases": {},
+            "tw_phrases": {},
+            "tw_phrases_rev": {},
+            "tw_variants": {},
+            "tw_variants_rev": {},
+            "tw_variants_rev_phrases": {},
+            "hk_variants": {},
+            "hk_variants_rev": {},
+            "hk_variants_rev_phrases": {},
+            "jps_characters": {},
+            "jps_phrases": {},
+            "jp_variants": {},
+            "jp_variants_rev": {}
+        }"#;
+
+        let dictionary: Dictionary = serde_json::from_str(json).unwrap();
+
+        assert_eq!(dictionary.schema_version, 2);
+        assert!(dictionary.tw_variants_phrases.map.is_empty());
+        assert!(dictionary.hk_variants_phrases.map.is_empty());
+    }
+
+    #[test]
+    fn bundled_dictionary_new_loads() {
+        let dictionary = Dictionary::new();
+
+        assert!(dictionary.schema_version >= 1);
+        assert!(!dictionary.st_characters.map.is_empty());
     }
 }
 
