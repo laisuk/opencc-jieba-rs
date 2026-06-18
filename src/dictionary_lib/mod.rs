@@ -1,64 +1,68 @@
 mod dict_map;
 
+#[cfg(feature = "dictionary-build")]
 use std::fs::File;
+#[cfg(feature = "dictionary-build")]
 use std::io;
-use std::io::BufWriter;
-use std::io::{BufRead, BufReader, Write};
+#[cfg(feature = "dictionary-build")]
+use std::io::{BufRead, BufReader, BufWriter, Write};
+#[cfg(feature = "dictionary-build")]
 use std::path::Path;
 
-pub use crate::dictionary_lib::dict_map::DictMap;
+pub(crate) use crate::dictionary_lib::dict_map::DictMap;
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
+#[cfg(feature = "dictionary-build")]
 use zstd::Encoder;
 
-pub const SCHEMA_VERSION: u16 = 3;
+pub(crate) const SCHEMA_VERSION: u16 = 3;
 
 /// Represents a collection of various Chinese character and phrase mappings
 /// used for conversion between Simplified, Traditional, Taiwanese, Hong Kong,
 /// and Japanese variants.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Dictionary {
-    pub schema_version: u16,
+pub(crate) struct Dictionary {
+    pub(crate) schema_version: u16,
     /// Simplified to Traditional character mappings.
-    pub st_characters: DictMap,
+    pub(crate) st_characters: DictMap,
     /// Simplified to Traditional phrase mappings.
-    pub st_phrases: DictMap,
+    pub(crate) st_phrases: DictMap,
     /// Traditional to Simplified character mappings.
-    pub ts_characters: DictMap,
+    pub(crate) ts_characters: DictMap,
     /// Traditional to Simplified phrase mappings.
-    pub ts_phrases: DictMap,
+    pub(crate) ts_phrases: DictMap,
     /// Taiwanese phrase mappings.
-    pub tw_phrases: DictMap,
+    pub(crate) tw_phrases: DictMap,
     /// Reverse Taiwanese phrase mappings.
-    pub tw_phrases_rev: DictMap,
+    pub(crate) tw_phrases_rev: DictMap,
     /// Taiwanese variant phrase mappings.
     #[serde(default)]
-    pub tw_variants_phrases: DictMap,
+    pub(crate) tw_variants_phrases: DictMap,
     /// Taiwanese variant mappings.
-    pub tw_variants: DictMap,
+    pub(crate) tw_variants: DictMap,
     /// Reverse Taiwanese variant mappings.
-    pub tw_variants_rev: DictMap,
+    pub(crate) tw_variants_rev: DictMap,
     /// Reverse Taiwanese variant phrase mappings.
-    pub tw_variants_rev_phrases: DictMap,
+    pub(crate) tw_variants_rev_phrases: DictMap,
     /// Hong Kong variant phrase mappings.
     #[serde(default)]
-    pub hk_variants_phrases: DictMap,
+    pub(crate) hk_variants_phrases: DictMap,
     /// Hong Kong variant mappings.
-    pub hk_variants: DictMap,
+    pub(crate) hk_variants: DictMap,
     /// Reverse Hong Kong variant mappings.
-    pub hk_variants_rev: DictMap,
+    pub(crate) hk_variants_rev: DictMap,
     /// Reverse Hong Kong variant phrase mappings.
-    pub hk_variants_rev_phrases: DictMap,
+    pub(crate) hk_variants_rev_phrases: DictMap,
     /// Japanese Shinjitai character mappings.
-    pub jps_characters: DictMap,
+    pub(crate) jps_characters: DictMap,
     /// Japanese Shinjitai phrase mappings.
-    pub jps_phrases: DictMap,
+    pub(crate) jps_phrases: DictMap,
     /// Japanese variant mappings.
-    pub jp_variants: DictMap,
+    pub(crate) jp_variants: DictMap,
     /// Reverse Japanese variant mappings.
-    pub jp_variants_rev: DictMap,
+    pub(crate) jp_variants_rev: DictMap,
 }
 
 impl Default for Dictionary {
@@ -116,15 +120,7 @@ impl Dictionary {
     /// - If the loaded dictionary's `schema_version` does not match the crate's
     ///   expected [`SCHEMA_VERSION`].
     ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use opencc_jieba_rs::dictionary_lib::Dictionary;
-    ///
-    /// let dict = Dictionary::new();
-    /// assert!(dict.schema_version >= 1);
-    /// ```
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
 
         let cursor = Cursor::new(DICTIONARY_JSON_ZSTD);
@@ -150,8 +146,8 @@ impl Dictionary {
 
     /// Loads all conversion dictionaries from raw `.txt` files in the `dicts/` directory.
     ///
-    /// This method is intended for **power users** who want to build the full [`Dictionary`]
-    /// structure from source text files rather than using the precompiled `.zst` versions.
+    /// This method is used by internal workspace tooling to build the full
+    /// dictionary structure from source text files.
     ///
     /// The following files must exist under the `dicts/` directory:
     /// - STCharacters.txt, STPhrases.txt, TSCharacters.txt, TSPhrases.txt
@@ -167,13 +163,8 @@ impl Dictionary {
     /// Panics if any file is missing or fails to load.
     /// Returns the default [`Dictionary`] instance only if `.unwrap()` is replaced by fallible handling.
     ///
-    /// # Intended Use
-    /// - Testing custom dictionary edits.
-    /// - Regenerating runtime `.zst` dictionary packages.
-    /// - Debugging dictionary mapping issues.
-    ///
-    /// [`Dictionary`]: Dictionary
-    pub fn from_dicts() -> Self {
+    #[cfg(feature = "dictionary-build")]
+    pub(crate) fn from_dicts() -> Self {
         let load = Self::load_dictionary_from_path;
 
         let files = [
@@ -254,6 +245,7 @@ impl Dictionary {
     /// - Strip UTF-8 BOM (`\u{FEFF}`) on the first *data* line
     /// - Parse strictly `key<TAB>value(s)`
     /// - If a line is malformed, warn and skip *only that line*
+    #[cfg(feature = "dictionary-build")]
     fn load_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
     where
         P: AsRef<Path>,
@@ -320,34 +312,28 @@ impl Dictionary {
         Ok(dict)
     }
 
-    /// Saves the dictionary to a file in compressed JSON format using Zstandard.
-    ///
-    /// # Arguments
-    /// * `dictionary` - The dictionary to save.
-    /// * `path` - The file path to write to.
-    ///
-    /// # Errors
-    /// Returns an `io::Error` if writing fails.
-    pub fn save_json_compressed(dictionary: &Dictionary, path: &str) -> Result<(), io::Error> {
+    /// Saves this dictionary as compressed JSON using Zstandard.
+    #[cfg(feature = "dictionary-build")]
+    pub(crate) fn save_json_compressed(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
         let mut encoder = Encoder::new(writer, 19)?;
-        serde_json::to_writer(&mut encoder, dictionary)?;
+        serde_json::to_writer(&mut encoder, self)?;
         encoder.finish()?;
         Ok(())
     }
 
-    /// Serializes the dictionary to a JSON file.
-    ///
-    /// # Arguments
-    /// * `filename` - The file path to write to.
-    ///
-    /// # Errors
-    /// Returns an `io::Error` if writing fails.
-    pub fn serialize_to_json(&self, filename: &str) -> io::Result<()> {
-        let json_string = serde_json::to_string(&self)?;
-        let mut file = File::create(filename)?;
-        file.write_all(json_string.as_bytes())?;
+    /// Saves this dictionary as compact or pretty-printed JSON.
+    #[cfg(feature = "dictionary-build")]
+    pub(crate) fn save_json(&self, path: impl AsRef<Path>, pretty: bool) -> io::Result<()> {
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        if pretty {
+            serde_json::to_writer_pretty(&mut writer, self)?;
+        } else {
+            serde_json::to_writer(&mut writer, self)?;
+        }
+        writer.flush()?;
         Ok(())
     }
 }

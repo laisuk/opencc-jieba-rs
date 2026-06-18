@@ -224,7 +224,33 @@ use zstd::stream::read::Decoder;
 
 use crate::dictionary_lib::{DictMap, Dictionary};
 use crate::keyword::keyword_extract_internal;
-pub mod dictionary_lib;
+mod dictionary_lib;
+
+/// Dictionary-pack generation operations.
+///
+/// This module is available only with the `dictionary-build` feature. It is
+/// intended for tooling that builds runtime packs from the repository's
+/// `./dicts` source directory. The runtime dictionary representation, maps,
+/// metadata, and logical slots remain private.
+///
+/// The plaintext dictionary sources are not included in the published crate,
+/// so callers must provide the expected `./dicts` directory themselves.
+#[cfg(feature = "dictionary-build")]
+pub mod dictionary_build {
+    use crate::dictionary_lib::Dictionary;
+    use std::io;
+    use std::path::Path;
+
+    /// Builds dictionaries from `./dicts` and writes pretty-printed JSON.
+    pub fn write_json_pretty(path: impl AsRef<Path>) -> io::Result<()> {
+        Dictionary::from_dicts().save_json(path, true)
+    }
+
+    /// Builds dictionaries from `./dicts` and writes Zstd-compressed JSON.
+    pub fn write_zstd(path: impl AsRef<Path>) -> io::Result<()> {
+        Dictionary::from_dicts().save_json_compressed(path)
+    }
+}
 mod keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 mod opencc_config;
@@ -871,7 +897,7 @@ impl OpenCC {
             let mut replaced = None;
 
             for dict in dictionaries {
-                if dict.min_len > 1 {
+                if dict.min_len() > 1 {
                     continue;
                 }
 
@@ -1392,8 +1418,14 @@ impl OpenCC {
 
     /// Converts Simplified Chinese to Traditional Chinese (Taiwan) with punctuation.
     ///
-    /// Performs a full conversion of text and punctuation marks from Simplified
-    /// to Traditional Chinese, including quote styles (`“”` → `「」`).
+    /// Performs two dictionary-conversion rounds:
+    ///
+    /// 1. Simplified-to-Traditional phrases and characters.
+    /// 2. Taiwan phrases, variant phrases, and character variants together,
+    ///    in that priority order.
+    ///
+    /// Punctuation marks are optionally converted after both dictionary rounds,
+    /// including quote styles (`“”` → `「」`).
     ///
     /// # Arguments
     ///
@@ -1408,13 +1440,13 @@ impl OpenCC {
     /// ```
     pub fn s2twp(&self, input: &str, punctuation: bool) -> String {
         let round1 = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
-        let round2 = [&self.dictionary.tw_phrases];
-        let round3 = [
+        let round2 = [
+            &self.dictionary.tw_phrases,
             &self.dictionary.tw_variants_phrases,
             &self.dictionary.tw_variants,
         ];
 
-        let result = self.convert_rounds(input, &[&round1, &round2, &round3], true);
+        let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
             Self::convert_punctuation(&result, "s")
@@ -2454,6 +2486,19 @@ mod tests {
     }
 
     #[test]
+    fn s2twp_combines_taiwan_dictionaries_in_second_round() {
+        let mut dictionary = Dictionary::default();
+        dictionary.tw_phrases = dict(&[("甲", "乙")]);
+        dictionary.tw_variants_phrases = dict(&[("甲", "丁")]);
+        dictionary.tw_variants = dict(&[("乙", "丙")]);
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        // Taiwan phrases have first priority within round 2, and their output
+        // is not fed through a separate Taiwan-variant round afterward.
+        assert_eq!(opencc.s2twp("甲", false), "乙");
+    }
+
+    #[test]
     fn hk_forward_variants_apply_phrases_before_characters() {
         let mut dictionary = Dictionary::default();
         dictionary.hk_variants_phrases = dict(&[("無線新聞", "無綫新聞")]);
@@ -2489,8 +2534,8 @@ mod tests {
         let dictionary: Dictionary = serde_json::from_str(json).unwrap();
 
         assert_eq!(dictionary.schema_version, 2);
-        assert!(dictionary.tw_variants_phrases.map.is_empty());
-        assert!(dictionary.hk_variants_phrases.map.is_empty());
+        assert!(dictionary.tw_variants_phrases.is_empty());
+        assert!(dictionary.hk_variants_phrases.is_empty());
     }
 
     #[test]
@@ -2498,7 +2543,7 @@ mod tests {
         let dictionary = Dictionary::new();
 
         assert!(dictionary.schema_version >= 1);
-        assert!(!dictionary.st_characters.map.is_empty());
+        assert!(!dictionary.st_characters.is_empty());
     }
 }
 

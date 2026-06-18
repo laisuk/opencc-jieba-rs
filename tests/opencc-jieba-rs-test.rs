@@ -3,8 +3,6 @@ use opencc_jieba_rs::OpenCC;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opencc_jieba_rs::dictionary_lib::Dictionary;
-    use std::fs;
     use std::sync::Arc;
 
     #[test]
@@ -144,43 +142,6 @@ mod tests {
         let opencc = OpenCC::new();
         let actual_output = opencc.zho_check(input);
         assert_eq!(actual_output, expected_output);
-    }
-
-    #[test]
-    #[ignore]
-    // In case there are new update to dictionaries contents,
-    // run this test to generate new dictionary.json
-    fn test_serialize_to_json() {
-        // Define the filename for testing
-        let filename = "dictionary.json";
-        let dictionary = Dictionary::from_dicts();
-        // Serialize to JSON and write to file
-        dictionary.serialize_to_json(filename).unwrap();
-        // Read the contents of the file
-        let file_contents = fs::read_to_string(filename).unwrap();
-        // Verify that the JSON contains the expected data
-        let expected_json = 1356183;
-        assert_eq!(file_contents.trim().len(), expected_json);
-
-        // Clean up: Delete the test file
-        // fs::remove_file(filename).unwrap();
-    }
-
-    #[test]
-    #[ignore]
-    fn test_save_compressed_to_zstd() {
-        use std::path::Path;
-        // Define the filename for testing
-        let filename = "dictionary.json.zst";
-        let dictionary = Dictionary::from_dicts();
-
-        Dictionary::save_json_compressed(&dictionary, filename).unwrap();
-
-        // Verify that the compressed file is created
-        assert_eq!(Path::new(filename).exists(), true);
-
-        // Clean up: Delete the test file
-        // std::fs::remove_file(filename).unwrap();
     }
 
     #[test]

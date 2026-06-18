@@ -13,15 +13,6 @@ use std::collections::{HashMap, HashSet};
 /// (used in JSON/Zstandard artifacts) and **runtime-efficient**
 /// (avoids rescanning keys on load).
 ///
-/// # Fields
-///
-/// - [`DictMap::map`]: The actual dictionary data mapping source → target strings.
-/// - [`DictMap::min_len`]: The shortest key length in Unicode scalar values.
-/// - [`DictMap::max_len`]: The longest key length in Unicode scalar values.
-/// - [`DictMap::key_len_mask`]: Bitmask (bits 0–63 → lengths 1–64) marking which
-///   key lengths are present in the dictionary.
-/// - [`DictMap::long_lengths`]: Set of key lengths greater than 64, if any.
-///
 /// # Serialization
 ///
 /// This struct is serialized/deserialized using Serde with
@@ -46,31 +37,29 @@ use std::collections::{HashMap, HashSet};
 /// - There is no need to call a rebuild or rescan function.
 /// - The bitmask allows `O(1)` checks in `has_key_len()` during segmentation.
 ///
-/// # See Also
-/// - [`Dictionary`](crate::Dictionary): Aggregates multiple [`DictMap`]s for all conversion directions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct DictMap {
+pub(crate) struct DictMap {
     /// Raw mapping of source phrase → target phrase.
     #[serde(default)]
-    pub map: HashMap<String, String>,
+    map: HashMap<String, String>,
 
     /// Shortest phrase length in Unicode scalars.
     #[serde(default)]
-    pub min_len: u16,
+    min_len: u16,
 
     /// Longest phrase length in Unicode scalars.
     #[serde(default)]
-    pub max_len: u16,
+    max_len: u16,
 
     /// Bitmask (bits 0–63) for phrase lengths 1..=64.
     /// Bit *n-1* corresponds to presence of key length *n*.
     #[serde(default)]
-    pub key_len_mask: u64,
+    key_len_mask: u64,
 
     /// Set of key lengths greater than 64 (rare, but supported).
     #[serde(default)]
-    pub long_lengths: HashSet<u16>,
+    long_lengths: HashSet<u16>,
 }
 
 /// Provides a zero-initialized, empty `DictMap`.
@@ -112,18 +101,9 @@ impl DictMap {
     /// * `val` — Target phrase (UTF-8 string).
     /// * `len_chars` — Number of Unicode scalar values in `key`.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// use opencc_jieba_rs::dictionary_lib::DictMap;
-    ///
-    /// let mut d = DictMap::default();
-    /// d.insert_with_len("漢字".into(), "汉字".into(), 2);
-    /// assert!(d.has_key_len(2));
-    /// assert_eq!(d.get("漢字"), Some("汉字"));
-    /// ```
     #[inline]
-    pub fn insert_with_len(&mut self, key: String, val: String, len_chars: u16) {
+    #[cfg(any(feature = "dictionary-build", test))]
+    pub(crate) fn insert_with_len(&mut self, key: String, val: String, len_chars: u16) {
         if len_chars != 0 {
             if len_chars <= 64 {
                 self.key_len_mask |= 1u64 << (len_chars - 1);
@@ -150,7 +130,7 @@ impl DictMap {
     ///
     /// `Some(&str)` if the phrase exists, otherwise `None`.
     #[inline(always)]
-    pub fn get(&self, from: &str) -> Option<&str> {
+    pub(crate) fn get(&self, from: &str) -> Option<&str> {
         self.map.get(from).map(|s| s.as_str())
     }
 
@@ -167,18 +147,8 @@ impl DictMap {
     ///
     /// `true` if at least one key of that length exists.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// use opencc_jieba_rs::dictionary_lib::DictMap;
-    ///
-    /// let mut d = DictMap::default();
-    /// d.insert_with_len("繁體".into(), "繁体".into(), 2);
-    /// assert!(d.has_key_len(2));
-    /// assert!(!d.has_key_len(3));
-    /// ```
     #[inline(always)]
-    pub fn has_key_len(&self, n: u16) -> bool {
+    pub(crate) fn has_key_len(&self, n: u16) -> bool {
         if n == 0 {
             return false;
         }
@@ -187,5 +157,16 @@ impl DictMap {
         } else {
             self.long_lengths.contains(&n)
         }
+    }
+
+    #[inline(always)]
+    pub(crate) fn min_len(&self) -> u16 {
+        self.min_len
+    }
+
+    #[inline]
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }

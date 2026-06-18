@@ -1,6 +1,5 @@
 use clap::{Arg, Command};
-use opencc_jieba_rs::dictionary_lib::Dictionary;
-use std::fs::File;
+use opencc_jieba_rs::dictionary_build;
 use std::path::{Path, PathBuf};
 use std::{env, io};
 
@@ -57,17 +56,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match dict_format {
         Some("zstd") => {
-            let dictionary = Dictionary::from_dicts();
-            Dictionary::save_json_compressed(&dictionary, output_file)?;
+            dictionary_build::write_zstd(output_file)?;
             eprintln!(
                 "{BLUE}Dictionary saved in ZSTD format at: {}{RESET}",
                 output_path.display()
             );
         }
         Some("json") => {
-            let dictionary = Dictionary::from_dicts();
-            let file = File::create(output_file)?;
-            serde_json::to_writer_pretty(file, &dictionary)?;
+            dictionary_build::write_json_pretty(output_file)?;
             eprintln!(
                 "{BLUE}Dictionary saved in JSON format at: {}{RESET}",
                 output_path.display()

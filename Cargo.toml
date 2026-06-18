@@ -8,7 +8,7 @@ members = [
 
 [package]
 name = "opencc-jieba-rs"
-version = "0.7.6"
+version = "0.8.0"
 edition = "2021"
 authors = ["Laisuk Lai <laisuk@yahoo.com>"]
 description = "High-performance Chinese text conversion and segmentation using Jieba and OpenCC-style dictionaries."
@@ -27,6 +27,12 @@ include = [
     "MSRV-1.75.0-GUIDE.md",
     "/LICENSE"
 ]
+
+[features]
+default = []
+# Enables dictionary-pack generation operations without exposing the runtime
+# dictionary representation or its logical slots.
+dictionary-build = []
 
 [dependencies]
 jieba-rs = { version = "=0.7.4", features = ["tfidf", "textrank"] }

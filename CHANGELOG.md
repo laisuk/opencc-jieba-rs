@@ -6,12 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.7.7] - Unrelease
+## [0.8.0] - Unreleased
 
 ### Changed
 
 - Added two new slot `hk_variants_phrasee` and `tw_variants_phrases`.
 - Update `JSON schema` to `3` with backward compatibility.
+- Refactored `s2twp` from three dictionary passes to two: Taiwan phrases,
+  variant phrases, and character variants now run together in round 2.
 
 ---
 
