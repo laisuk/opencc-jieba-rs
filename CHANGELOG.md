@@ -8,10 +8,26 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.8.0] - Unreleased
 
+### Added
+
+- Added `OpenCC::try_new_with_dictionary_zstd` to construct a converter from
+  a custom Zstd conversion pack produced by `dict-generate`.
+- Added transactional `OpenCC::load_dictionary_zstd` so custom conversion
+  packs compose with existing Jieba user-dictionary constructors and loaders.
+- Added dedicated errors for conversion-pack I/O, decoding, parsing, and
+  unsupported schema versions.
+- Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the
+  new `HKPhrases.txt` and `HKPhrasesRev.txt` dictionary slots.
+
 ### Changed
 
-- Added two new slot `hk_variants_phrasee` and `tw_variants_phrases`.
-- Update `JSON schema` to `3` with backward compatibility.
+- Added forward variant phrase slots `hk_variants_phrases` and
+  `tw_variants_phrases`.
+- Updated JSON schema 3 with backward compatibility for schema-2 custom packs.
+- Replaced the legacy `jp_variants` / `jp_variants_rev` schema-3 model with
+  `jps_characters_rev`, matching `JPShinjitaiCharactersRev.txt`.
+- Updated the Japanese chains: `t2jp` uses `jps_characters_rev`, while
+  `jp2t` uses `jps_phrases` followed by `jps_characters`.
 - Refactored `s2twp` from three dictionary passes to two: Taiwan phrases,
   variant phrases, and character variants now run together in round 2.
 

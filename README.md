@@ -61,7 +61,7 @@ Options:
       --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -o, --output <file>        Write converted text to <file>.
       --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|t2s|tw2s|tw2sp|hk2s|jp2t|t2jp]
+  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|s2hkp|t2s|tw2s|tw2sp|hk2s|hk2sp|jp2t|t2jp]
   -p, --punct <boolean>      Punctuation conversion: [true|false] [default: false]
   -h, --help                 Print help
 
@@ -98,7 +98,7 @@ Usage: opencc-jieba.exe office [OPTIONS] --config <config>
 Options:
   -i, --input <file>     Input <file> (use stdin if omitted for non-office documents)
   -o, --output <file>    Output <file> (use stdout if omitted for non-office documents)
-  -c, --config <config>  Conversion configuration <config> [possible values: s2t, t2s, s2tw, tw2s, s2twp, tw2sp, s2hk, hk2s, t2tw, t2twp, t2hk, tw2t, tw2tp, hk2t, t2jp, jp2t]
+  -c, --config <config>  Conversion configuration <config> [possible values: s2t, t2s, s2tw, tw2s, s2twp, tw2sp, s2hk, s2hkp, hk2s, hk2sp, t2tw, t2twp, t2hk, tw2t, tw2tp, hk2t, t2jp, jp2t]
   -p, --punct            Enable punctuation conversion
   -f, --format <ext>     Force office document format <ext>: docx, xlsx, pptx odt, ods, odp, epub
       --keep-font        Preserve original font styles
@@ -248,6 +248,67 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 > These .txt files are used for development only.  
 > The runtime uses .zst files generated with zstd.  
 > These are included in the crate, but the .txt source files are not.
+
+### Generate and load a custom conversion dictionary
+
+Power users can edit the OpenCC source files under `dicts/` and generate a
+runtime conversion pack with the workspace tool:
+
+```bash
+cargo run -p dict-generate -- --format zstd --output dictionary.json.zst
+```
+
+Load that pack without enabling any Cargo feature:
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cc = OpenCC::try_new_with_dictionary_zstd("dictionary.json.zst")?;
+    println!("{}", cc.s2t("汉字", false));
+    Ok(())
+}
+```
+
+Custom OpenCC conversion dictionaries and Jieba user dictionaries are
+independent and can be combined in either order:
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Start with the custom OpenCC conversion pack, then add Jieba terms.
+    let mut cc = OpenCC::try_new_with_dictionary_zstd("dictionary.json.zst")?;
+    cc.load_user_dict("dicts/user_dict.txt")?;
+
+    // Or start with a Jieba user dictionary and replace the conversion pack:
+    let mut cc = OpenCC::try_new_with_user_dict_path("dicts/user_dict.txt")?;
+    cc.load_dictionary_zstd("dictionary.json.zst")?;
+
+    Ok(())
+}
+```
+
+The loader validates Zstd data, JSON structure, and the dictionary schema
+version before replacing the active conversion mappings.
+
+Schema 3 uses the upstream-aligned JP/HK slots:
+
+| Runtime slot              | Source dictionary              |
+|---------------------------|--------------------------------|
+| `hk_phrases`              | `HKPhrases.txt`                |
+| `hk_phrases_rev`          | `HKPhrasesRev.txt`             |
+| `hk_variants_phrases`     | `HKVariantsPhrases.txt`        |
+| `hk_variants`             | `HKVariants.txt`               |
+| `hk_variants_rev_phrases` | `HKVariantsRevPhrases.txt`     |
+| `hk_variants_rev`         | `HKVariantsRev.txt`            |
+| `jps_phrases`             | `JPShinjitaiPhrases.txt`       |
+| `jps_characters`          | `JPShinjitaiCharacters.txt`    |
+| `jps_characters_rev`      | `JPShinjitaiCharactersRev.txt` |
+
+The legacy `JPVariants.txt` and `JPVariantsRev.txt` slots are not emitted in
+schema-3 packs. Schema-2 custom packs remain loadable through compatibility
+fallbacks.
 
 ---
 

@@ -36,6 +36,8 @@
 /// | 14      | `Hk2t` | Hong Kong → Traditional                    | ❌ (ignored)                |
 /// | 15      | `Jp2t` | Japanese (Kanji variants) → Traditional     | ❌ (ignored)                |
 /// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)     | ❌ (ignored)                |
+/// | 17      | `S2hkp`| Simplified → Hong Kong (with phrases)       | ✅                          |
+/// | 18      | `Hk2sp`| Hong Kong → Simplified (with phrases)       | ✅                          |
 ///
 /// # Since
 /// v0.7.3
@@ -89,6 +91,12 @@ pub enum OpenccConfig {
 
     /// Traditional Chinese → Japanese Kanji.
     T2jp = 16,
+
+    /// Simplified Chinese → Hong Kong Traditional (with phrases).
+    S2hkp = 17,
+
+    /// Hong Kong Traditional → Simplified Chinese (with phrases).
+    Hk2sp = 18,
 }
 
 impl TryFrom<&str> for OpenccConfig {
@@ -126,11 +134,12 @@ impl OpenccConfig {
     ///
     /// # Since
     /// v0.7.3
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 18] = [
         Self::S2t,
         Self::S2tw,
         Self::S2twp,
         Self::S2hk,
+        Self::S2hkp,
         Self::T2s,
         Self::T2tw,
         Self::T2twp,
@@ -140,6 +149,7 @@ impl OpenccConfig {
         Self::Tw2t,
         Self::Tw2tp,
         Self::Hk2s,
+        Self::Hk2sp,
         Self::Hk2t,
         Self::Jp2t,
         Self::T2jp,
@@ -180,6 +190,8 @@ impl OpenccConfig {
             14 => Some(Self::Hk2t),
             15 => Some(Self::Jp2t),
             16 => Some(Self::T2jp),
+            17 => Some(Self::S2hkp),
+            18 => Some(Self::Hk2sp),
             _ => None,
         }
     }
@@ -262,6 +274,7 @@ impl OpenccConfig {
             Self::S2tw => "s2tw",
             Self::S2twp => "s2twp",
             Self::S2hk => "s2hk",
+            Self::S2hkp => "s2hkp",
             Self::T2s => "t2s",
             Self::T2tw => "t2tw",
             Self::T2twp => "t2twp",
@@ -271,6 +284,7 @@ impl OpenccConfig {
             Self::Tw2t => "tw2t",
             Self::Tw2tp => "tw2tp",
             Self::Hk2s => "hk2s",
+            Self::Hk2sp => "hk2sp",
             Self::Hk2t => "hk2t",
             Self::Jp2t => "jp2t",
             Self::T2jp => "t2jp",

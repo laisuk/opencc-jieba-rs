@@ -37,6 +37,12 @@ pub(crate) struct Dictionary {
     pub(crate) tw_phrases: DictMap,
     /// Reverse Taiwanese phrase mappings.
     pub(crate) tw_phrases_rev: DictMap,
+    /// Hong Kong phrase mappings.
+    #[serde(default)]
+    pub(crate) hk_phrases: DictMap,
+    /// Reverse Hong Kong phrase mappings.
+    #[serde(default)]
+    pub(crate) hk_phrases_rev: DictMap,
     /// Taiwanese variant phrase mappings.
     #[serde(default)]
     pub(crate) tw_variants_phrases: DictMap,
@@ -57,12 +63,17 @@ pub(crate) struct Dictionary {
     pub(crate) hk_variants_rev_phrases: DictMap,
     /// Japanese Shinjitai character mappings.
     pub(crate) jps_characters: DictMap,
+    /// Reverse Japanese Shinjitai character mappings.
+    #[serde(default)]
+    pub(crate) jps_characters_rev: DictMap,
     /// Japanese Shinjitai phrase mappings.
     pub(crate) jps_phrases: DictMap,
-    /// Japanese variant mappings.
-    pub(crate) jp_variants: DictMap,
-    /// Reverse Japanese variant mappings.
-    pub(crate) jp_variants_rev: DictMap,
+    /// Legacy schema-2 Traditional-to-Japanese mappings.
+    #[serde(default, rename = "jp_variants", skip_serializing)]
+    pub(crate) legacy_jp_variants: DictMap,
+    /// Legacy schema-2 Japanese-to-Traditional mappings.
+    #[serde(default, rename = "jp_variants_rev", skip_serializing)]
+    pub(crate) legacy_jp_variants_rev: DictMap,
 }
 
 impl Default for Dictionary {
@@ -76,6 +87,8 @@ impl Default for Dictionary {
             ts_phrases: DictMap::default(),
             tw_phrases: DictMap::default(),
             tw_phrases_rev: DictMap::default(),
+            hk_phrases: DictMap::default(),
+            hk_phrases_rev: DictMap::default(),
             tw_variants_phrases: DictMap::default(),
             tw_variants: DictMap::default(),
             tw_variants_rev: DictMap::default(),
@@ -85,9 +98,10 @@ impl Default for Dictionary {
             hk_variants_rev: DictMap::default(),
             hk_variants_rev_phrases: DictMap::default(),
             jps_characters: DictMap::default(),
+            jps_characters_rev: DictMap::default(),
             jps_phrases: DictMap::default(),
-            jp_variants: DictMap::default(),
-            jp_variants_rev: DictMap::default(),
+            legacy_jp_variants: DictMap::default(),
+            legacy_jp_variants_rev: DictMap::default(),
         }
     }
 }
@@ -152,8 +166,8 @@ impl Dictionary {
     /// The following files must exist under the `dicts/` directory:
     /// - STCharacters.txt, STPhrases.txt, TSCharacters.txt, TSPhrases.txt
     /// - TWPhrases.txt, TWPhrasesRev.txt, TWVariantsPhrases.txt, TWVariants.txt, TWVariantsRev.txt, TWVariantsRevPhrases.txt
-    /// - HKVariantsPhrases.txt, HKVariants.txt, HKVariantsRev.txt, HKVariantsRevPhrases.txt
-    /// - JPShinjitaiCharacters.txt, JPShinjitaiPhrases.txt, JPVariants.txt, JPVariantsRev.txt
+    /// - HKPhrases.txt, HKPhrasesRev.txt, HKVariantsPhrases.txt, HKVariants.txt, HKVariantsRev.txt, HKVariantsRevPhrases.txt
+    /// - JPShinjitaiCharacters.txt, JPShinjitaiCharactersRev.txt, JPShinjitaiPhrases.txt
     ///
     /// # Note
     /// - These `.txt` files are **not included** in the published crate on crates.io.
@@ -174,6 +188,8 @@ impl Dictionary {
             "dicts/TSPhrases.txt",
             "dicts/TWPhrases.txt",
             "dicts/TWPhrasesRev.txt",
+            "dicts/HKPhrases.txt",
+            "dicts/HKPhrasesRev.txt",
             "dicts/TWVariantsPhrases.txt",
             "dicts/TWVariants.txt",
             "dicts/TWVariantsRev.txt",
@@ -183,9 +199,8 @@ impl Dictionary {
             "dicts/HKVariantsRev.txt",
             "dicts/HKVariantsRevPhrases.txt",
             "dicts/JPShinjitaiCharacters.txt",
+            "dicts/JPShinjitaiCharactersRev.txt",
             "dicts/JPShinjitaiPhrases.txt",
-            "dicts/JPVariants.txt",
-            "dicts/JPVariantsRev.txt",
         ];
 
         let [
@@ -195,6 +210,8 @@ impl Dictionary {
         ts_phrases,
         tw_phrases,
         tw_phrases_rev,
+        hk_phrases,
+        hk_phrases_rev,
         tw_variants_phrases,
         tw_variants,
         tw_variants_rev,
@@ -204,10 +221,9 @@ impl Dictionary {
         hk_variants_rev,
         hk_variants_rev_phrases,
         jps_characters,
+        jps_characters_rev,
         jps_phrases,
-        jp_variants,
-        jp_variants_rev,
-        ]: [DictMap; 18] = files
+        ]: [DictMap; 19] = files
             .into_iter()
             .map(|f| load(f).unwrap())
             .collect::<Vec<_>>()
@@ -222,6 +238,8 @@ impl Dictionary {
             ts_phrases,
             tw_phrases,
             tw_phrases_rev,
+            hk_phrases,
+            hk_phrases_rev,
             tw_variants_phrases,
             tw_variants,
             tw_variants_rev,
@@ -231,9 +249,10 @@ impl Dictionary {
             hk_variants_rev,
             hk_variants_rev_phrases,
             jps_characters,
+            jps_characters_rev,
             jps_phrases,
-            jp_variants,
-            jp_variants_rev,
+            legacy_jp_variants: DictMap::default(),
+            legacy_jp_variants_rev: DictMap::default(),
         }
     }
 
