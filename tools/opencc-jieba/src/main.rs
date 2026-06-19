@@ -6,7 +6,6 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
-use std::path::Path;
 use std::sync::OnceLock;
 
 mod office_converter;
@@ -67,10 +66,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .help("Preserve original font styles"),
                 )
                 .arg(
-                    Arg::new("auto_ext")
-                        .long("auto-ext")
+                    Arg::new("convert_filename")
+                        .long("convert-filename")
                         .action(clap::ArgAction::SetTrue)
-                        .help("Infer format from file extension"),
+                        .help(
+                            "Convert the output filename using the selected OpenCC configuration",
+                        ),
                 ),
         )
         .subcommand(
@@ -267,59 +268,61 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
     let config = matches.get_one::<String>("config").unwrap();
     let punctuation = matches.get_flag("punct");
     let keep_font = matches.get_flag("keep_font");
-    let auto_ext = matches.get_flag("auto_ext");
+    let convert_filename = matches.get_flag("convert_filename");
     let format = matches.get_one::<String>("format").map(String::as_str);
 
-    let office_format = match format {
-        Some(f) => f.to_lowercase(),
-        None => {
-            if auto_ext {
-                let ext = Path::new(input_file)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .ok_or("❌  Cannot infer file extension")?;
-                if office_extensions.contains(ext) {
-                    ext.to_string()
-                } else {
-                    return Err(format!("❌  Unsupported Office extension: .{ext}").into());
-                }
-            } else {
-                return Err("❌  Please provide --format or use --auto-ext".into());
-            }
+    let office_format = if let Some(f) = format {
+        f.to_lowercase()
+    } else {
+        let ext = std::path::Path::new(input_file)
+            .extension()
+            .and_then(|e| e.to_str())
+            .ok_or("❌  Cannot infer file extension. Please provide --format.")?
+            .to_lowercase();
+
+        if office_extensions.contains(ext.as_str()) {
+            ext
+        } else {
+            return Err(format!(
+                "❌  Unsupported Office extension: .{ext}. Please provide --format."
+            )
+                .into());
         }
     };
+
+    if !office_extensions.contains(office_format.as_str()) {
+        return Err(format!("❌  Unsupported Office format: {office_format}").into());
+    }
 
     let helper = OpenCC::new();
 
     let final_output = match output_file {
         Some(path) => {
-            if auto_ext
-                && Path::new(path).extension().is_none()
-                && office_extensions.contains(office_format.as_str())
-            {
+            let output_path = std::path::Path::new(path);
+
+            if output_path.extension().is_none() {
                 format!("{path}.{}", office_format)
             } else {
-                path.to_string()
+                path.clone()
             }
         }
         None => {
-            let input_path = Path::new(input_file);
+            let input_path = std::path::Path::new(input_file);
             let file_stem = input_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("converted");
-            let ext = office_format.as_str();
-            let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
 
-            let file_stem_converted = helper.convert(file_stem, config, punctuation);
-            let final_stem = if auto_ext {
+            let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
+            let final_stem = if convert_filename {
+                let file_stem_converted = helper.convert(file_stem, config, punctuation);
                 format!("{file_stem_converted}_converted")
             } else {
                 format!("{file_stem}_converted")
             };
 
             parent
-                .join(format!("{final_stem}.{ext}"))
+                .join(format!("{final_stem}.{office_format}"))
                 .to_string_lossy()
                 .to_string()
         }
