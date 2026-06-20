@@ -41,8 +41,7 @@ def subcommand_office(args):
 
     input_file = args.input
     output_file = args.output
-    office_format = args.format
-    auto_ext = getattr(args, "auto_ext", False)
+    office_format = args.format.lower() if args.format else None
     config = args.config
     punct = args.punct
     keep_font = getattr(args, "keep_font", False)
@@ -54,36 +53,32 @@ def subcommand_office(args):
     if not input_file:
         print("❌  Input file is missing.", file=sys.stderr)
         return 1
+    if not Path(input_file).is_file():
+        print(f"❌ Input file not found: {input_file}", file=sys.stderr)
+        return 1
+
+    # Determine office format from file extension if not provided
+    if office_format:
+        if office_format not in OFFICE_FORMATS:
+            print(f"❌  Unsupported Office format: {args.format}", file=sys.stderr)
+            return 1
+    else:
+        file_ext = os.path.splitext(input_file)[1].lower().lstrip(".")
+        if file_ext not in OFFICE_FORMATS:
+            print(f"❌  Invalid Office file extension: .{file_ext or '(none)'}", file=sys.stderr)
+            print("   Valid extensions: .docx | .xlsx | .pptx | .odt | .ods | .odp | .epub", file=sys.stderr)
+            return 1
+        office_format = str(file_ext)
 
     # If output file is not specified, generate one based on input file
     if not output_file:
         input_path = Path(input_file)
-
-        input_name = input_path.stem
-        input_ext = input_path.suffix
         input_dir = input_path.parent if input_path.parent != Path("") else Path.cwd()
-
-        if auto_ext and office_format in OFFICE_FORMATS:
-            ext = f".{office_format}"
-        else:
-            ext = input_ext
-
-        output_path = input_dir / f"{input_name}_converted{ext}"
+        output_path = input_dir / f"{input_path.stem}_converted.{office_format}"
         output_file = str(output_path)
-
         print(f"ℹ️  Output file not specified. Using: {output_path}", file=sys.stderr)
 
-    # Determine office format from file extension if not provided
-    if not office_format:
-        file_ext = os.path.splitext(input_file)[1].lower()
-        if file_ext[1:] not in OFFICE_FORMATS:
-            print(f"❌  Invalid Office file extension: {file_ext}", file=sys.stderr)
-            print("   Valid extensions: .docx | .xlsx | .pptx | .odt | .ods | .odp | .epub", file=sys.stderr)
-            return 1
-        office_format = file_ext[1:]
-
-    # Auto-append extension to output file if needed
-    if auto_ext and output_file and not os.path.splitext(output_file)[1] and office_format in OFFICE_FORMATS:
+    elif not os.path.splitext(output_file)[1]:
         output_file += f".{office_format}"
         print(f"ℹ️  Auto-extension applied: {output_file}", file=sys.stderr)
 
@@ -235,12 +230,7 @@ def main():
         help="Target Office format (e.g., docx, xlsx, pptx, odt, ods, odp, epub)",
     )
     parser_office.add_argument(
-        "--auto-ext",
-        action="store_true",
-        default=False,
-        help="Auto-append extension to output file",
-    )
-    parser_office.add_argument(
+        "-k",
         "--keep-font",
         action="store_true",
         default=False,
