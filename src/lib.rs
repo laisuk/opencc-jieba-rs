@@ -1841,7 +1841,7 @@ impl OpenCC {
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let text = "裡面"; // Taiwan variant
     /// let out = opencc.tw2t(text);
-    /// assert_eq!(out, "裏面"); // Standard Traditional
+    /// assert_eq!(out, "裡面"); // Standard Traditional
     /// ```
     pub fn tw2t(&self, input: &str) -> String {
         let dict_refs = [
