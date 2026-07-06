@@ -30,6 +30,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `jp2t` uses `jps_phrases` followed by `jps_characters`.
 - Refactored `s2twp` from three dictionary passes to two: Taiwan phrases,
   variant phrases, and character variants now run together in round 2.
+- Improved unmatched Jieba token handling by adding an internal fallback
+  forward maximum matching (FMM) pass for tokens of three or more characters,
+  allowing phrase recovery before character-by-character conversion while
+  preserving the existing conversion pipeline and performance.
 
 ---
 

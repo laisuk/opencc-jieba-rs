@@ -975,7 +975,15 @@ impl OpenCC {
                 }
             }
 
-            Self::convert_by_char(phrase, dictionaries, out);
+            // Self::convert_by_char(phrase, dictionaries, out);
+
+            let token_len = phrase.chars().count();
+
+            if token_len < 3 {
+                Self::convert_by_char(phrase, dictionaries, out);
+            } else {
+                Self::convert_by_fallback_fmm(phrase, dictionaries, out);
+            }
         }
     }
 
@@ -1049,6 +1057,89 @@ impl OpenCC {
             match replaced {
                 Some(v) => out.push_str(v),
                 None => out.push(ch),
+            }
+        }
+    }
+
+    /// Fallback FMM conversion for an unmatched jieba token.
+    ///
+    /// The full token has already failed phrase lookup before entering this helper,
+    /// so the first FMM window skips the full-token candidate.
+    ///
+    /// For short tokens, prefer `convert_by_char()` instead:
+    /// - len 1: FMM is pointless
+    /// - len 2: FMM degenerates to char conversion
+    #[inline(always)]
+    fn convert_by_fallback_fmm(s: &str, dictionaries: &[&DictMap], out: &mut String) {
+        debug_assert!(s.chars().count() >= 3);
+
+        // Longest key length that exists in any dictionary.
+        let global_max_len = dictionaries.iter().map(|d| d.max_len()).max().unwrap_or(1) as usize;
+
+        let mut start = 0usize;
+
+        while start < s.len() {
+            let rest = &s[start..];
+
+            // Store candidate byte ends for this suffix.
+            // Most OpenCC phrase lengths are small; 64 is enough for normal mask-backed keys.
+            let mut ends = [0usize; 64];
+            let mut count = 0usize;
+
+            for (idx, ch) in rest.char_indices().take(global_max_len) {
+                ends[count] = idx + ch.len_utf8();
+                count += 1;
+
+                if count == ends.len() {
+                    break;
+                }
+            }
+
+            if count == 0 {
+                break;
+            }
+
+            // At start == 0, the full token was already tried and failed by caller.
+            // So skip that exact full-token slice to avoid duplicate lookup.
+            let skip_full_token = start == 0 && ends[count - 1] == rest.len();
+
+            let mut replaced: Option<(&str, usize)> = None;
+
+            for n in (0..count).rev() {
+                if skip_full_token && n == count - 1 {
+                    continue;
+                }
+
+                let key_len = (n + 1) as u16;
+                let end = ends[n];
+                let key = &rest[..end];
+
+                for dict in dictionaries {
+                    if !dict.has_key_len(key_len) {
+                        continue;
+                    }
+
+                    if let Some(v) = dict.get(key) {
+                        replaced = Some((v, end));
+                        break;
+                    }
+                }
+
+                if replaced.is_some() {
+                    break;
+                }
+            }
+
+            match replaced {
+                Some((v, consumed)) => {
+                    out.push_str(v);
+                    start += consumed;
+                }
+                None => {
+                    let ch = rest.chars().next().unwrap();
+                    out.push(ch);
+                    start += ch.len_utf8();
+                }
             }
         }
     }

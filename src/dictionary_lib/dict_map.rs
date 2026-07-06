@@ -164,6 +164,11 @@ impl DictMap {
         self.min_len
     }
 
+    #[inline(always)]
+    pub(crate) fn max_len(&self) -> u16 {
+        self.max_len
+    }
+
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
         self.map.is_empty()
