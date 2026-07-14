@@ -763,6 +763,28 @@ mod tests {
     }
 
     #[test]
+    fn test_opencc_jieba_convert_hong_kong_phrase_configs() {
+        let opencc = OpenCC::new();
+
+        for (input_text, config_name, expected) in
+            [("鼠標", "t2hkp", "滑鼠"), ("滑鼠", "hk2tp", "鼠標")]
+        {
+            let input = raw_cstring(input_text);
+            let config = raw_cstring(config_name);
+            let result_ptr = opencc_jieba_convert(&opencc as *const OpenCC, input, config, false);
+            assert!(!result_ptr.is_null());
+            let result = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
+
+            unsafe {
+                reclaim_raw_cstring(config);
+                reclaim_raw_cstring(input);
+            }
+
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
     fn test_opencc_jieba_convert_2() {
         let opencc = opencc_jieba_new();
         let input =

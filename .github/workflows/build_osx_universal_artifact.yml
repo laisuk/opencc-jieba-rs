@@ -77,8 +77,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          cp capi/opencc_jieba_capi.h dist/include/
-          cp capi/OpenccJiebaHelper.hpp dist/include/
+          cp capi/include/opencc_jieba_capi.h dist/include/
+          cp capi/include/OpenccJiebaHelper.hpp dist/include/
 
       # Package ZIP
       - name: Package ZIP

@@ -60,9 +60,10 @@ public:
     // ---- Configuration -----------------------------------------------------
     // Known-good OpenCC-style configs you want to allow here; tweak as needed.
     // Keep small, constexpr, and case-sensitive for zero heap overhead.
-    static constexpr std::array<const char*, 16> kKnownConfigs{
-        "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw",
-        "t2twp", "t2hk", "tw2t", "tw2tp", "hk2t", "t2jp", "jp2t"
+    static constexpr std::array<const char*, 20> kKnownConfigs{
+        "s2t", "s2tw", "s2twp", "s2hk", "s2hkp", "t2s", "t2tw", "t2twp", "t2hk",
+        "t2hkp", "tw2s", "tw2sp", "tw2t", "tw2tp", "hk2s", "hk2sp", "hk2t", "hk2tp",
+        "jp2t", "t2jp"
     };
 
     static bool isValidConfig(const std::string& cfg)

@@ -286,8 +286,8 @@ jobs:
           cp "${OUT_DIR}/${{ matrix.dll_name }}" dist/lib/
 
           # Headers
-          cp capi/opencc_jieba_capi.h dist/include/
-          cp capi/OpenccJiebaHelper.hpp dist/include/
+          cp capi/include/opencc_jieba_capi.h dist/include/
+          cp capi/include/OpenccJiebaHelper.hpp dist/include/
 
           # Optional: Windows import library if produced
           if [ "${{ matrix.platform }}" = "windows" ]; then

@@ -61,7 +61,7 @@ Options:
       --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -o, --output <file>        Write converted text to <file>.
       --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|s2hkp|t2s|tw2s|tw2sp|hk2s|hk2sp|jp2t|t2jp]
+  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|s2hkp|t2s|t2tw|t2twp|t2hk|t2hkp|tw2s|tw2sp|tw2t|tw2tp|hk2s|hk2sp|hk2t|hk2tp|jp2t|t2jp]
   -p, --punct <boolean>      Punctuation conversion: [true|false] [default: false]
   -h, --help                 Print help
 
@@ -98,7 +98,7 @@ Usage: opencc-jieba.exe office [OPTIONS] --config <config>
 Options:
   -i, --input <file>     Input <file> (use stdin if omitted for non-office documents)
   -o, --output <file>    Output <file> (use stdout if omitted for non-office documents)
-  -c, --config <config>  Conversion configuration <config> [possible values: s2t, t2s, s2tw, tw2s, s2twp, tw2sp, s2hk, s2hkp, hk2s, hk2sp, t2tw, t2twp, t2hk, tw2t, tw2tp, hk2t, t2jp, jp2t]
+  -c, --config <config>  Conversion configuration <config> [possible values: s2t, s2tw, s2twp, s2hk, s2hkp, t2s, t2tw, t2twp, t2hk, t2hkp, tw2s, tw2sp, tw2t, tw2tp, hk2s, hk2sp, hk2t, hk2tp, jp2t, t2jp]
   -p, --punct            Enable punctuation conversion
   -f, --format <ext>     Force office document format <ext>: docx, xlsx, pptx odt, ods, odp, epub
       --keep-font        Preserve original font styles
@@ -132,10 +132,23 @@ opencc-jieba segment --mode tag --delim " " --separator ":"
     - `s2t` – Simplified to Traditional
     - `s2tw` – Simplified to Traditional Taiwan
     - `s2twp` – Simplified to Traditional Taiwan with idioms
+    - `s2hk` – Simplified to Hong Kong Traditional
+    - `s2hkp` – Simplified to Hong Kong Traditional with phrase preferences
     - `t2s` – Traditional to Simplified
+    - `t2tw` – Traditional to Taiwan variants
+    - `t2twp` – Traditional to Taiwan variants with phrase preferences
+    - `t2hk` – Traditional to Hong Kong variants
+    - `t2hkp` – Traditional to Hong Kong variants with phrase preferences
     - `tw2s` – Traditional Taiwan to Simplified
     - `tw2sp` – Traditional Taiwan to Simplified with idioms
-    - etc
+    - `tw2t` – Taiwan variants to Traditional
+    - `tw2tp` – Taiwan variants to Traditional with phrase normalization
+    - `hk2s` – Hong Kong variants to Simplified
+    - `hk2sp` – Hong Kong variants to Simplified with phrase normalization
+    - `hk2t` – Hong Kong variants to Traditional
+    - `hk2tp` – Hong Kong variants to Traditional with phrase normalization
+    - `jp2t` – Japanese Shinjitai to Traditional
+    - `t2jp` – Traditional to Japanese Shinjitai
 
 ### Lexicons
 
@@ -154,19 +167,28 @@ cargo add opencc-jieba-rs
 Or add the following line to your `Cargo.toml`:
 
 ```toml
-opencc-jieba-rs = "0.7.6"
+opencc-jieba-rs = "0.8.0"
 ```
 
 Use `opencc-jieba-rs` as a library:
 
 ```rust
-use opencc_jieba_rs::OpenCC;
+use opencc_jieba_rs::{OpenCC, OpenccConfig};
 
 fn main() {
-    let input = "这是一个测试";
     let opencc = OpenCC::new();
-    let output = opencc.convert(input, "s2t", false);
-    println!("{}", output); // -> "這是一個測試"
+
+    assert_eq!(opencc.convert("这是一个测试", "s2t", false), "這是一個測試");
+
+    // Direct one-pass Hong Kong phrase APIs.
+    assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
+    assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
+
+    // The same conversion through the strongly typed public API.
+    assert_eq!(
+        opencc.convert_with_config("鼠標", OpenccConfig::T2hkp, false),
+        "滑鼠"
+    );
 }
 ```
 
@@ -178,6 +200,8 @@ fn main() {
 ## C API Usage (`opencc_jieba_capi`)
 
 You can also use `opencc-jieba-rs` via a C API for integration with C/C++ projects.
+The maintained C and C++ headers live in [`capi/include`](./capi/include); add
+that directory to your compiler's include path.
 
 ### Example
 
@@ -219,7 +243,7 @@ Converted Code: 1
 ### Notes
 
 - `opencc_jieba_new()` initializes the engine.
-- `opencc_jieba_convert(...)` performs the conversion with the specified config (e.g., `s2t`, `t2s`, `s2twp`).
+- `opencc_jieba_convert(...)` performs the conversion with the specified config (e.g., `s2t`, `t2hkp`, `hk2tp`).
 - `opencc_jieba_free_string(...)` must be called to free the returned string.
 - `opencc_jieba_delete(...)` must be called to free OpenCC instance.
 - `opencc_jieba_zho_check(...)` to detect zh-Hant (1), zh-Hans (2), others (0).
@@ -229,7 +253,8 @@ Converted Code: 1
 ## Project Structure
 
 - `src/lib.rs` – Main library with segmentation logic.
-- `capi/opencc-jieba-capi` C API source and demo.
+- `capi/opencc_jieba_capi` – C ABI implementation crate.
+- `capi/include` – Canonical public C and C++ headers.
 - `tools/opencc-jieba/src/main.rs` – CLI tool (`opencc-cs`) implementation.
 - `dicts/` – OpenCC text lexicons which converted into JSON format.
 

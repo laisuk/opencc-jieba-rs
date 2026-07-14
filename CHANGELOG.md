@@ -18,6 +18,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   unsupported schema versions.
 - Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the
   new `HKPhrases.txt` and `HKPhrasesRev.txt` dictionary slots.
+- Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus
+  the `t2hkp` and `hk2tp` configurations across the typed Rust API, workspace
+  CLIs, C/C++ integration, and Python wrapper.
 
 ### Changed
 
@@ -30,6 +33,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `jp2t` uses `jps_phrases` followed by `jps_characters`.
 - Refactored `s2twp` from three dictionary passes to two: Taiwan phrases,
   variant phrases, and character variants now run together in round 2.
+- Refactored the direct `t2twp` and `tw2tp` APIs from two conversion rounds to
+  one ordered dictionary pass. The first matching dictionary wins and emitted
+  replacements are no longer reprocessed by later dictionaries.
+- Documented all direct Taiwan and Hong Kong phrase conversions and their
+  dictionary precedence on docs.rs and in the README.
+- Moved the maintained C and C++ headers into `capi/include` and updated all
+  release and C API artifact workflows while preserving the published
+  `include/` archive layout.
 - Improved unmatched Jieba token handling by adding an internal fallback
   forward maximum matching (FMM) pass for tokens of three or more characters,
   allowing phrase recovery before character-by-character conversion while

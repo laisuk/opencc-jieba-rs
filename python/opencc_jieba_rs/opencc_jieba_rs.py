@@ -24,8 +24,8 @@ class OpenccJiebaTag(ctypes.Structure):
 
 class OpenCC:
     config_list = [
-        "s2t", "t2s", "s2tw", "tw2s", "s2twp", "tw2sp", "s2hk", "hk2s", "t2tw", "tw2t", "t2twp", "tw2t", "tw2tp",
-        "t2hk", "hk2t", "t2jp", "jp2t"
+        "s2t", "s2tw", "s2twp", "s2hk", "s2hkp", "t2s", "t2tw", "t2twp", "t2hk", "t2hkp",
+        "tw2s", "tw2sp", "tw2t", "tw2tp", "hk2s", "hk2sp", "hk2t", "hk2tp", "jp2t", "t2jp"
     ]
 
     def __init__(self, config=None):

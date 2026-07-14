@@ -47,12 +47,20 @@ mod tests {
 
         assert_eq!(OpenccConfig::from_ffi(17), Some(OpenccConfig::S2hkp));
         assert_eq!(OpenccConfig::from_ffi(18), Some(OpenccConfig::Hk2sp));
+        assert_eq!(OpenccConfig::from_ffi(19), Some(OpenccConfig::T2hkp));
+        assert_eq!(OpenccConfig::from_ffi(20), Some(OpenccConfig::Hk2tp));
         assert_eq!(OpenccConfig::S2hkp.as_str(), "s2hkp");
         assert_eq!(OpenccConfig::Hk2sp.as_str(), "hk2sp");
+        assert_eq!(OpenccConfig::T2hkp.as_str(), "t2hkp");
+        assert_eq!(OpenccConfig::Hk2tp.as_str(), "hk2tp");
         assert_eq!(opencc.s2hkp("鼠标", false), "滑鼠");
         assert_eq!(opencc.hk2sp("滑鼠", false), "鼠标");
+        assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
+        assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
         assert_eq!(opencc.convert("鼠标", "s2hkp", false), "滑鼠");
         assert_eq!(opencc.convert("滑鼠", "hk2sp", false), "鼠标");
+        assert_eq!(opencc.convert("鼠標", "t2hkp", false), "滑鼠");
+        assert_eq!(opencc.convert("滑鼠", "hk2tp", false), "鼠標");
         assert_eq!(
             opencc.convert_with_config("鼠标", OpenccConfig::S2hkp, false),
             "滑鼠"
@@ -60,6 +68,14 @@ mod tests {
         assert_eq!(
             opencc.convert_with_config("滑鼠", OpenccConfig::Hk2sp, false),
             "鼠标"
+        );
+        assert_eq!(
+            opencc.convert_with_config("鼠標", OpenccConfig::T2hkp, false),
+            "滑鼠"
+        );
+        assert_eq!(
+            opencc.convert_with_config("滑鼠", OpenccConfig::Hk2tp, false),
+            "鼠標"
         );
     }
 

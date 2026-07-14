@@ -92,7 +92,10 @@ void opencc_jieba_free(void *instance);
  *
  * @param instance     Instance created by `opencc_jieba_new()`.
  * @param input        Input UTF-8, null-terminated string.
- * @param config       Conversion config name, such as `"s2t"` or `"t2s"`.
+ * @param config       Conversion config name. Supported values are `"s2t"`, `"s2tw"`,
+ *                     `"s2twp"`, `"s2hk"`, `"s2hkp"`, `"t2s"`, `"t2tw"`, `"t2twp"`,
+ *                     `"t2hk"`, `"t2hkp"`, `"tw2s"`, `"tw2sp"`, `"tw2t"`, `"tw2tp"`,
+ *                     `"hk2s"`, `"hk2sp"`, `"hk2t"`, `"hk2tp"`, `"jp2t"`, or `"t2jp"`.
  * @param punctuation  Whether punctuation conversion is enabled.
  *
  * @return Newly allocated UTF-8 string. Free with `opencc_jieba_free_string()`.

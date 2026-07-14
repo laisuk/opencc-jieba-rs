@@ -112,16 +112,20 @@
 //!
 //! ## Hong Kong Traditional (HK)
 //!
-//! | Direction | Method             | Description                                       |
-//! |-----------|--------------------|---------------------------------------------------|
-//! | T → HK    | [`OpenCC::t2hk`]   | Standard Traditional → Hong Kong Traditional.    |
-//! | HK → T    | [`OpenCC::hk2t`]   | Hong Kong Traditional → Standard Traditional.    |
-//! | S → HKP   | [`OpenCC::s2hkp`]  | Simplified → Hong Kong with phrase preferences.  |
-//! | HKP → S   | [`OpenCC::hk2sp`]  | Hong Kong phrases → Simplified.                   |
+//! | Direction      | Method              | Description                                          |
+//! |----------------|---------------------|------------------------------------------------------|
+//! | T → HK         | [`OpenCC::t2hk`]    | Standard Traditional → Hong Kong variants.          |
+//! | T → HK (phr.)  | [`OpenCC::t2hkp`]   | T→HK with Hong Kong phrase and variant preferences.  |
+//! | HK → T         | [`OpenCC::hk2t`]    | Hong Kong variants → Standard Traditional.          |
+//! | HK → T (phr.)  | [`OpenCC::hk2tp`]   | HK→T with reverse phrase normalization.              |
+//! | S → HKP        | [`OpenCC::s2hkp`]   | Simplified → Hong Kong with phrase preferences.     |
+//! | HKP → S        | [`OpenCC::hk2sp`]   | Hong Kong phrases → Simplified.                     |
 //!
 //! - `t2hk` applies `hk_variants_phrases` + `hk_variants` (HK-specific variants and preferences).
 //! - `hk2t` uses `hk_variants_rev_phrases` + `hk_variants_rev` to normalize
 //!   back to standard Traditional.
+//! - `t2hkp` and `hk2tp` add `hk_phrases` or `hk_phrases_rev` in the same
+//!   single ordered pass; the first matching dictionary wins.
 //! - `s2hkp` and `hk2sp` additionally apply `hk_phrases` or
 //!   `hk_phrases_rev` in their regional phrase round.
 //!
@@ -216,7 +220,7 @@
 //!   conversion.
 //! - Use **`t2tw` / `t2twp` / `tw2t` / `tw2tp`** when targeting **Taiwan**
 //!   content or normalizing it.
-//! - Use **`t2hk` / `hk2t`** for Hong Kong character variants, and
+//! - Use **`t2hk` / `t2hkp` / `hk2t` / `hk2tp`** for Hong Kong variants, and
 //!   **`s2hkp` / `hk2sp`** when Hong Kong phrase preferences are required.
 //! - Use **`t2jp` / `jp2t`** for interoperability with **Japanese Kanji** forms,
 //!   when only character-shape conversion is desired (not full translation).
@@ -1994,6 +1998,44 @@ impl OpenCC {
         self.phrases_cut_convert(input, &dict_refs, true)
     }
 
+    /// Converts Traditional Chinese (T) to **Hong Kong Traditional Chinese with
+    /// phrase preferences (T→HKP)**.
+    ///
+    /// This corresponds to the **`t2hkp`** configuration. It segments the input
+    /// once and applies these dictionaries in precedence order:
+    ///
+    /// 1. `hk_phrases`
+    /// 2. `hk_variants_phrases`
+    /// 3. `hk_variants`
+    ///
+    /// The first matching dictionary wins. A replacement is emitted directly and
+    /// is not passed through the remaining dictionaries, preserving deterministic
+    /// dictionary precedence without a second conversion round. Punctuation is
+    /// preserved.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Traditional Chinese text.
+    ///
+    /// # Returns
+    ///
+    /// Hong Kong Traditional Chinese using regional phrases and variants.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
+    /// ```
+    pub fn t2hkp(&self, input: &str) -> String {
+        let dict_refs = [
+            &self.dictionary.hk_phrases,
+            &self.dictionary.hk_variants_phrases,
+            &self.dictionary.hk_variants,
+        ];
+        self.phrases_cut_convert(input, &dict_refs, true)
+    }
+
     /// Converts Hong Kong Traditional Chinese text back to **Standard Traditional
     /// Chinese (HK→T)**.
     ///
@@ -2008,6 +2050,43 @@ impl OpenCC {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
+        ];
+        self.phrases_cut_convert(input, &dict_refs, true)
+    }
+
+    /// Converts Hong Kong Traditional Chinese (HK) to **Standard Traditional
+    /// Chinese with phrase normalization (HK→TP)**.
+    ///
+    /// This corresponds to the **`hk2tp`** configuration. It segments the input
+    /// once and applies these dictionaries in precedence order:
+    ///
+    /// 1. `hk_variants_rev_phrases`
+    /// 2. `hk_variants_rev`
+    /// 3. `hk_phrases_rev`
+    ///
+    /// The first matching dictionary wins. A replacement is emitted directly and
+    /// is not passed through the remaining dictionaries, avoiding a second
+    /// segmentation and conversion round. Punctuation is preserved.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Hong Kong Traditional Chinese text.
+    ///
+    /// # Returns
+    ///
+    /// Standard Traditional Chinese with Hong Kong phrases and variants normalized.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let opencc = opencc_jieba_rs::OpenCC::new();
+    /// assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
+    /// ```
+    pub fn hk2tp(&self, input: &str) -> String {
+        let dict_refs = [
+            &self.dictionary.hk_variants_rev_phrases,
+            &self.dictionary.hk_variants_rev,
+            &self.dictionary.hk_phrases_rev,
         ];
         self.phrases_cut_convert(input, &dict_refs, true)
     }
@@ -2208,6 +2287,7 @@ impl OpenCC {
     ///   - `"t2tw"`  — Traditional → Taiwan Traditional
     ///   - `"t2twp"` — Traditional → Taiwan Traditional (phrase-level refinement)
     ///   - `"t2hk"`  — Traditional → Hong Kong Traditional
+    ///   - `"t2hkp"` — Traditional → Hong Kong Traditional (phrase preferences)
     ///   - `"tw2s"`  — Taiwan Traditional → Simplified
     ///   - `"tw2sp"` — Taiwan Traditional → Simplified (phrase-level refinement)
     ///   - `"tw2t"`  — Taiwan Traditional → Standard Traditional
@@ -2215,6 +2295,7 @@ impl OpenCC {
     ///   - `"hk2s"`  — Hong Kong Traditional → Simplified
     ///   - `"hk2sp"` — Hong Kong Traditional → Simplified (phrase preferences)
     ///   - `"hk2t"`  — Hong Kong Traditional → Standard Traditional
+    ///   - `"hk2tp"` — Hong Kong Traditional → Standard Traditional (phrase normalization)
     ///   - `"jp2t"`  — Japanese Shinjitai → Traditional Chinese
     ///   - `"t2jp"`  — Traditional Chinese → Japanese Shinjitai
     ///
@@ -2295,6 +2376,7 @@ impl OpenCC {
             OpenccConfig::T2tw => self.t2tw(input),
             OpenccConfig::T2twp => self.t2twp(input),
             OpenccConfig::T2hk => self.t2hk(input),
+            OpenccConfig::T2hkp => self.t2hkp(input),
             OpenccConfig::Tw2s => self.tw2s(input, punctuation),
             OpenccConfig::Tw2sp => self.tw2sp(input, punctuation),
             OpenccConfig::Tw2t => self.tw2t(input),
@@ -2302,6 +2384,7 @@ impl OpenCC {
             OpenccConfig::Hk2s => self.hk2s(input, punctuation),
             OpenccConfig::Hk2sp => self.hk2sp(input, punctuation),
             OpenccConfig::Hk2t => self.hk2t(input),
+            OpenccConfig::Hk2tp => self.hk2tp(input),
             OpenccConfig::Jp2t => self.jp2t(input),
             OpenccConfig::T2jp => self.t2jp(input),
         }
@@ -2825,6 +2908,28 @@ mod tests {
 
         assert_eq!(opencc.t2hk("無線新聞"), "無綫新聞");
         assert_eq!(opencc.t2hk("線"), "綫");
+    }
+
+    #[test]
+    fn t2hkp_uses_one_pass_with_dictionary_precedence() {
+        let mut dictionary = Dictionary::default();
+        dictionary.hk_phrases = dict(&[("甲", "乙")]);
+        dictionary.hk_variants_phrases = dict(&[("甲", "丁")]);
+        dictionary.hk_variants = dict(&[("乙", "丙")]);
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.t2hkp("甲"), "乙");
+    }
+
+    #[test]
+    fn hk2tp_uses_one_pass_with_dictionary_precedence() {
+        let mut dictionary = Dictionary::default();
+        dictionary.hk_variants_rev_phrases = dict(&[("甲", "乙")]);
+        dictionary.hk_variants_rev = dict(&[("甲", "丁")]);
+        dictionary.hk_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.hk2tp("甲"), "乙");
     }
 
     #[test]

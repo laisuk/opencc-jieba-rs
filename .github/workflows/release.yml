@@ -296,8 +296,8 @@ jobs:
           cp "${OUT_DIR}/dict-generate${{ matrix.bin_ext }}" dist/bin/
 
           # Headers
-          cp capi/opencc_jieba_capi.h dist/include/
-          cp capi/OpenccJiebaHelper.hpp dist/include/
+          cp capi/include/opencc_jieba_capi.h dist/include/
+          cp capi/include/OpenccJiebaHelper.hpp dist/include/
 
           # C API shared lib
           cp "${OUT_DIR}/${{ matrix.dll_name }}" dist/lib/
