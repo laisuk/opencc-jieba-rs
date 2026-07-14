@@ -99,15 +99,16 @@
 //! | Direction      | Method             | Description                                               |
 //! |----------------|--------------------|-----------------------------------------------------------|
 //! | T → Tw         | [`OpenCC::t2tw`]   | Standard Traditional → Taiwan variants.                  |
-//! | T → Tw (phr.)  | [`OpenCC::t2twp`]  | T→Tw with an extra phrase refinement round.              |
+//! | T → Tw (phr.)  | [`OpenCC::t2twp`]  | T→Tw with Taiwan phrase and variant preferences.         |
 //! | Tw → T         | [`OpenCC::tw2t`]   | Taiwan variants → Standard Traditional.                  |
 //! | Tw → T (phr.)  | [`OpenCC::tw2tp`]  | Tw→T with additional reverse phrase normalization.       |
 //!
 //! - `t2tw` uses `tw_variants_phrases` + `tw_variants` for Taiwan-specific forms.
-//! - `t2twp` performs **two rounds**: phrases first (`tw_phrases`), then
-//!   variants (`tw_variants_phrases` + `tw_variants`).
-//! - `tw2t` and `tw2tp` are reverse directions, using `*_rev` dictionaries
-//!   to normalize back to standard Traditional.
+//! - `t2twp` uses one ordered pass: `tw_phrases`, `tw_variants_phrases`, then
+//!   `tw_variants`. The first matching dictionary wins.
+//! - `tw2t` and `tw2tp` are reverse directions. `tw2tp` likewise uses one
+//!   ordered pass: `tw_variants_rev`, `tw_variants_rev_phrases`, then
+//!   `tw_phrases_rev`.
 //!
 //! ## Hong Kong Traditional (HK)
 //!
@@ -1874,16 +1875,17 @@ impl OpenCC {
     /// Converts Traditional Chinese (T) text to **Taiwan Traditional Chinese with
     /// phrase-level idioms (T→Twp)**.
     ///
-    /// This corresponds to the OpenCC configuration **`t2twp`**, which requires
-    /// **two-round dictionary application**:
+    /// This corresponds to the OpenCC configuration **`t2twp`**. It segments the
+    /// input once and applies these dictionaries in precedence order:
     ///
-    /// 1. **Round 1** — apply Taiwan phrase dictionary (`tw_phrases`)
-    /// 2. **Round 2** — apply Taiwan variant dictionaries (`tw_variants_phrases`, then `tw_variants`)
+    /// 1. `tw_phrases`
+    /// 2. `tw_variants_phrases`
+    /// 3. `tw_variants`
     ///
-    /// Phrase-level Jieba segmentation is applied before each round to ensure
-    /// correct multi-character phrase matching.
-    ///
-    /// Punctuation conversion is enabled by default.
+    /// The first matching dictionary wins. A replacement is emitted directly and
+    /// is not passed through the remaining dictionaries, so dictionary precedence
+    /// remains deterministic without a second conversion round. Punctuation is
+    /// preserved.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Traditional Chinese text.
@@ -1893,18 +1895,17 @@ impl OpenCC {
     /// with Taiwan-specific idioms and variants.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let out = opencc.t2twp("後臺資訊");
+    /// assert_eq!(opencc.t2twp("鼠標"), "滑鼠");
     /// ```
     pub fn t2twp(&self, input: &str) -> String {
-        let round1 = [&self.dictionary.tw_phrases];
-        let round2 = [
+        let dict_refs = [
+            &self.dictionary.tw_phrases,
             &self.dictionary.tw_variants_phrases,
             &self.dictionary.tw_variants,
         ];
-
-        self.convert_rounds(input, &[&round1, &round2], true)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     /// Converts **Taiwan Traditional Chinese (Tw)** text to **Standard Traditional
@@ -1945,22 +1946,16 @@ impl OpenCC {
     /// Converts **Taiwan Traditional Chinese (Tw)** to **Standard Traditional Chinese
     /// with phrase refinement (Tw→Tp)**.
     ///
-    /// This corresponds to the OpenCC configuration **`tw2tp`**, which requires
-    /// **two rounds** of dictionary application:
+    /// This corresponds to the OpenCC configuration **`tw2tp`**. It segments the
+    /// input once and applies these dictionaries in precedence order:
     ///
-    /// 1. **Round 1**
-    ///    Normalize Taiwan-specific variants and idioms using:
-    ///    - `tw_variants_rev`
-    ///    - `tw_variants_rev_phrases`
+    /// 1. `tw_variants_rev`
+    /// 2. `tw_variants_rev_phrases`
+    /// 3. `tw_phrases_rev`
     ///
-    /// 2. **Round 2**
-    ///    Apply additional phrase-level normalization via:
-    ///    - `tw_phrases_rev`
-    ///
-    /// Jieba phrase segmentation is performed at each round to ensure correct
-    /// multi-character matching.
-    ///
-    /// Punctuation conversion is enabled.
+    /// The first matching dictionary wins. A replacement is emitted directly and
+    /// is not passed through the remaining dictionaries, avoiding a second
+    /// segmentation and conversion round. Punctuation is preserved.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Taiwan Traditional Chinese text.
@@ -1972,19 +1967,15 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let text = "裡頭"; // Taiwan variant + phrase
-    /// let out = opencc.tw2tp(text);
-    /// // Depending on dictionary, may normalize to "裏頭"
-    /// println!("{}", out);
+    /// assert_eq!(opencc.tw2tp("滑鼠"), "鼠標");
     /// ```
     pub fn tw2tp(&self, input: &str) -> String {
-        let round1 = [
+        let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
+            &self.dictionary.tw_phrases_rev,
         ];
-        let round2 = [&self.dictionary.tw_phrases_rev];
-
-        self.convert_rounds(input, &[&round1, &round2], true)
+        self.phrases_cut_convert(input, &dict_refs, true)
     }
 
     /// Converts Standard Traditional Chinese (T) text to **Hong Kong Traditional
@@ -2801,6 +2792,28 @@ mod tests {
         // Taiwan phrases have first priority within round 2, and their output
         // is not fed through a separate Taiwan-variant round afterward.
         assert_eq!(opencc.s2twp("甲", false), "乙");
+    }
+
+    #[test]
+    fn t2twp_uses_one_pass_with_dictionary_precedence() {
+        let mut dictionary = Dictionary::default();
+        dictionary.tw_phrases = dict(&[("甲", "乙")]);
+        dictionary.tw_variants_phrases = dict(&[("甲", "丁")]);
+        dictionary.tw_variants = dict(&[("乙", "丙")]);
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.t2twp("甲"), "乙");
+    }
+
+    #[test]
+    fn tw2tp_uses_one_pass_with_dictionary_precedence() {
+        let mut dictionary = Dictionary::default();
+        dictionary.tw_variants_rev = dict(&[("甲", "乙")]);
+        dictionary.tw_variants_rev_phrases = dict(&[("甲", "丁")]);
+        dictionary.tw_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.tw2tp("甲"), "乙");
     }
 
     #[test]
