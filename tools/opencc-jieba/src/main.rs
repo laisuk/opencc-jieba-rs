@@ -6,6 +6,7 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
+use std::path::Path;
 use std::sync::OnceLock;
 
 mod office_converter;
@@ -226,7 +227,7 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
 
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
-        Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
+        Some(file_name) => Box::new(open_input_file(file_name)?),
         None => {
             if io::stdin().is_terminal() {
                 eprintln!("{PROMPT_CONVERT}");
@@ -264,6 +265,7 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
     let input_file = matches
         .get_one::<String>("input")
         .ok_or("❌  Input file is required for office mode")?;
+    validate_input_file(input_file)?;
 
     let output_file = matches.get_one::<String>("output");
     let config = matches.get_one::<String>("config").unwrap();
@@ -366,7 +368,7 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
 
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
-        Some(file_name) => Box::new(BufReader::new(File::open(file_name)?)),
+        Some(file_name) => Box::new(open_input_file(file_name)?),
         None => {
             if io::stdin().is_terminal() {
                 eprintln!("{PROMPT_SEGMENT}");
@@ -525,4 +527,37 @@ fn normalize_line_endings(s: &str) -> String {
     }
 
     out
+}
+
+fn open_input_file<P: AsRef<Path>>(path: P) -> io::Result<BufReader<File>> {
+    let path = path.as_ref();
+    validate_input_file(path)?;
+    Ok(BufReader::new(File::open(path)?))
+}
+
+fn validate_input_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    let path = path.as_ref();
+
+    let metadata = std::fs::metadata(path).map_err(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Input file not found: {}", path.display()),
+            )
+        } else {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot access input file {}: {error}", path.display()),
+            )
+        }
+    })?;
+
+    if !metadata.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Input path is not a file: {}", path.display()),
+        ));
+    }
+
+    Ok(())
 }
