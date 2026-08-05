@@ -298,7 +298,11 @@ mod tests {
 
         jieba.add_word("云计算", Some(3), Some("n"));
 
-        let result = jieba.cut(input, false);
+        let result: Vec<&str> = jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|t| t.word)
+            .collect();
         println!("{:?}", result);
 
         assert!(result.contains(&"云计算"));
@@ -311,7 +315,12 @@ mod tests {
         let opencc = OpenCC::try_new_with_user_dict_path("tests/dicts/user_dict.txt")
             .unwrap_or_else(|e| panic!("failed to initialize OpenCC with user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|t| t.word)
+            .collect();
 
         println!("{:?}", result);
 
@@ -335,7 +344,12 @@ mod tests {
             .load_user_dict("tests/dicts/user_dict2.txt")
             .unwrap_or_else(|e| panic!("failed to load second user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|t| t.word)
+            .collect();
 
         println!("{:?}", result);
 

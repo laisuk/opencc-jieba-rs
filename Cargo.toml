@@ -35,7 +35,7 @@ default = []
 dictionary-build = []
 
 [dependencies]
-jieba-rs = { version = "=0.7.4", features = ["tfidf", "textrank"] }
+jieba-rs = { version = "0.10.3", features = ["tfidf", "textrank"] }
 regex = "1.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -46,10 +46,10 @@ zstd = "0.13"
 rayon = "=1.10"
 rayon-core = "=1.12"
 
-# Keep include-flate at 0.3.0 for Edition 2021 / MSRV compatibility.
-# Do not pin libflate directly; include-flate depends on libflate ^2.0,
+# jieba-rs 0.10 requires include-flate ^0.3.1, so the previous "=0.3.0" pin can no
+# longer resolve. Do not pin libflate directly; include-flate depends on libflate ^2.0,
 # allowing modern toolchains to resolve newer libflate versions that avoid yanked core2.
-include-flate = "=0.3.0"
+include-flate = "0.3.1"
 
 [profile.release]
 opt-level = 3              # Maximize speed (better suited for C API performance)

@@ -238,7 +238,7 @@
 //! These utilities can be used independently of Chinese variant conversion,
 //! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
 //! as indexing, text analysis, and keyword extraction.
-use jieba_rs::Jieba;
+use jieba_rs::{Jieba, Token};
 use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
@@ -952,7 +952,9 @@ impl OpenCC {
     ) {
         let tokens = self.jieba.cut(chunk, hmm);
 
-        'tok: for phrase in tokens {
+        'tok: for token in tokens {
+            let phrase = token.word;
+
             if phrase.is_empty() {
                 continue 'tok;
             }
@@ -1228,13 +1230,14 @@ impl OpenCC {
     ///   `split_string_ranges()`.
     fn phrases_cut_impl<F>(&self, input: &str, use_parallel: bool, cutter: F) -> Vec<String>
     where
-        F: for<'a> Fn(&Jieba, &'a str) -> Vec<&'a str> + Sync + Send,
+        F: for<'a> Fn(&Jieba, &'a str) -> Vec<Token<'a>> + Sync + Send,
     {
         let ranges = self.split_string_ranges(input, true);
 
         let process_range = |range: Range<usize>| {
-            let chunk = &input[range];
-            cutter(&self.jieba, chunk).into_iter().map(str::to_owned)
+            cutter(&self.jieba, &input[range])
+                .into_iter()
+                .map(|token| token.word.to_owned())
         };
 
         if use_parallel {
