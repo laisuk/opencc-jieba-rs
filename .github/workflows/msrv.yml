@@ -1,0 +1,26 @@
+name: MSRV 1.75.0
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  msrv:
+    name: Rust 1.75.0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.75.0
+        uses: dtolnay/rust-toolchain@1.75.0
+
+      - name: Test workspace on MSRV
+        run: cargo test --workspace --all-features --locked
