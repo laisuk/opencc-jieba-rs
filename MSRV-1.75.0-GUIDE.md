@@ -92,9 +92,8 @@ As a result:
 
 - Dependency updates are evaluated not only for new features, bug fixes, and performance improvements, but also for
   their impact on the library's effective MSRV.
-- Contributions that require a newer Rust compiler—whether due to language features or dependency upgrades—are welcome
-  for discussion. However, such changes may be deferred until the project intentionally decides to raise its MSRV in a
-  future release.
+- Changes that would raise the library's effective MSRV are carefully considered alongside their compatibility impact.
+  When appropriate, such changes may be scheduled for a future release that intentionally raises the project's MSRV.
 - Preserving MSRV compatibility helps downstream libraries and applications adopt **opencc-jieba-rs** without being
   forced to upgrade their Rust toolchain.
 
