@@ -2,9 +2,11 @@ name: MSRV 1.75.0
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
+
   pull_request:
-    branches: [master]
+    branches: [ master ]
+
   workflow_dispatch:
 
 permissions:
@@ -22,5 +24,10 @@ jobs:
       - name: Install Rust 1.75.0
         uses: dtolnay/rust-toolchain@1.75.0
 
+      - name: Check workspace on MSRV
+        if: github.event_name == 'push'
+        run: cargo check --workspace --all-features --locked
+
       - name: Test workspace on MSRV
+        if: github.event_name != 'push'
         run: cargo test --workspace --all-features --locked
