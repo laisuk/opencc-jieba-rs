@@ -10,17 +10,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Added `OpenCC::try_new_with_dictionary_zstd` to construct a converter from
-  a custom Zstd conversion pack produced by `dict-generate`.
-- Added transactional `OpenCC::load_dictionary_zstd` so custom conversion
-  packs compose with existing Jieba user-dictionary constructors and loaders.
-- Added dedicated errors for conversion-pack I/O, decoding, parsing, and
-  unsupported schema versions.
-- Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the
-  new `HKPhrases.txt` and `HKPhrasesRev.txt` dictionary slots.
-- Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus
-  the `t2hkp` and `hk2tp` configurations across the typed Rust API, workspace
-  CLIs, C/C++ integration, and Python wrapper.
+- Added `OpenCC::try_new_with_dictionary_zstd` to construct a converter from a custom Zstd conversion pack produced by
+  `dict-generate`.
+- Added transactional `OpenCC::load_dictionary_zstd` so custom conversion packs compose with existing Jieba
+  user-dictionary constructors and loaders.
+- Added dedicated errors for conversion-pack I/O, decoding, parsing, and unsupported schema versions.
+- Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the new `HKPhrases.txt` and `HKPhrasesRev.txt`
+  dictionary slots.
+- Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus the `t2hkp` and `hk2tp` configurations
+  across the typed Rust API, workspace CLIs, C/C++ integration, and Python wrapper.
 
 ### Changed
 
@@ -31,20 +29,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `jps_characters_rev`, matching `JPShinjitaiCharactersRev.txt`.
 - Updated the Japanese chains: `t2jp` uses `jps_characters_rev`, while
   `jp2t` uses `jps_phrases` followed by `jps_characters`.
-- Refactored `s2twp` from three dictionary passes to two: Taiwan phrases,
-  variant phrases, and character variants now run together in round 2.
-- Refactored the direct `t2twp` and `tw2tp` APIs from two conversion rounds to
-  one ordered dictionary pass. The first matching dictionary wins and emitted
-  replacements are no longer reprocessed by later dictionaries.
-- Documented all direct Taiwan and Hong Kong phrase conversions and their
-  dictionary precedence on docs.rs and in the README.
-- Moved the maintained C and C++ headers into `capi/include` and updated all
-  release and C API artifact workflows while preserving the published
+- Refactored `s2twp` from three dictionary passes to two: Taiwan phrases, variant phrases, and character variants now
+  run together in round 2.
+- Refactored the direct `t2twp` and `tw2tp` APIs from two conversion rounds to one ordered dictionary pass. The first
+  matching dictionary wins and emitted replacements are no longer reprocessed by later dictionaries.
+- Documented all direct Taiwan and Hong Kong phrase conversions and their dictionary precedence on docs.rs and in the
+  README.
+- Moved the maintained C and C++ headers into `capi/include` and updated all release and C API artifact workflows while
+  preserving the published
   `include/` archive layout.
-- Improved unmatched Jieba token handling by adding an internal fallback
-  forward maximum matching (FMM) pass for tokens of three or more characters,
-  allowing phrase recovery before character-by-character conversion while
-  preserving the existing conversion pipeline and performance.
+- Improved unmatched Jieba token handling by adding an internal fallback forward maximum matching (FMM) pass for tokens
+  of three or more characters, allowing phrase recovery before character-by-character conversion while preserving the
+  existing conversion pipeline and performance.
+- Made generated JSON conversion packs deterministic by serializing entries within each dictionary slot in
+  lexicographical key order, while preserving the existing slot order and dictionary contents. The stable ordering also
+  improves Zstd compression without affecting runtime conversion behavior.
 
 ---
 
@@ -58,22 +57,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
       `Jieba::default()`, and `load_default_dict()` for downstream crates.
     - `OpenCC::new()` behavior is unchanged: it still initializes Jieba with
       `opencc-jieba-rs`'s bundled Hans/Hant dictionary via `Jieba::with_dict(...)`.
-    - User dictionaries loaded through `OpenCC::load_user_dict()` continue to be
-      merged into the existing tokenizer and follow `jieba-rs` conflict behavior.
+    - User dictionaries loaded through `OpenCC::load_user_dict()` continue to be merged into the existing tokenizer and
+      follow `jieba-rs` conflict behavior.
 
 ### Notes
 
-- Re-enabling `jieba-rs` defaults also enables its `default-dict` feature. This improves
-  Cargo feature unification for downstream users, but may retain `jieba-rs`'s embedded
-  default dictionary support in size-sensitive binaries even when `OpenCC` itself uses
-  the bundled Hans/Hant dictionary.
-  In release builds, the current LTO-oriented profile (`lto = "fat"`,
-  `codegen-units = 1`, `panic = "abort"`, `strip = "symbols"`) can allow unused
-  static dictionary data to be optimized out when the low-level default dictionary
-  APIs are not used. This has been verified in real downstream builds, though exact
-  results may vary by target, linker, and build profile.
-- `jieba-rs` remains exactly pinned to `=0.7.4` to preserve stable segmentation behavior,
-  API compatibility, and MSRV-oriented dependency resolution.
+- Re-enabling `jieba-rs` defaults also enables its `default-dict` feature. This improves Cargo feature unification for
+  downstream users, but may retain `jieba-rs`'s embedded default dictionary support in size-sensitive binaries even when
+  `OpenCC` itself uses the bundled Hans/Hant dictionary. In release builds, the current LTO-oriented profile
+  (`lto = "fat"`,
+  `codegen-units = 1`, `panic = "abort"`, `strip = "symbols"`) can allow unused static dictionary data to be optimized
+  out when the low-level default dictionary APIs are not used. This has been verified in real downstream builds, though
+  exact results may vary by target, linker, and build profile.
+- `jieba-rs` remains exactly pinned to `=0.7.4` to preserve stable segmentation behavior, API compatibility, and
+  MSRV-oriented dependency resolution.
 
 ---
 
@@ -190,7 +187,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Optimized zho_check() to scan only first 1000 bytes of input string.
+- Optimized zho_check () to scan only first 1000 bytes of input string.
 - Optimized and add more wrapper methods in OpenccJiebaHelper.hpp
 - Update dictionaries
 - Optimized split input text by delimiters
