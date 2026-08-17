@@ -390,6 +390,7 @@ dependencies = [
  "clap",
  "clap_lex",
  "opencc-jieba-rs",
+ "opencc-tool-common",
 ]
 
 [[package]]
@@ -852,6 +853,7 @@ dependencies = [
  "encoding_rs",
  "encoding_rs_io",
  "opencc-jieba-rs",
+ "opencc-tool-common",
  "regex",
  "zip",
 ]
@@ -868,6 +870,13 @@ dependencies = [
  "serde",
  "serde_json",
  "zstd",
+]
+
+[[package]]
+name = "opencc-tool-common"
+version = "0.8.0"
+dependencies = [
+ "opencc-jieba-rs",
 ]
 
 [[package]]

@@ -22,6 +22,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   dictionary and custom Zstd conversion packs.
 - Added plaintext custom-dictionary file loading with ordered multi-file composition, UTF-8 BOM and comment handling,
   and OpenCC-style tab-separated mappings.
+- Added `-D` / `--custom-dict <slot>:<append|override>:<path>` to `dict-generate`, allowing custom conversion
+  dictionaries to be composed into generated JSON and Zstd packs without modifying the base dictionary sources. Multiple
+  custom dictionaries are applied in command-line order using the same slot and mode semantics as the Rust API.
+- Added `-D` / `--custom-dict <slot>:<append|override>:<path>` to the `opencc-jieba convert` command, allowing custom
+  conversion dictionaries to be applied post-load for individual text conversions. This option affects OpenCC conversion
+  mappings only and does not modify Jieba tokenization.
+- Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
+  conversion mappings and domain-specific tokenization separately.
 - Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
   conversion mappings and domain-specific tokenization separately.
 - Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the new `HKPhrases.txt` and `HKPhrasesRev.txt`

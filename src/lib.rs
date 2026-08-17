@@ -256,34 +256,12 @@ use crate::dictionary_lib::{DictMap, Dictionary};
 use crate::keyword::keyword_extract_internal;
 mod dictionary_lib;
 
-/// Dictionary-pack generation operations.
-///
-/// This module is available only with the `dictionary-build` feature. It is
-/// intended for tooling that builds runtime packs from the repository's
-/// `./dicts` source directory. The runtime dictionary representation, maps,
-/// metadata, and logical slots remain private.
-///
-/// The plaintext dictionary sources are not included in the published crate,
-/// so callers must provide the expected `./dicts` directory themselves.
-#[cfg(feature = "dictionary-build")]
-pub mod dictionary_build {
-    use crate::dictionary_lib::Dictionary;
-    use std::io;
-    use std::path::Path;
-
-    /// Builds dictionaries from `./dicts` and writes pretty-printed JSON.
-    pub fn write_json_pretty(path: impl AsRef<Path>) -> io::Result<()> {
-        Dictionary::from_dicts().save_json(path, true)
-    }
-
-    /// Builds dictionaries from `./dicts` and writes Zstd-compressed JSON.
-    pub fn write_zstd(path: impl AsRef<Path>) -> io::Result<()> {
-        Dictionary::from_dicts().save_json_compressed(path)
-    }
-}
 mod keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
+#[cfg(feature = "dictionary-build")]
+pub mod dictionary_build;
 mod opencc_config;
+
 pub use jieba_rs::Keyword;
 pub use opencc_config::OpenccConfig;
 
@@ -659,44 +637,6 @@ impl OpenCC {
         Ok(())
     }
 
-    /// Returns a mutable reference to the conversion dictionary for a custom slot.
-    ///
-    /// This helper maps a logical [`DictSlot`] to the corresponding [`DictMap`]
-    /// owned by this [`OpenCC`] instance. It is used internally when applying
-    /// post-load custom dictionary entries.
-    ///
-    /// # Since
-    /// v0.8.0
-    #[inline]
-    fn custom_slot_mut(&mut self, slot: DictSlot) -> &mut DictMap {
-        match slot {
-            DictSlot::STCharacters => &mut self.dictionary.st_characters,
-            DictSlot::STPhrases => &mut self.dictionary.st_phrases,
-            DictSlot::TSCharacters => &mut self.dictionary.ts_characters,
-            DictSlot::TSPhrases => &mut self.dictionary.ts_phrases,
-
-            DictSlot::TWPhrases => &mut self.dictionary.tw_phrases,
-            DictSlot::TWPhrasesRev => &mut self.dictionary.tw_phrases_rev,
-
-            DictSlot::HKPhrases => &mut self.dictionary.hk_phrases,
-            DictSlot::HKPhrasesRev => &mut self.dictionary.hk_phrases_rev,
-
-            DictSlot::TWVariants => &mut self.dictionary.tw_variants,
-            DictSlot::TWVariantsPhrases => &mut self.dictionary.tw_variants_phrases,
-            DictSlot::TWVariantsRev => &mut self.dictionary.tw_variants_rev,
-            DictSlot::TWVariantsRevPhrases => &mut self.dictionary.tw_variants_rev_phrases,
-
-            DictSlot::HKVariants => &mut self.dictionary.hk_variants,
-            DictSlot::HKVariantsPhrases => &mut self.dictionary.hk_variants_phrases,
-            DictSlot::HKVariantsRev => &mut self.dictionary.hk_variants_rev,
-            DictSlot::HKVariantsRevPhrases => &mut self.dictionary.hk_variants_rev_phrases,
-
-            DictSlot::JPSCharacters => &mut self.dictionary.jps_characters,
-            DictSlot::JPSCharactersRev => &mut self.dictionary.jps_characters_rev,
-            DictSlot::JPSPhrases => &mut self.dictionary.jps_phrases,
-        }
-    }
-
     /// Applies custom OpenCC conversion dictionary entries to this instance.
     ///
     /// Each [`CustomDictSpec`] targets one logical [`DictSlot`] and is applied
@@ -748,7 +688,7 @@ impl OpenCC {
         }
 
         for spec in specs {
-            let dict = self.custom_slot_mut(spec.slot);
+            let dict = self.dictionary.custom_slot_mut(spec.slot);
 
             if spec.mode == CustomDictMode::Override {
                 dict.clear();

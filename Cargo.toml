@@ -3,7 +3,8 @@ members = [
     "capi/opencc_jieba_capi",
     "tools/dict-generate",
     "tools/opencc-clip-jieba",
-    "tools/opencc-jieba"
+    "tools/opencc-jieba",
+    "tools/opencc-tool-common",
 ]
 
 [package]

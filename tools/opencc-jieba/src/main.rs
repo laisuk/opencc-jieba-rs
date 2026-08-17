@@ -3,6 +3,7 @@ use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
 use opencc_jieba_rs::{OpenCC, OpenccConfig};
+use opencc_tool_common::parse_custom_dict_spec;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
@@ -16,15 +17,15 @@ const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
 
 const PROMPT_CONVERT: &str = concat!(
-    "\x1B[1;34m",
-    "Input text to convert, <ctrl-z> or <ctrl-d> to submit:",
-    "\x1B[0m"
+"\x1B[1;34m",
+"Input text to convert, <ctrl-z> or <ctrl-d> to submit:",
+"\x1B[0m"
 );
 
 const PROMPT_SEGMENT: &str = concat!(
-    "\x1B[1;34m",
-    "Input text to segment, <ctrl-z> or <ctrl-d> to submit:",
-    "\x1B[0m"
+"\x1B[1;34m",
+"Input text to segment, <ctrl-z> or <ctrl-d> to submit:",
+"\x1B[0m"
 );
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -42,7 +43,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     BLUE, RESET
                 ))
                 .args(common_args())
-                .args(enc_args()),
+                .args(enc_args())
+                .arg(
+                    Arg::new("custom-dict")
+                        .short('D')
+                        .long("custom-dict")
+                        .value_name("SLOT:MODE:FILE")
+                        .action(clap::ArgAction::Append)
+                        .help(
+                            "Custom conversion dictionary file, e.g. \
+                             HKPhrasesRev:append:my_hk_dict.txt \
+                             (slot names are ASCII case-insensitive)",
+                        ),
+                ),
         )
         .subcommand(
             Command::new("office")
@@ -252,7 +265,7 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     }
 
     let input_str = decode_input(&buffer, in_enc)?;
-    let opencc = OpenCC::new();
+    let opencc = build_opencc(matches)?;
     let output_str = opencc.convert(&input_str, config, punctuation);
 
     let (is_console_output, mut output) = open_output(output_file)?;
@@ -267,6 +280,29 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     output.flush()?;
 
     Ok(())
+}
+
+/// Builds the converter used by the `convert` subcommand.
+///
+/// Without `-D/--custom-dict`, this returns the normal built-in converter.
+/// When one or more custom dictionary specs are supplied, they are parsed and
+/// applied post-load in command-line order.
+///
+/// Custom conversion dictionaries affect OpenCC mappings only; Jieba
+/// segmentation dictionaries remain unchanged.
+fn build_opencc(matches: &ArgMatches) -> Result<OpenCC, Box<dyn std::error::Error>> {
+    let mut opencc = OpenCC::new();
+
+    let Some(values) = matches.get_many::<String>("custom-dict") else {
+        return Ok(opencc);
+    };
+
+    let specs = values
+        .map(|value| parse_custom_dict_spec(value))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    opencc.load_custom_dict_files(&specs)?;
+    Ok(opencc)
 }
 
 fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
@@ -304,7 +340,7 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
             return Err(format!(
                 "❌  Unsupported Office extension: .{ext}. Please provide --format."
             )
-            .into());
+                .into());
         }
     };
 

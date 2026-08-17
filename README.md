@@ -50,20 +50,17 @@ target/release/opencc-jieba
 ```
 opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
 
-(Windows)
-Usage: opencc-jieba.exe convert [OPTIONS] --config <conversion>
-(Linux / macOS)
-Usage: opencc-jieba convert [OPTIONS] --config <conversion>
+Usage: opencc-jieba.exe convert [OPTIONS] --config <config>
 
 Options:
-  -i, --input <file>         Read original text from <file>.
-      --in-enc <encoding>    Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -o, --output <file>        Write converted text to <file>.
-      --out-enc <encoding>   Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -c, --config <conversion>  Conversion configuration: [s2t|s2tw|s2twp|s2hk|s2hkp|t2s|t2tw|t2twp|t2hk|t2hkp|tw2s|tw2sp|tw2t|tw2tp|hk2s|hk2sp|hk2t|hk2tp|jp2t|t2jp]
-  -p, --punct <boolean>      Punctuation conversion: [true|false] [default: false]
-  -h, --help                 Print help
-
+  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
+  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
+  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
+  -p, --punct                         Enable punctuation conversion
+      --in-enc <encoding>             Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>            Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
+  -h, --help                          Print help
 ```
 
 ## Usage: `opencc-jieba segment`

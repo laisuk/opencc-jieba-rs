@@ -327,6 +327,44 @@ impl Dictionary {
         }
     }
 
+    /// Returns a mutable reference to the conversion dictionary for a custom slot.
+    ///
+    /// This helper maps a logical [`DictSlot`] to the corresponding [`DictMap`]
+    /// owned by this [`Dictionary`]. It is shared by runtime post-load customization
+    /// and dictionary-build tooling.
+    ///
+    /// # Since
+    /// v0.8.0
+    #[inline]
+    pub(crate) fn custom_slot_mut(&mut self, slot: DictSlot) -> &mut DictMap {
+        match slot {
+            DictSlot::STCharacters => &mut self.st_characters,
+            DictSlot::STPhrases => &mut self.st_phrases,
+            DictSlot::TSCharacters => &mut self.ts_characters,
+            DictSlot::TSPhrases => &mut self.ts_phrases,
+
+            DictSlot::TWPhrases => &mut self.tw_phrases,
+            DictSlot::TWPhrasesRev => &mut self.tw_phrases_rev,
+
+            DictSlot::HKPhrases => &mut self.hk_phrases,
+            DictSlot::HKPhrasesRev => &mut self.hk_phrases_rev,
+
+            DictSlot::TWVariants => &mut self.tw_variants,
+            DictSlot::TWVariantsPhrases => &mut self.tw_variants_phrases,
+            DictSlot::TWVariantsRev => &mut self.tw_variants_rev,
+            DictSlot::TWVariantsRevPhrases => &mut self.tw_variants_rev_phrases,
+
+            DictSlot::HKVariants => &mut self.hk_variants,
+            DictSlot::HKVariantsPhrases => &mut self.hk_variants_phrases,
+            DictSlot::HKVariantsRev => &mut self.hk_variants_rev,
+            DictSlot::HKVariantsRevPhrases => &mut self.hk_variants_rev_phrases,
+
+            DictSlot::JPSCharacters => &mut self.jps_characters,
+            DictSlot::JPSCharactersRev => &mut self.jps_characters_rev,
+            DictSlot::JPSPhrases => &mut self.jps_phrases,
+        }
+    }
+
     /// Loads an OpenCC dictionary file.
     ///
     /// Rules:
@@ -402,6 +440,75 @@ impl Dictionary {
         Ok(dict)
     }
 
+    #[cfg(feature = "dictionary-build")]
+    fn load_custom_dictionary_from_path<P>(filename: P) -> io::Result<DictMap>
+    where
+        P: AsRef<Path>,
+    {
+        let path = filename.as_ref();
+        let file = File::open(path)?;
+        let mut dict = DictMap::default();
+
+        let mut saw_data_line = false;
+
+        for (lineno, line_res) in BufReader::new(file).lines().enumerate() {
+            let line = line_res?;
+            let mut s = line.trim_end();
+
+            if s.is_empty() {
+                continue;
+            }
+
+            if s.trim_start().starts_with('#') {
+                continue;
+            }
+
+            if !saw_data_line {
+                if let Some(rest) = s.strip_prefix('\u{FEFF}') {
+                    s = rest;
+                }
+                saw_data_line = true;
+
+                if s.is_empty() {
+                    continue;
+                }
+            }
+
+            let Some((k, v)) = s.split_once('\t') else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{}:{}: missing TAB separator", path.display(), lineno + 1),
+                ));
+            };
+
+            let val = v.split_whitespace().next().unwrap_or("");
+
+            if k.is_empty() || val.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{}:{}: empty key or value", path.display(), lineno + 1),
+                ));
+            }
+
+            let key = k.to_string();
+            let value = val.to_string();
+            let len_chars = u16::try_from(key.chars().count()).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "{}:{}: key exceeds supported character length",
+                        path.display(),
+                        lineno + 1
+                    ),
+                )
+            })?;
+
+            dict.insert_with_len(key, value, len_chars);
+        }
+
+        Ok(dict)
+    }
+
     /// Saves this dictionary as compressed JSON using Zstandard.
     #[cfg(feature = "dictionary-build")]
     pub(crate) fn save_json_compressed(&self, path: impl AsRef<Path>) -> io::Result<()> {
@@ -425,5 +532,79 @@ impl Dictionary {
         }
         writer.flush()?;
         Ok(())
+    }
+
+    #[cfg(feature = "dictionary-build")]
+    pub(crate) fn from_dicts_with_custom_files<P>(
+        specs: &[CustomDictFileSpec<P>],
+    ) -> io::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let mut dictionary = Self::from_dicts();
+
+        for spec in specs {
+            let dict = dictionary.custom_slot_mut(spec.slot);
+
+            if spec.mode == CustomDictMode::Override {
+                dict.clear();
+            }
+
+            for file in &spec.files {
+                let custom = Self::load_custom_dictionary_from_path(file)?;
+
+                for (key, value) in custom.into_entries() {
+                    let len_chars = key.chars().count() as u16;
+                    dict.insert_with_len(key, value, len_chars);
+                }
+            }
+        }
+
+        Ok(dictionary)
+    }
+}
+
+#[cfg(all(test, feature = "dictionary-build"))]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dict_path(name: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        std::env::temp_dir().join(format!(
+            "opencc-jieba-rs-dictionary-build-{name}-{nonce}.txt"
+        ))
+    }
+
+    #[test]
+    fn custom_build_dictionary_rejects_malformed_line() {
+        let path = temp_dict_path("malformed");
+        fs::write(&path, "帕兰蒂尔\t柏蘭蒂爾\nmalformed-without-tab\n").unwrap();
+
+        let specs = [CustomDictFileSpec {
+            slot: DictSlot::STPhrases,
+            files: vec![path.clone()],
+            mode: CustomDictMode::Append,
+        }];
+
+        let result = Dictionary::from_dicts_with_custom_files(&specs);
+
+        let _ = fs::remove_file(&path);
+
+        let err = match result {
+            Ok(_) => panic!("malformed custom dictionary must be rejected"),
+            Err(err) => err,
+        };
+
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+
+        let message = err.to_string();
+        assert!(message.contains("missing TAB separator"));
+        assert!(message.contains(":2:"));
     }
 }

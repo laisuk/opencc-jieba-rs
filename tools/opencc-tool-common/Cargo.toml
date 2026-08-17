@@ -1,0 +1,8 @@
+[package]
+name = "opencc-tool-common"
+version = "0.8.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+opencc-jieba-rs = { path = "../.." }

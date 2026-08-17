@@ -1,6 +1,4 @@
-use opencc_jieba_rs::{
-    CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot, OpenCC,
-};
+use opencc_jieba_rs::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot, OpenCC};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,9 +13,7 @@ mod tests {
             .unwrap()
             .as_nanos();
 
-        std::env::temp_dir().join(format!(
-            "opencc-jieba-rs-custom-dict-{name}-{nonce}.txt"
-        ))
+        std::env::temp_dir().join(format!("opencc-jieba-rs-custom-dict-{name}-{nonce}.txt"))
     }
 
     #[test]
@@ -146,11 +142,7 @@ mod tests {
     fn custom_file_parser_supports_comments_bom_and_multiple_values() {
         let path = temp_dict_path("parser");
 
-        fs::write(
-            &path,
-            "\u{FEFF}# custom dictionary\n\n龙\t龍龍 備選值\n",
-        )
-        .unwrap();
+        fs::write(&path, "\u{FEFF}# custom dictionary\n\n龙\t龍龍 備選值\n").unwrap();
 
         let mut opencc = OpenCC::new();
 
@@ -218,10 +210,7 @@ mod tests {
             }])
             .unwrap();
 
-        assert_eq!(
-            opencc.jieba.cut("帕兰蒂尔", false),
-            vec!["帕兰蒂尔"]
-        );
+        assert_eq!(opencc.jieba.cut("帕兰蒂尔", false), vec!["帕兰蒂尔"]);
         assert_eq!(opencc.s2t("帕兰蒂尔", false), "柏蘭蒂爾");
     }
 }

@@ -190,4 +190,17 @@ impl DictMap {
     pub(crate) fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
+
+    /// Consumes this dictionary and returns its raw mapping entries.
+    ///
+    /// This is used by dictionary-build tooling when composing custom
+    /// dictionary files into a generated conversion pack.
+    ///
+    /// # Since
+    /// v0.8.0
+    #[cfg(feature = "dictionary-build")]
+    #[inline]
+    pub(crate) fn into_entries(self) -> impl Iterator<Item = (String, String)> {
+        self.map.into_iter()
+    }
 }
