@@ -18,6 +18,59 @@ use zstd::Encoder;
 
 pub(crate) const SCHEMA_VERSION: u16 = 3;
 
+/// Serializes a [`DictMap`] with its JSON object entries sorted lexicographically by key.
+///
+/// The helper preserves the existing serialized representation of [`DictMap`] and
+/// only imposes deterministic ordering on the entries of that JSON object. It does
+/// not modify the underlying runtime map or change the declaration order of fields
+/// in [`Dictionary`].
+///
+/// This keeps exported dictionaries easier to inspect and edit by hand, produces
+/// stable source-control diffs, and makes dictionary builds reproducible without
+/// replacing the runtime map with an ordered map.
+///
+/// # Serialization behavior
+///
+/// Given a `DictMap` whose serialized entries would otherwise appear in arbitrary
+/// order, for example:
+///
+/// ```json
+/// {
+///   "中": "中",
+///   "一": "壹",
+///   "二": "貳"
+/// }
+/// ```
+///
+/// this helper emits:
+///
+/// ```json
+/// {
+///   "一": "壹",
+///   "中": "中",
+///   "二": "貳"
+/// }
+/// ```
+///
+/// Only map-entry order is affected. Top-level dictionary slots such as
+/// `st_characters`, `st_phrases`, and `ts_characters` remain in the order declared
+/// by [`Dictionary`].
+fn serialize_dict_map_sorted<S>(map: &DictMap, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use std::collections::BTreeMap;
+
+    let value = serde_json::to_value(map).map_err(serde::ser::Error::custom)?;
+
+    let serde_json::Value::Object(entries) = value else {
+        return value.serialize(serializer);
+    };
+
+    let sorted: BTreeMap<_, _> = entries.into_iter().collect();
+    sorted.serialize(serializer)
+}
+
 /// Represents a collection of various Chinese character and phrase mappings
 /// used for conversion between Simplified, Traditional, Taiwanese, Hong Kong,
 /// and Japanese variants.
@@ -26,47 +79,61 @@ pub(crate) const SCHEMA_VERSION: u16 = 3;
 pub(crate) struct Dictionary {
     pub(crate) schema_version: u16,
     /// Simplified to Traditional character mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) st_characters: DictMap,
     /// Simplified to Traditional phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) st_phrases: DictMap,
     /// Traditional to Simplified character mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) ts_characters: DictMap,
     /// Traditional to Simplified phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) ts_phrases: DictMap,
     /// Taiwanese phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_phrases: DictMap,
     /// Reverse Taiwanese phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_phrases_rev: DictMap,
     /// Hong Kong phrase mappings.
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_phrases: DictMap,
     /// Reverse Hong Kong phrase mappings.
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_phrases_rev: DictMap,
     /// Taiwanese variant phrase mappings.
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_variants_phrases: DictMap,
     /// Taiwanese variant mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_variants: DictMap,
     /// Reverse Taiwanese variant mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_variants_rev: DictMap,
     /// Reverse Taiwanese variant phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) tw_variants_rev_phrases: DictMap,
     /// Hong Kong variant phrase mappings.
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_variants_phrases: DictMap,
     /// Hong Kong variant mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_variants: DictMap,
     /// Reverse Hong Kong variant mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_variants_rev: DictMap,
     /// Reverse Hong Kong variant phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) hk_variants_rev_phrases: DictMap,
     /// Japanese Shinjitai character mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) jps_characters: DictMap,
     /// Reverse Japanese Shinjitai character mappings.
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_dict_map_sorted")]
     pub(crate) jps_characters_rev: DictMap,
     /// Japanese Shinjitai phrase mappings.
+    #[serde(serialize_with = "serialize_dict_map_sorted")]
     pub(crate) jps_phrases: DictMap,
     /// Legacy schema-2 Traditional-to-Japanese mappings.
     #[serde(default, rename = "jp_variants", skip_serializing)]
