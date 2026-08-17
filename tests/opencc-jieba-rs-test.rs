@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_textrank() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
         let output = opencc.keyword_extract_textrank(input, 10);
         println!("TextRank: {:?}", output);
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_textrank_pos() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
 
         // Common content POS (nouns + verbs)
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_textrank_pos_vs_all() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
 
         let all = opencc.keyword_extract_textrank(input, 10);
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_keyword_weight_textrank() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
         let output = opencc.keyword_weight_textrank(input, 10);
         println!("TextRank: {:?}", output);
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_tfidf() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
         let output = opencc.keyword_extract_tfidf(input, 10);
         println!("TF-IDF: {:?}", output);
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_tfidf_pos() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
 
         // Common content POS (nouns + verbs)
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_keyword_extract_tfidf_pos_vs_all() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
 
         let all = opencc.keyword_extract_tfidf(input, 10);
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_keyword_weight_tfidf() {
-        let input = include_str!("../src/OneDay.txt");
+        let input = include_str!("data/OneDay.txt");
         let opencc = OpenCC::new();
         let output = opencc.keyword_weight_tfidf(input, 10);
         println!("TF-IDF: {:?}", output);

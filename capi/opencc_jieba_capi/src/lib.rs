@@ -859,7 +859,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_textrank() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method = raw_cstring("textrank");
@@ -880,7 +880,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_tfidf() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method = raw_cstring("tfidf");
@@ -901,7 +901,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_textrank_pos() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method = raw_cstring("textrank");
@@ -925,7 +925,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_tfidf_pos() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method = raw_cstring("tfidf");
@@ -949,7 +949,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_textrank_pos_empty_equivalent() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method = raw_cstring("textrank");
@@ -973,7 +973,7 @@ mod tests {
     #[test]
     fn test_opencc_jieba_keyword_extract_textrank_pos_compare() {
         let opencc = OpenCC::new();
-        let input = CString::new(include_str!("../../../src/OneDay.txt"))
+        let input = CString::new(include_str!("../../../tests/data/OneDay.txt"))
             .unwrap()
             .into_raw();
         let method_all = raw_cstring("textrank");

@@ -61,6 +61,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Made generated JSON conversion packs deterministic by serializing entries within each dictionary slot in
   lexicographical key order, while preserving the existing slot order and dictionary contents. The stable ordering also
   improves Zstd compression without affecting runtime conversion behavior.
+- Extracted the core `OpenCC` implementation from `lib.rs` into a dedicated `opencc.rs` module, leaving `lib.rs` as the
+  crate entry point.
 
 ---
 
