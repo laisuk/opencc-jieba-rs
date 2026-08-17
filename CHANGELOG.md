@@ -15,6 +15,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added transactional `OpenCC::load_dictionary_zstd` so custom conversion packs compose with existing Jieba
   user-dictionary constructors and loaders.
 - Added dedicated errors for conversion-pack I/O, decoding, parsing, and unsupported schema versions.
+- Added post-load custom conversion dictionaries with `DictSlot`, `CustomDictMode`, `CustomDictSpec`, and
+  `CustomDictFileSpec`, supporting per-slot `append` and `override` semantics.
+- Added transactional `OpenCC::load_custom_dicts` and `OpenCC::load_custom_dict_files` APIs. Custom mappings are applied
+  to the conversion dictionary already owned by the converter, allowing them to compose with both the built-in
+  dictionary and custom Zstd conversion packs.
+- Added plaintext custom-dictionary file loading with ordered multi-file composition, UTF-8 BOM and comment handling,
+  and OpenCC-style tab-separated mappings.
+- Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
+  conversion mappings and domain-specific tokenization separately.
 - Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the new `HKPhrases.txt` and `HKPhrasesRev.txt`
   dictionary slots.
 - Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus the `t2hkp` and `hk2tp` configurations

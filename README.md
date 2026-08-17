@@ -12,9 +12,8 @@ High-performance Rust-based Chinese text converter using Jieba segmentation and 
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust.yml/badge.svg)
 
 A Rust-based Chinese text converter powered by **OpenCC lexicons**, using **Jieba** for word segmentation to improve
-phrase-level accuracy.
-This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant)
-conversion.
+phrase-level accuracy. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese**
+(zh-Hans ↔ zh-Hant) conversion.
 
 ## Features
 
@@ -199,9 +198,8 @@ fn main() {
 
 ## C API Usage (`opencc_jieba_capi`)
 
-You can also use `opencc-jieba-rs` via a C API for integration with C/C++ projects.
-The maintained C and C++ headers live in [`capi/include`](./capi/include); add
-that directory to your compiler's include path.
+You can also use `opencc-jieba-rs` via a C API for integration with C/C++ projects. The maintained C and C++ headers
+live in [`capi/include`](./capi/include); add that directory to your compiler's include path.
 
 ### Example
 
@@ -276,8 +274,8 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 
 ### Generate and load a custom conversion dictionary
 
-Power users can edit the OpenCC source files under `dicts/` and generate a
-runtime conversion pack with the workspace tool:
+Power users can edit the OpenCC source files under `dicts/` and generate a runtime conversion pack with the workspace
+tool:
 
 ```bash
 cargo run -p dict-generate -- --format zstd --output dictionary.json.zst
@@ -295,8 +293,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Custom OpenCC conversion dictionaries and Jieba user dictionaries are
-independent and can be combined in either order:
+Custom OpenCC conversion dictionaries and Jieba user dictionaries are independent and can be combined in either order:
 
 ```rust
 use opencc_jieba_rs::OpenCC;
@@ -314,8 +311,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The loader validates Zstd data, JSON structure, and the dictionary schema
-version before replacing the active conversion mappings.
+The loader validates Zstd data, JSON structure, and the dictionary schema version before replacing the active conversion
+mappings.
 
 Schema 3 uses the upstream-aligned JP/HK slots:
 
@@ -331,9 +328,142 @@ Schema 3 uses the upstream-aligned JP/HK slots:
 | `jps_characters`          | `JPShinjitaiCharacters.txt`    |
 | `jps_characters_rev`      | `JPShinjitaiCharactersRev.txt` |
 
-The legacy `JPVariants.txt` and `JPVariantsRev.txt` slots are not emitted in
-schema-3 packs. Schema-2 custom packs remain loadable through compatibility
-fallbacks.
+The legacy `JPVariants.txt` and `JPVariantsRev.txt` slots are not emitted in schema-3 packs. Schema-2 custom packs
+remain loadable through compatibility fallbacks.
+
+---
+
+## Custom OpenCC conversion dictionaries
+
+For smaller runtime changes, you do not need to rebuild or replace the complete Zstd conversion pack. `OpenCC` can apply
+custom mappings directly to individual OpenCC dictionary slots after the converter has been created.
+
+Custom conversion dictionaries are separate from Jieba user dictionaries:
+
+- **OpenCC custom dictionaries** change conversion mappings such as `帕兰蒂尔 → 柏蘭蒂爾`.
+- **Jieba user dictionaries** change tokenization, frequencies, and POS tags.
+
+They can be used independently or together. For domain-specific phrases, a Jieba entry can preserve the phrase as one
+token while a custom OpenCC slot provides its conversion.
+
+### Load custom mappings from pairs
+
+Use `CustomDictSpec` when mappings are already available in memory:
+
+```rust
+use opencc_jieba_rs::{CustomDictMode, CustomDictSpec, DictSlot, OpenCC};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cc = OpenCC::new();
+
+    cc.load_custom_dicts(&[CustomDictSpec {
+        slot: DictSlot::STPhrases,
+        pairs: vec![("帕兰蒂尔".to_string(), "柏蘭蒂爾".to_string())],
+        mode: CustomDictMode::Append,
+    }])?;
+
+    assert_eq!(cc.s2t("帕兰蒂尔", false), "柏蘭蒂爾");
+    Ok(())
+}
+```
+
+`Append` keeps the existing slot and adds or replaces the supplied keys. When multiple specs or mappings target the same
+key, the last applied value wins.
+`Override` clears the selected slot first and then inserts the custom mappings. Other dictionary slots are left
+unchanged.
+
+Custom dictionary loading is transactional: validation or parsing errors do not partially modify the converter.
+
+### Load custom mappings from OpenCC text files
+
+Use `CustomDictFileSpec` to load one or more OpenCC-style dictionary files:
+
+```rust
+use opencc_jieba_rs::{
+    CustomDictFileSpec, CustomDictMode, DictSlot, OpenCC,
+};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cc = OpenCC::new();
+
+    cc.load_custom_dict_files(&[CustomDictFileSpec {
+        slot: DictSlot::STPhrases,
+        files: vec!["dicts/my_phrases.txt".into()],
+        mode: CustomDictMode::Append,
+    }])?;
+
+    Ok(())
+}
+```
+
+Files are applied in the listed order and use the normal OpenCC dictionary format:
+
+```text
+source<TAB>target
+```
+
+Blank lines and comment lines beginning with `#` are ignored. UTF-8 BOM is accepted, and when a source line contains
+multiple whitespace-separated target values, the first target is used.
+
+### Available custom dictionary slots
+
+`DictSlot::ALL` is the single source of truth for the public slot list, and
+`DictSlot::canonical_name()` returns each stable slot name.
+
+| `DictSlot`             | Conversion dictionary                       |
+|------------------------|---------------------------------------------|
+| `STCharacters`         | Simplified → Traditional characters         |
+| `STPhrases`            | Simplified → Traditional phrases            |
+| `STPunctuations`       | Simplified → Traditional punctuation        |
+| `TSCharacters`         | Traditional → Simplified characters         |
+| `TSPhrases`            | Traditional → Simplified phrases            |
+| `TSPunctuations`       | Traditional → Simplified punctuation        |
+| `TWPhrases`            | Traditional → Taiwan phrases                |
+| `TWPhrasesRev`         | Taiwan → Traditional phrases                |
+| `HKPhrases`            | Traditional → Hong Kong phrases             |
+| `HKPhrasesRev`         | Hong Kong → Traditional phrases             |
+| `TWVariants`           | Traditional → Taiwan character variants     |
+| `TWVariantsPhrases`    | Traditional → Taiwan phrase variants        |
+| `TWVariantsRev`        | Taiwan → Traditional character variants     |
+| `TWVariantsRevPhrases` | Taiwan → Traditional phrase variants        |
+| `HKVariants`           | Traditional → Hong Kong character variants  |
+| `HKVariantsPhrases`    | Traditional → Hong Kong phrase variants     |
+| `HKVariantsRev`        | Hong Kong → Traditional character variants  |
+| `HKVariantsRevPhrases` | Hong Kong → Traditional phrase variants     |
+| `JPSCharacters`        | Japanese Shinjitai → Traditional characters |
+| `JPSCharactersRev`     | Traditional → Japanese Shinjitai characters |
+| `JPSPhrases`           | Japanese Shinjitai → Traditional phrases    |
+
+The `JPS*` names are the canonical public slot names. The physical bundled files retain the `JPShinjitai*.txt`
+filenames.
+
+### Combine custom conversion mappings with Jieba terms
+
+For domain-specific phrases, both layers can be useful:
+
+```rust
+use opencc_jieba_rs::{CustomDictMode, CustomDictSpec, DictSlot, OpenCC};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cc = OpenCC::new();
+
+    // Tokenization: preserve the domain term as one Jieba token.
+    cc.load_user_dict("dicts/user_dict.txt")?;
+
+    // Conversion: define how that token should be converted.
+    cc.load_custom_dicts(&[CustomDictSpec {
+        slot: DictSlot::STPhrases,
+        pairs: vec![("帕兰蒂尔".to_string(), "柏蘭蒂爾".to_string())],
+        mode: CustomDictMode::Append,
+    }])?;
+
+    assert_eq!(cc.s2t("帕兰蒂尔", false), "柏蘭蒂爾");
+    Ok(())
+}
+```
+
+Custom slot mappings are applied to the conversion dictionary already owned by the `OpenCC` instance, so they also
+compose with a converter created from a custom Zstd conversion pack.
 
 ---
 

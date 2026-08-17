@@ -1,4 +1,5 @@
 mod dict_map;
+mod dict_slots;
 
 #[cfg(feature = "dictionary-build")]
 use std::fs::File;
@@ -10,6 +11,9 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 pub(crate) use crate::dictionary_lib::dict_map::DictMap;
+pub use crate::dictionary_lib::dict_slots::{
+    CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot,
+};
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;

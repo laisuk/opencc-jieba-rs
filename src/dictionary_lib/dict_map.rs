@@ -102,7 +102,6 @@ impl DictMap {
     /// * `len_chars` — Number of Unicode scalar values in `key`.
     ///
     #[inline]
-    #[cfg(any(feature = "dictionary-build", test))]
     pub(crate) fn insert_with_len(&mut self, key: String, val: String, len_chars: u16) {
         if len_chars != 0 {
             if len_chars <= 64 {
@@ -110,14 +109,32 @@ impl DictMap {
             } else {
                 self.long_lengths.insert(len_chars);
             }
+
             if self.min_len == 0 || len_chars < self.min_len {
                 self.min_len = len_chars;
             }
+
             if len_chars > self.max_len {
                 self.max_len = len_chars;
             }
         }
+
         self.map.insert(key, val);
+    }
+
+    /// Clears all dictionary entries and resets the associated key-length metadata.
+    ///
+    /// This restores the [`DictMap`] to its default empty state, including
+    /// `min_len`, `max_len`, the key-length bitmask, and long-key length tracking.
+    ///
+    /// This is used when a custom dictionary overrides an existing dictionary slot,
+    /// ensuring that no metadata from the previous entries remains.
+    ///
+    /// # Since
+    /// v0.8.0
+    #[inline]
+    pub(crate) fn clear(&mut self) {
+        *self = Self::default();
     }
 
     /// Retrieves the mapped value for a given key (if any).

@@ -251,6 +251,7 @@ use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
 use zstd::stream::read::Decoder;
 
+pub use crate::dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};
 use crate::dictionary_lib::{DictMap, Dictionary};
 use crate::keyword::keyword_extract_internal;
 mod dictionary_lib;
@@ -495,6 +496,15 @@ pub enum OpenccError {
     /// 区块链 10 nz
     /// ```
     UserDictParse(String),
+
+    /// Failed to validate or apply a custom conversion dictionary entry.
+    CustomDictParse(String),
+
+    /// Failed to read a custom conversion dictionary file.
+    CustomDictIo(io::Error),
+
+    /// Failed to parse a custom conversion dictionary file.
+    CustomDictFileParse(String),
 }
 
 impl fmt::Display for OpenccError {
@@ -518,6 +528,15 @@ impl fmt::Display for OpenccError {
             ),
             Self::UserDictIo(e) => write!(f, "user dictionary I/O error: {e}"),
             Self::UserDictParse(e) => write!(f, "user dictionary parse error: {e}"),
+            Self::CustomDictParse(e) => {
+                write!(f, "custom conversion dictionary error: {e}")
+            },
+            Self::CustomDictIo(e) => {
+                write!(f, "custom conversion dictionary I/O error: {e}")
+            }
+            Self::CustomDictFileParse(e) => {
+                write!(f, "custom conversion dictionary parse error: {e}")
+            },
         }
     }
 }
@@ -525,7 +544,7 @@ impl fmt::Display for OpenccError {
 impl std::error::Error for OpenccError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::DictionaryIo(e) | Self::UserDictIo(e) => Some(e),
+            Self::DictionaryIo(e) | Self::UserDictIo(e) | Self::CustomDictIo(e) => Some(e),
             _ => None,
         }
     }
@@ -638,6 +657,226 @@ impl OpenCC {
         let dictionary = Self::read_dictionary_zstd(path)?;
         self.dictionary = dictionary;
         Ok(())
+    }
+
+    /// Returns a mutable reference to the conversion dictionary for a custom slot.
+    ///
+    /// This helper maps a logical [`DictSlot`] to the corresponding [`DictMap`]
+    /// owned by this [`OpenCC`] instance. It is used internally when applying
+    /// post-load custom dictionary entries.
+    ///
+    /// # Since
+    /// v0.8.0
+    #[inline]
+    fn custom_slot_mut(&mut self, slot: DictSlot) -> &mut DictMap {
+        match slot {
+            DictSlot::STCharacters => &mut self.dictionary.st_characters,
+            DictSlot::STPhrases => &mut self.dictionary.st_phrases,
+            DictSlot::TSCharacters => &mut self.dictionary.ts_characters,
+            DictSlot::TSPhrases => &mut self.dictionary.ts_phrases,
+
+            DictSlot::TWPhrases => &mut self.dictionary.tw_phrases,
+            DictSlot::TWPhrasesRev => &mut self.dictionary.tw_phrases_rev,
+
+            DictSlot::HKPhrases => &mut self.dictionary.hk_phrases,
+            DictSlot::HKPhrasesRev => &mut self.dictionary.hk_phrases_rev,
+
+            DictSlot::TWVariants => &mut self.dictionary.tw_variants,
+            DictSlot::TWVariantsPhrases => &mut self.dictionary.tw_variants_phrases,
+            DictSlot::TWVariantsRev => &mut self.dictionary.tw_variants_rev,
+            DictSlot::TWVariantsRevPhrases => &mut self.dictionary.tw_variants_rev_phrases,
+
+            DictSlot::HKVariants => &mut self.dictionary.hk_variants,
+            DictSlot::HKVariantsPhrases => &mut self.dictionary.hk_variants_phrases,
+            DictSlot::HKVariantsRev => &mut self.dictionary.hk_variants_rev,
+            DictSlot::HKVariantsRevPhrases => &mut self.dictionary.hk_variants_rev_phrases,
+
+            DictSlot::JPSCharacters => &mut self.dictionary.jps_characters,
+            DictSlot::JPSCharactersRev => &mut self.dictionary.jps_characters_rev,
+            DictSlot::JPSPhrases => &mut self.dictionary.jps_phrases,
+        }
+    }
+
+    /// Applies custom OpenCC conversion dictionary entries to this instance.
+    ///
+    /// Each [`CustomDictSpec`] targets one logical [`DictSlot`] and is applied
+    /// in the order supplied.
+    ///
+    /// [`CustomDictMode::Append`] merges entries into the existing slot using
+    /// last-wins semantics for duplicate keys.
+    ///
+    /// [`CustomDictMode::Override`] clears the target slot first, then inserts
+    /// the supplied entries.
+    ///
+    /// This method modifies OpenCC conversion dictionaries only. It does not
+    /// modify the Jieba tokenizer or Jieba user dictionary.
+    ///
+    /// # Arguments
+    ///
+    /// * `specs` - Custom conversion dictionary specifications to apply.
+    ///
+    /// # Notes
+    ///
+    /// Custom dictionaries are applied post-load to the dictionary already owned
+    /// by this [`OpenCC`] instance. This means they compose naturally with both
+    /// the built-in conversion dictionary and dictionaries loaded through
+    /// [`OpenCC::load_dictionary_zstd`].
+    ///
+    /// # Since
+    /// v0.8.0
+    pub fn load_custom_dicts(&mut self, specs: &[CustomDictSpec]) -> Result<(), OpenccError> {
+        for spec in specs {
+            for (key, value) in &spec.pairs {
+                if key.is_empty() {
+                    return Err(OpenccError::CustomDictParse(
+                        "custom dictionary key must not be empty".to_string(),
+                    ));
+                }
+
+                if value.is_empty() {
+                    return Err(OpenccError::CustomDictParse(
+                        "custom dictionary value must not be empty".to_string(),
+                    ));
+                }
+
+                u16::try_from(key.chars().count()).map_err(|_| {
+                    OpenccError::CustomDictParse(
+                        "custom dictionary key exceeds supported character length".to_string(),
+                    )
+                })?;
+            }
+        }
+
+        for spec in specs {
+            let dict = self.custom_slot_mut(spec.slot);
+
+            if spec.mode == CustomDictMode::Override {
+                dict.clear();
+            }
+
+            for (key, value) in &spec.pairs {
+                let len_chars = key.chars().count() as u16;
+
+                dict.insert_with_len(key.clone(), value.clone(), len_chars);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Loads and applies custom OpenCC conversion dictionaries from plaintext files.
+    ///
+    /// Each [`CustomDictFileSpec`] targets one logical [`DictSlot`] and may contain
+    /// one or more OpenCC-style dictionary files.
+    ///
+    /// Files use the format:
+    ///
+    /// ```text
+    /// source<TAB>target
+    /// ```
+    ///
+    /// Empty lines and comment lines starting with `#` are ignored. If multiple
+    /// target values are present, only the first whitespace-separated value is used.
+    ///
+    /// Files within each specification are read in the supplied order. The parsed
+    /// entries are then applied through [`OpenCC::load_custom_dicts`], so pair-based
+    /// and file-based customization share identical append/override semantics.
+    ///
+    /// This method modifies OpenCC conversion dictionaries only. It does not modify
+    /// Jieba segmentation or Jieba user dictionaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a file cannot be opened/read or contains a malformed
+    /// dictionary entry.
+    ///
+    /// No conversion dictionary changes are applied unless all files have been
+    /// successfully parsed.
+    ///
+    /// # Since
+    /// v0.8.0
+    pub fn load_custom_dict_files<P>(
+        &mut self,
+        specs: &[CustomDictFileSpec<P>],
+    ) -> Result<(), OpenccError>
+    where
+        P: AsRef<Path>,
+    {
+        let mut pair_specs = Vec::with_capacity(specs.len());
+
+        for spec in specs {
+            let mut pairs = Vec::new();
+
+            for path in &spec.files {
+                pairs.extend(Self::read_custom_dict_file(path)?);
+            }
+
+            pair_specs.push(CustomDictSpec {
+                slot: spec.slot,
+                pairs,
+                mode: spec.mode,
+            });
+        }
+
+        self.load_custom_dicts(&pair_specs)
+    }
+
+    /// Reads an OpenCC-style custom conversion dictionary file into key-value pairs.
+    ///
+    /// The expected format is:
+    ///
+    /// ```text
+    /// source<TAB>target
+    /// ```
+    ///
+    /// Blank lines and comment lines beginning with `#` are ignored. A UTF-8 BOM
+    /// is stripped from the first physical line. If multiple target candidates are
+    /// present, only the first whitespace-separated value is retained.
+    fn read_custom_dict_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<Vec<(String, String)>, OpenccError> {
+        let path = path.as_ref();
+        let file = File::open(path).map_err(OpenccError::CustomDictIo)?;
+        let reader = BufReader::new(file);
+
+        let mut pairs = Vec::new();
+
+        for (lineno, line) in reader.lines().enumerate() {
+            let line = line.map_err(OpenccError::CustomDictIo)?;
+            let mut s = line.trim_end();
+
+            if lineno == 0 {
+                if let Some(rest) = s.strip_prefix('\u{FEFF}') {
+                    s = rest;
+                }
+            }
+
+            if s.is_empty() || s.trim_start().starts_with('#') {
+                continue;
+            }
+
+            let Some((key, values)) = s.split_once('\t') else {
+                return Err(OpenccError::CustomDictFileParse(format!(
+                    "{}:{}: missing TAB separator",
+                    path.display(),
+                    lineno + 1
+                )));
+            };
+
+            let value = values.split_whitespace().next().unwrap_or("");
+
+            if key.is_empty() || value.is_empty() {
+                return Err(OpenccError::CustomDictFileParse(format!(
+                    "{}:{}: empty key or value",
+                    path.display(),
+                    lineno + 1
+                )));
+            }
+
+            pairs.push((key.to_owned(), value.to_owned()));
+        }
+
+        Ok(pairs)
     }
 
     /// Loads a Jieba user dictionary into the current [`OpenCC`] instance.
