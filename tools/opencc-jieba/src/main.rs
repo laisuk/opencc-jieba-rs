@@ -17,15 +17,15 @@ const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
 
 const PROMPT_CONVERT: &str = concat!(
-"\x1B[1;34m",
-"Input text to convert, <ctrl-z> or <ctrl-d> to submit:",
-"\x1B[0m"
+    "\x1B[1;34m",
+    "Input text to convert, <ctrl-z> or <ctrl-d> to submit:",
+    "\x1B[0m"
 );
 
 const PROMPT_SEGMENT: &str = concat!(
-"\x1B[1;34m",
-"Input text to segment, <ctrl-z> or <ctrl-d> to submit:",
-"\x1B[0m"
+    "\x1B[1;34m",
+    "Input text to segment, <ctrl-z> or <ctrl-d> to submit:",
+    "\x1B[0m"
 );
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,18 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ))
                 .args(common_args())
                 .args(enc_args())
-                .arg(
-                    Arg::new("custom-dict")
-                        .short('D')
-                        .long("custom-dict")
-                        .value_name("SLOT:MODE:FILE")
-                        .action(clap::ArgAction::Append)
-                        .help(
-                            "Custom conversion dictionary file, e.g. \
-                             HKPhrasesRev:append:my_hk_dict.txt \
-                             (slot names are ASCII case-insensitive)",
-                        ),
-                ),
         )
         .subcommand(
             Command::new("office")
@@ -208,6 +196,16 @@ fn common_args() -> Vec<Arg> {
             .long("punct")
             .action(clap::ArgAction::SetTrue)
             .help("Enable punctuation conversion"),
+        Arg::new("custom-dict")
+            .short('D')
+            .long("custom-dict")
+            .value_name("SLOT:MODE:FILE")
+            .action(clap::ArgAction::Append)
+            .help(
+                "Custom conversion dictionary file, e.g. \
+                             HKPhrasesRev:append:my_hk_dict.txt \
+                             (slot names are ASCII case-insensitive)",
+            ),
     ]
 }
 
@@ -340,7 +338,7 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
             return Err(format!(
                 "❌  Unsupported Office extension: .{ext}. Please provide --format."
             )
-                .into());
+            .into());
         }
     };
 
@@ -348,7 +346,8 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         return Err(format!("❌  Unsupported Office format: {office_format}").into());
     }
 
-    let helper = OpenCC::new();
+    // let helper = OpenCC::new();
+    let helper = build_opencc(matches)?;
 
     let final_output = match output_file {
         Some(path) => {
