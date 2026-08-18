@@ -1,7 +1,7 @@
+use crate::dictionary_lib;
 use crate::dictionary_lib::{
     CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictMap, Dictionary,
 };
-use crate::dictionary_lib;
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
 use jieba_rs::{Jieba, Keyword};
@@ -280,6 +280,77 @@ impl std::error::Error for OpenccError {
     }
 }
 
+/// A single in-memory Jieba user-dictionary entry.
+///
+/// `UserDictEntry` provides the structured equivalent of one line in a
+/// Jieba user dictionary file:
+///
+/// ```text
+/// word freq [tag]
+/// ```
+///
+/// The frequency is required and influences Jieba's segmentation behavior.
+/// The part-of-speech tag is optional.
+///
+/// This type is intended for applications that already hold custom terms in
+/// memory and therefore do not need to create a temporary user-dictionary
+/// file before loading them into [`OpenCC`].
+///
+/// # Fields
+///
+/// - [`word`](Self::word) — The word or phrase to add to the Jieba dictionary.
+/// - [`freq`](Self::freq) — The word frequency used by Jieba segmentation.
+/// - [`tag`](Self::tag) — Optional part-of-speech tag, such as `"n"` or `"nz"`.
+///
+/// # Example
+///
+/// ```
+/// use opencc_jieba_rs::UserDictEntry;
+///
+/// let entry = UserDictEntry {
+///     word: "云计算".to_string(),
+///     freq: 100_000,
+///     tag: Some("n".to_string()),
+/// };
+///
+/// assert_eq!(entry.word, "云计算");
+/// assert_eq!(entry.freq, 100_000);
+/// assert_eq!(entry.tag.as_deref(), Some("n"));
+/// ```
+///
+/// An entry does not require a POS tag:
+///
+/// ```
+/// use opencc_jieba_rs::UserDictEntry;
+///
+/// let entry = UserDictEntry {
+///     word: "OpenAI".to_string(),
+///     freq: 100_000,
+///     tag: None,
+/// };
+///
+/// assert_eq!(entry.tag, None);
+/// ```
+///
+/// # See also
+///
+/// - [`OpenCC::load_user_dict`](crate::OpenCC::load_user_dict) for loading
+///   Jieba user-dictionary entries from a file.
+///
+/// # Since
+/// v0.8.0
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserDictEntry {
+    /// Word or phrase to add to the Jieba dictionary.
+    pub word: String,
+
+    /// Frequency used by Jieba when determining segmentation.
+    pub freq: usize,
+
+    /// Optional Jieba part-of-speech tag.
+    pub tag: Option<String>,
+}
+
 /// The main struct for performing Chinese text conversion and segmentation.
 ///
 /// `OpenCC` combines a [`Jieba`] tokenizer with OpenCC-style dictionaries,
@@ -391,7 +462,7 @@ impl OpenCC {
 
     /// Applies custom OpenCC conversion dictionary entries to this instance.
     ///
-    /// Each [`CustomDictSpec`] targets one logical [`DictSlot`] and is applied
+    /// Each [`CustomDictSpec`] targets one logical [`crate::DictSlot`] and is applied
     /// in the order supplied.
     ///
     /// [`CustomDictMode::Append`] merges entries into the existing slot using
@@ -458,7 +529,7 @@ impl OpenCC {
 
     /// Loads and applies custom OpenCC conversion dictionaries from plaintext files.
     ///
-    /// Each [`CustomDictFileSpec`] targets one logical [`DictSlot`] and may contain
+    /// Each [`CustomDictFileSpec`] targets one logical [`crate::DictSlot`] and may contain
     /// one or more OpenCC-style dictionary files.
     ///
     /// Files use the format:
@@ -647,6 +718,76 @@ impl OpenCC {
         Ok(())
     }
 
+    /// Loads in-memory Jieba user-dictionary entries into this [`OpenCC`] instance.
+    ///
+    /// This is the structured equivalent of [`OpenCC::load_user_dict`], but accepts
+    /// already parsed [`UserDictEntry`] values instead of reading a dictionary file.
+    ///
+    /// Each entry contains:
+    ///
+    /// - a word or phrase
+    /// - a required frequency
+    /// - an optional part-of-speech tag
+    ///
+    /// Entries are applied to a cloned Jieba tokenizer first. The current tokenizer
+    /// is replaced only after all entries have been successfully added, preserving
+    /// the existing instance if loading fails.
+    ///
+    /// This method affects Jieba segmentation only. It does not modify OpenCC
+    /// conversion dictionaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - Jieba user-dictionary entries to add.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use opencc_jieba_rs::{OpenCC, UserDictEntry};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    ///
+    /// let entries = vec![
+    ///     UserDictEntry {
+    ///         word: "云计算".to_string(),
+    ///         freq: 100_000,
+    ///         tag: Some("n".to_string()),
+    ///     },
+    ///     UserDictEntry {
+    ///         word: "OpenAI".to_string(),
+    ///         freq: 100_000,
+    ///         tag: None,
+    ///     },
+    /// ];
+    ///
+    /// cc.load_user_dict_entries(&entries)?;
+    ///
+    /// assert_eq!(cc.jieba_cut("云计算", false), vec!["云计算"]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Since
+    /// v0.8.0
+    pub fn load_user_dict_entries(&mut self, entries: &[UserDictEntry]) -> Result<(), OpenccError> {
+        let mut new_jieba = (*self.jieba).clone();
+
+        for entry in entries {
+            if entry.word.is_empty() {
+                return Err(OpenccError::UserDictParse(
+                    "user dictionary word must not be empty".to_string(),
+                ));
+            }
+
+            new_jieba.add_word(&entry.word, Some(entry.freq), entry.tag.as_deref());
+        }
+
+        self.jieba = Arc::new(new_jieba);
+
+        Ok(())
+    }
+
     /// Internal fallible constructor for [`OpenCC`].
     ///
     /// This method initializes the embedded Jieba tokenizer from the compressed
@@ -756,6 +897,55 @@ impl OpenCC {
     pub fn try_new_with_user_dict_path<P: AsRef<Path>>(path: P) -> Result<Self, OpenccError> {
         let mut opencc = Self::try_new_internal()?;
         opencc.load_user_dict(path)?;
+        Ok(opencc)
+    }
+
+    /// Creates a new [`OpenCC`] instance and loads in-memory Jieba
+    /// user-dictionary entries.
+    ///
+    /// This is the structured equivalent of
+    /// [`OpenCC::try_new_with_user_dict_path`]. It initializes the built-in
+    /// OpenCC conversion dictionaries and Jieba tokenizer, then applies the
+    /// supplied [`UserDictEntry`] values.
+    ///
+    /// This affects Jieba segmentation only. It does not modify the OpenCC
+    /// conversion dictionaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - Jieba user-dictionary entries to load.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// - the embedded Jieba dictionary fails to initialize
+    /// - any user-dictionary entry is invalid
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use opencc_jieba_rs::{OpenCC, UserDictEntry};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let entries = [UserDictEntry {
+    ///     word: "云计算".to_string(),
+    ///     freq: 100_000,
+    ///     tag: Some("n".to_string()),
+    /// }];
+    ///
+    /// let cc = OpenCC::try_new_with_user_dict_entries(&entries)?;
+    ///
+    /// assert_eq!(cc.jieba_cut("云计算", false), vec!["云计算"]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Since
+    /// v0.8.0
+    pub fn try_new_with_user_dict_entries(entries: &[UserDictEntry]) -> Result<Self, OpenccError> {
+        let mut opencc = Self::try_new_internal()?;
+        opencc.load_user_dict_entries(entries)?;
         Ok(opencc)
     }
 
@@ -2948,8 +3138,8 @@ mod tests {
     #[test]
     fn custom_dictionary_zstd_composes_with_jieba_user_dictionary() {
         let dictionary_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/dictionary_lib/dicts/dictionary.json.zst"
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/dictionary_lib/dicts/dictionary.json.zst"
         );
         let user_dictionary_path = std::env::temp_dir().join(format!(
             "opencc-jieba-rs-user-dict-{}.txt",

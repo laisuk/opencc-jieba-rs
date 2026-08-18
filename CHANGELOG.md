@@ -28,10 +28,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added `-D` / `--custom-dict <slot>:<append|override>:<path>` to the `opencc-jieba convert` command, allowing custom
   conversion dictionaries to be applied post-load for individual text conversions. This option affects OpenCC conversion
   mappings only and does not modify Jieba tokenization.
+- Added `UserDictEntry` for defining Jieba user-dictionary entries directly in memory with a word, required frequency,
+  and optional part-of-speech tag.
+- Added transactional `OpenCC::load_user_dict_entries` for applying in-memory Jieba user-dictionary entries to an
+  existing converter without requiring a temporary dictionary file.
+- Added `OpenCC::try_new_with_user_dict_entries` for constructing a converter with in-memory Jieba user-dictionary
+  entries.
 - Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
-  conversion mappings and domain-specific tokenization separately.
-- Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
-  conversion mappings and domain-specific tokenization separately.
+  conversion mappings and domain-specific tokenization separately through either file-based or in-memory APIs.
 - Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the new `HKPhrases.txt` and `HKPhrasesRev.txt`
   dictionary slots.
 - Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus the `t2hkp` and `hk2tp` configurations

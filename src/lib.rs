@@ -250,7 +250,7 @@ pub mod dictionary_build;
 pub use dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};
 pub use jieba_rs::Keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
-pub use opencc::{find_max_utf8_length, is_delimiter, OpenCC, OpenccError};
+pub use opencc::{find_max_utf8_length, is_delimiter, OpenCC, OpenccError, UserDictEntry};
 pub use opencc_config::OpenccConfig;
 
 // Kept at the crate root for the internal keyword module's existing call path.

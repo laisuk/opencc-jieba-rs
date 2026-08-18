@@ -42,13 +42,10 @@ mod tests {
 
     #[test]
     fn parses_custom_dict_slots_case_insensitively() {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/data/my_hk_dict.txt");
+        let path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/data/my_hk_dict.txt");
 
-        let arg = format!(
-            " jpscharactersrev : APPEND : {} ",
-            path.display()
-        );
+        let arg = format!(" jpscharactersrev : APPEND : {} ", path.display());
 
         let spec = parse_custom_dict_spec(&arg).unwrap();
 

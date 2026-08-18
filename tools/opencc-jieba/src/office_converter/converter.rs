@@ -787,7 +787,7 @@ mod tests {
             true,
             true,
         )
-            .expect("convert_bytes failed");
+        .expect("convert_bytes failed");
 
         assert_eq!(
             converted_count, 1,
@@ -830,7 +830,7 @@ mod tests {
                  </row></sheetData></worksheet>"
                     .as_bytes(),
             )
-                .unwrap();
+            .unwrap();
 
             zip.finish().unwrap();
         }
@@ -845,7 +845,7 @@ mod tests {
             true,
             true,
         )
-            .expect("convert_bytes failed");
+        .expect("convert_bytes failed");
 
         let cursor = Cursor::new(out_bytes);
         let mut zip = ZipArchive::new(cursor).expect("Output is not a valid ZIP archive");

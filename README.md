@@ -506,6 +506,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### In-memory user dictionary entries
+
+Applications that already hold terms in memory can use `UserDictEntry` directly without creating a temporary dictionary
+file. Each entry contains a word, required frequency, and optional part-of-speech tag.
+
+```rust
+use opencc_jieba_rs::{OpenCC, UserDictEntry};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let entries = [
+        UserDictEntry {
+            word: "云计算".to_string(),
+            freq: 100_000,
+            tag: Some("n".to_string()),
+        },
+        UserDictEntry {
+            word: "OpenAI".to_string(),
+            freq: 100_000,
+            tag: None,
+        },
+    ];
+
+    let mut opencc = OpenCC::new();
+    opencc.load_user_dict_entries(&entries)?;
+
+    Ok(())
+}
+```
+
+You can also construct the converter with in-memory entries directly:
+
+```rust
+use opencc_jieba_rs::{OpenCC, UserDictEntry};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let entries = [UserDictEntry {
+        word: "人工智能".to_string(),
+        freq: 100_000,
+        tag: Some("n".to_string()),
+    }];
+
+    let opencc = OpenCC::try_new_with_user_dict_entries(&entries)?;
+    Ok(())
+}
+```
+
+This is useful for dynamic sources such as GUI text input, databases, configuration files, generated terminology, or
+network data. In-memory Jieba entries affect tokenization only; they do not modify OpenCC conversion mappings.
+
 ### User dictionary format
 
 The user dictionary must follow the `jieba-rs` format:

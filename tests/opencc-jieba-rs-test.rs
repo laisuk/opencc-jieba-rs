@@ -3,6 +3,7 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opencc_jieba_rs::{OpenccError, UserDictEntry};
     use std::sync::Arc;
 
     #[test]
@@ -358,5 +359,77 @@ mod tests {
                 "技术"
             ]
         );
+    }
+
+    #[test]
+    fn load_user_dict_entries_adds_words() {
+        let mut opencc = OpenCC::new();
+
+        let entries = [UserDictEntry {
+            word: "火星詞".to_string(),
+            freq: 100_000,
+            tag: Some("n".to_string()),
+        }];
+
+        opencc.load_user_dict_entries(&entries).unwrap();
+
+        assert_eq!(opencc.jieba_cut("火星詞", false), vec!["火星詞"]);
+    }
+
+    #[test]
+    fn load_user_dict_entries_compose_across_calls() {
+        let mut opencc = OpenCC::new();
+
+        opencc
+            .load_user_dict_entries(&[UserDictEntry {
+                word: "火星詞".to_string(),
+                freq: 100_000,
+                tag: Some("n".to_string()),
+            }])
+            .unwrap();
+
+        opencc
+            .load_user_dict_entries(&[UserDictEntry {
+                word: "木星詞".to_string(),
+                freq: 100_000,
+                tag: Some("n".to_string()),
+            }])
+            .unwrap();
+
+        assert_eq!(opencc.jieba_cut("火星詞", false), vec!["火星詞"]);
+        assert_eq!(opencc.jieba_cut("木星詞", false), vec!["木星詞"]);
+    }
+
+    #[test]
+    fn load_user_dict_entries_rejects_empty_word() {
+        let mut opencc = OpenCC::new();
+
+        let result = opencc.load_user_dict_entries(&[UserDictEntry {
+            word: String::new(),
+            freq: 100_000,
+            tag: None,
+        }]);
+
+        assert!(matches!(result, Err(OpenccError::UserDictParse(_))));
+    }
+
+    #[test]
+    fn new_with_user_dict_entries_adds_words() {
+        let entries = [UserDictEntry {
+            word: "火星詞".to_string(),
+            freq: 100_000,
+            tag: Some("n".to_string()),
+        }];
+
+        let opencc = OpenCC::try_new_with_user_dict_entries(&entries).unwrap();
+
+        assert_eq!(opencc.jieba_cut("火星詞", false), vec!["火星詞"]);
+    }
+
+    #[test]
+    fn new_with_empty_user_dict_entries_succeeds() {
+        let opencc = OpenCC::try_new_with_user_dict_entries(&[]).unwrap();
+
+        assert_eq!(opencc.s2t("汉字", false), "漢字");
     }
 }

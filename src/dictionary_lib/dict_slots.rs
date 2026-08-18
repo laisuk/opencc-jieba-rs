@@ -17,8 +17,8 @@ use std::path::Path;
 
 /// Identifies a logical conversion dictionary slot.
 ///
-/// Each slot corresponds to one [`DictMap`](crate::dictionary_lib::DictMap)
-/// stored inside [`Dictionary`](crate::dictionary_lib::Dictionary).
+/// Each slot corresponds to one internal dictionary map stored inside the
+/// runtime conversion dictionary.
 ///
 /// Custom dictionaries can append entries to a slot or replace that slot's
 /// contents entirely.
@@ -121,7 +121,7 @@ impl TryFrom<&str> for DictSlot {
 impl DictSlot {
     /// Every supported logical conversion dictionary slot.
     ///
-    /// The order follows the field order used by the runtime [`Dictionary`].
+    /// The order follows the field order used by the runtime dictionary.
     pub const ALL: &'static [Self] = &[
         Self::STCharacters,
         Self::STPhrases,
