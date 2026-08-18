@@ -57,9 +57,10 @@ Options:
   -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
   -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
   -p, --punct                         Enable punctuation conversion
+  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
+  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
       --in-enc <encoding>             Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
       --out-enc <encoding>            Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
   -h, --help                          Print help
 ```
 
@@ -77,6 +78,7 @@ Options:
   -s, --separator <character>  Separator character for segmented mode=tag (use " " for space) [default: /]
   -m, --mode <mode>            Segmentation mode: cut | search | all | tag [default: cut] [possible values: cut, search, all, tag]
       --no-hmm                 Disable HMM for segmentation and tagging
+  -U, --user-dict-file <FILE>  Jieba user dictionary file; may be specified multiple times
       --in-enc <encoding>      Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
       --out-enc <encoding>     Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -h, --help                   Print help
@@ -92,14 +94,16 @@ opencc-jieba office: Convert Office or EPUB documents using OpenCC
 Usage: opencc-jieba.exe office [OPTIONS] --config <config>
 
 Options:
-  -i, --input <file>     Input <file> (use stdin if omitted for non-office documents)
-  -o, --output <file>    Output <file> (use stdout if omitted for non-office documents)
-  -c, --config <config>  Conversion configuration <config> [possible values: s2t, s2tw, s2twp, s2hk, s2hkp, t2s, t2tw, t2twp, t2hk, t2hkp, tw2s, tw2sp, tw2t, tw2tp, hk2s, hk2sp, hk2t, hk2tp, jp2t, t2jp]
-  -p, --punct            Enable punctuation conversion
-  -f, --format <ext>     Force office document format <ext>: docx, xlsx, pptx odt, ods, odp, epub
-      --keep-font        Preserve original font styles
-      --auto-ext         Infer format from file extension
-  -h, --help             Print help
+  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
+  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
+  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
+  -p, --punct                         Enable punctuation conversion
+  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
+  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
+  -f, --format <ext>                  Force office document format <ext>: docx, xlsx, pptx, odt, ods, odp, epub
+  -k, --keep-font                     Preserve original font styles
+      --convert-filename              Convert the output filename using the selected OpenCC configuration
+  -h, --help                          Print help
 ```
 
 ### Example
@@ -111,11 +115,24 @@ opencc-jieba convert -i input.txt -o output.txt --config s2t
 # Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
 opencc-jieba convert -i input.txt -o output.txt --config tw2s
 
+# Convert with a Jieba user dictionary and a custom OpenCC conversion dictionary
+opencc-jieba convert -i input.txt -o output.txt --config hk2sp \
+  --user-dict-file user_dict.txt \
+  --custom-dict HkPhrasesRev:append:my_hk_dict.txt
+
 # Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese with idioms
 opencc-jieba office -i input.docx -o output.docx --config tw2sp --punct --format docx --keep-font
 
+# Convert an Office document with a Jieba user dictionary
+opencc-jieba office -i input.docx -o output.docx --config s2t \
+  --user-dict-file user_dict.txt
+
 # Segment text file contents then output to new file
 opencc-jieba segment -i input.txt -o output.txt --delim ","
+
+# Segment using a Jieba user dictionary
+opencc-jieba segment -i input.txt -o output.txt \
+  --user-dict-file user_dict.txt
 
 # Segment with POS tagging (format: word:tag)
 opencc-jieba segment -i input.txt -o output.txt --mode tag --delim " " --separator ":"

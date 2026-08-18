@@ -40,6 +40,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   dictionary slots.
 - Added direct Hong Kong phrase APIs `OpenCC::t2hkp` and `OpenCC::hk2tp`, plus the `t2hkp` and `hk2tp` configurations
   across the typed Rust API, workspace CLIs, C/C++ integration, and Python wrapper.
+- CLI: Added repeatable `-U` / `--user-dict-file <FILE>` support to the `convert`, `office`, and `segment` commands,
+  allowing Jieba user dictionaries to be loaded for custom tokenization.
 
 ### Changed
 

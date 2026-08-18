@@ -132,6 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .action(clap::ArgAction::SetTrue)
                         .help("Disable HMM for segmentation and tagging"),
                 )
+                .arg(user_dict_arg())
                 .args(enc_args()),
         )
         .get_matches();
@@ -167,6 +168,15 @@ fn config_value_parser() -> ValueParser {
             .map(str::to_owned)
             .map_err(|_| format!("\nSupported configs: {}", get_supported_configs()))
     }))
+}
+
+fn user_dict_arg() -> Arg {
+    Arg::new("user-dict-file")
+        .short('U')
+        .long("user-dict-file")
+        .value_name("FILE")
+        .action(clap::ArgAction::Append)
+        .help("Jieba user dictionary file; may be specified multiple times")
 }
 
 fn common_args() -> Vec<Arg> {
@@ -206,6 +216,7 @@ fn common_args() -> Vec<Arg> {
                              HKPhrasesRev:append:my_hk_dict.txt \
                              (slot names are ASCII case-insensitive)",
             ),
+        user_dict_arg(),
     ]
 }
 
@@ -288,18 +299,41 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
 ///
 /// Custom conversion dictionaries affect OpenCC mappings only; Jieba
 /// segmentation dictionaries remain unchanged.
+fn load_user_dict_files(
+    opencc: &mut OpenCC,
+    matches: &ArgMatches,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(paths) = matches.get_many::<String>("user-dict-file") {
+        for path in paths {
+            opencc.load_user_dict(path)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Builds the converter used by the `convert` and `office` subcommands.
+///
+/// Jieba user dictionaries supplied with `-U/--user-dict-file` are loaded
+/// first, in command-line order. Custom OpenCC conversion dictionaries
+/// supplied with `-D/--custom-dict` are then parsed and applied post-load,
+/// also in command-line order.
+///
+/// The two customization layers are independent: `-U` affects Jieba
+/// tokenization, while `-D` affects OpenCC conversion mappings.
 fn build_opencc(matches: &ArgMatches) -> Result<OpenCC, Box<dyn std::error::Error>> {
     let mut opencc = OpenCC::new();
 
-    let Some(values) = matches.get_many::<String>("custom-dict") else {
-        return Ok(opencc);
-    };
+    load_user_dict_files(&mut opencc, matches)?;
 
-    let specs = values
-        .map(|value| parse_custom_dict_spec(value))
-        .collect::<Result<Vec<_>, _>>()?;
+    if let Some(values) = matches.get_many::<String>("custom-dict") {
+        let specs = values
+            .map(|value| parse_custom_dict_spec(value))
+            .collect::<Result<Vec<_>, _>>()?;
 
-    opencc.load_custom_dict_files(&specs)?;
+        opencc.load_custom_dict_files(&specs)?;
+    }
+
     Ok(opencc)
 }
 
@@ -445,7 +479,8 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     }
 
     let mut input_str = decode_input(&buffer, in_enc)?;
-    let opencc = OpenCC::new();
+    let mut opencc = OpenCC::new();
+    load_user_dict_files(&mut opencc, matches)?;
     if is_console {
         input_str = normalize_line_endings(&input_str);
         // Remove trailing submit newline from interactive console input
