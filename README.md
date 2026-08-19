@@ -175,7 +175,7 @@ To add this crate to your project:
 
 ```bash
 cargo add opencc-jieba-rs
-````
+```
 
 Or add the following line to your `Cargo.toml`:
 
@@ -264,10 +264,14 @@ Converted Code: 1
 
 ## Project Structure
 
-- `src/lib.rs` – Main library with segmentation logic.
+- `src/lib.rs` – Crate entry point, module declarations, and public re-exports.
+- `src/opencc.rs` – Main `OpenCC` implementation, conversion, segmentation, Jieba user dictionary, and runtime custom
+  dictionary APIs.
+- `src/opencc_config.rs` – Strongly typed conversion configuration.
+- `src/dictionary_lib/` – Internal runtime dictionary implementation and public custom dictionary slot/spec definitions.
 - `capi/opencc_jieba_capi` – C ABI implementation crate.
 - `capi/include` – Canonical public C and C++ headers.
-- `tools/opencc-jieba/src/main.rs` – CLI tool (`opencc-cs`) implementation.
+- `tools/opencc-jieba/src/main.rs` – `opencc-jieba` CLI implementation.
 - `dicts/` – OpenCC text lexicons which converted into JSON format.
 
 ---
@@ -428,10 +432,8 @@ multiple whitespace-separated target values, the first target is used.
 |------------------------|---------------------------------------------|
 | `STCharacters`         | Simplified → Traditional characters         |
 | `STPhrases`            | Simplified → Traditional phrases            |
-| `STPunctuations`       | Simplified → Traditional punctuation        |
 | `TSCharacters`         | Traditional → Simplified characters         |
 | `TSPhrases`            | Traditional → Simplified phrases            |
-| `TSPunctuations`       | Traditional → Simplified punctuation        |
 | `TWPhrases`            | Traditional → Taiwan phrases                |
 | `TWPhrasesRev`         | Taiwan → Traditional phrases                |
 | `HKPhrases`            | Traditional → Hong Kong phrases             |

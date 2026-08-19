@@ -46,8 +46,8 @@
 //! - **Jieba segmentation** for phrase-level matching
 //! - Optional **punctuation conversion**
 //!
-//! All methods take `&self` and `&str` input and return a newly allocated
-//! `String`.
+//! The high-level text conversion methods take `&self` and `&str` input and
+//! return an owned `String`.
 //!
 //! ## Quick Start
 //!
@@ -59,40 +59,12 @@
 //! let tw = opencc.t2tw(&t);    // Traditional → Taiwan Traditional
 //! ```
 //!
-//! ## Phrase-Level vs Character-Level
-//!
-//! There are two main categories of conversion:
-//!
-//! 1. **Phrase-level conversions**
-//!    Use Jieba segmentation and multiple dictionaries to correctly handle
-//!    idioms, multi-character words, and regional preferences.
-//!
-//! 2. **Character-level conversions**
-//!    Use only character variant dictionaries (no segmentation), ideal for
-//!    high-speed normalization where phrase context is unimportant.
-//!
 //! ## Core Simplified ↔ Traditional
 //!
-//! | Direction | Method         | Level      | Notes                                     |
-//! |----------|----------------|-----------|-------------------------------------------|
-//! | S → T    | [`OpenCC::s2t`] | Phrase    | Standard Simplified → Traditional.        |
-//! | T → S    | [`OpenCC::t2s`] | Phrase    | Standard Traditional → Simplified.        |
-//! | S → T    | `st`            | Character | Fast char-only S→T (no segmentation).     |
-//! | T → S    | `ts`            | Character | Fast char-only T→S (no segmentation).     |
-//!
-//! ### `s2t` / `t2s`
-//!
-//! - Use phrase dictionaries + Jieba segmentation.
-//! - Preserve idioms and phrase-level semantics where possible.
-//! - Recommended for user-facing text conversion.
-//!
-//! ### `st` / `ts`
-//!
-//! - Use only `st_characters` / `ts_characters` dictionaries.
-//! - Do **not** segment or match phrases.
-//! - Ideal for:
-//!   - bulk normalization
-//!   - preprocessing before heavier conversions
+//! [`OpenCC::s2t`] and [`OpenCC::t2s`] use phrase and character dictionaries
+//! with internal Jieba segmentation. For configuration-driven conversion, use
+//! [`OpenCC::convert`] or [`OpenCC::convert_with_config`]. Character-level
+//! conversion helpers are internal implementation details.
 //!
 //! ## Taiwan Traditional (Tw)
 //!
@@ -143,18 +115,14 @@
 //!
 //! ## Punctuation and Symbols
 //!
-//! Most high-level methods enable **punctuation conversion** by default,
-//! using OpenCC’s punctuation dictionaries to normalize:
+//! Some Simplified/Traditional conversion methods accept a
+//! `punctuation: bool` argument. When enabled, supported methods apply the
+//! punctuation mapping after text conversion. Direct regional and variant
+//! methods without that argument preserve punctuation.
 //!
-//! - Chinese-style quotes / brackets
-//! - Full-width / half-width punctuation
-//!
-//! Lower-level helpers inside this crate may expose more granular control if
-//! you need to:
-//!
-//! - disable punctuation conversion
-//! - run custom dictionary pipelines
-//! - integrate with your own segmentation logic
+//! [`OpenCC::convert`] and [`OpenCC::convert_with_config`] accept the same
+//! option generically, but ignore it for configurations whose direct method has
+//! no punctuation conversion stage.
 //!
 //! ## User Dictionaries
 //!
@@ -224,8 +192,6 @@
 //!   **`s2hkp` / `hk2sp`** when Hong Kong phrase preferences are required.
 //! - Use **`t2jp` / `jp2t`** for interoperability with **Japanese Kanji** forms,
 //!   when only character-shape conversion is desired (not full translation).
-//! - Use **`st` / `ts`** when you need **fast, character-only** normalization
-//!   with minimal overhead.
 //!
 //! For segmentation-only or keyword extraction APIs, see:
 //!

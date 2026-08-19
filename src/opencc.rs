@@ -1150,7 +1150,7 @@ impl OpenCC {
     /// # Examples
     /// ```ignore
     /// // Internal helper; shown here for illustration.
-    /// // In production, this is called from phrase-level conversion or st()/ts().
+    /// // In production, this is called from phrase-level conversion and internal character-level helpers.
     /// let mut out = String::new();
     /// convert_by_char("測試", &[&dict_chars], &mut out);
     /// assert!(!out.is_empty());
@@ -1652,8 +1652,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - The Simplified Chinese input text.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Simplified Chinese input text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Returns
     ///
@@ -1682,8 +1682,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - The Traditional Chinese input.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Traditional Chinese input.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Returns
     ///
@@ -1712,8 +1712,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - The Simplified Chinese input text.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Simplified Chinese input text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Example
     /// ```
@@ -1743,8 +1743,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - The Taiwanese Traditional Chinese input.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Taiwanese Traditional Chinese input.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Returns
     ///
@@ -1772,7 +1772,7 @@ impl OpenCC {
         }
     }
 
-    /// Converts Simplified Chinese to Traditional Chinese (Taiwan) with punctuation.
+    /// Converts Simplified Chinese to Traditional Chinese (Taiwan), with optional punctuation conversion.
     ///
     /// Performs two dictionary-conversion rounds:
     ///
@@ -1785,8 +1785,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - The Simplified Chinese input.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Simplified Chinese input.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Example
     /// ```
@@ -1811,19 +1811,19 @@ impl OpenCC {
         }
     }
 
-    /// Converts Taiwanese Traditional Chinese to Simplified Chinese with punctuation.
+    /// Converts Taiwanese Traditional Chinese to Simplified Chinese, with optional punctuation conversion.
     ///
-    /// This method includes punctuation transformation (e.g., `「」` → `“”`)
-    /// in addition to textual content replacement.
+    /// When requested, punctuation transformation (e.g., `「」` → `“”`) is
+    /// applied after textual content replacement.
     ///
     /// # Arguments
     ///
-    /// * `text` - The Traditional Chinese input.
-    /// * `hmm` - Whether to enable HMM-based segmentation.
+    /// * `input` - The Traditional Chinese input.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Returns
     ///
-    /// A fully simplified and punctuated version.
+    /// The converted Simplified Chinese text.
     ///
     /// # Example
     /// ```
@@ -1855,8 +1855,8 @@ impl OpenCC {
     ///
     /// # Arguments
     ///
-    /// * `text` - Simplified Chinese text.
-    /// * `hmm` - Whether to enable HMM segmentation.
+    /// * `input` - Simplified Chinese text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Example
     /// ```
@@ -1887,6 +1887,13 @@ impl OpenCC {
     /// Round 2 applies Hong Kong phrases, variant phrases, and character
     /// variants together in priority order.
     ///
+    /// # Arguments
+    ///
+    /// * `input` - Simplified Chinese text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    ///
+    /// # Example
+    ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// assert_eq!(opencc.s2hkp("鼠标", false), "滑鼠");
@@ -1910,19 +1917,19 @@ impl OpenCC {
 
     /// Converts Traditional Chinese to Simplified Chinese (Hong Kong standard).
     ///
-    /// This adds phrase mapping specific to the Hong Kong locale after a
-    /// general Simplified-to-Traditional conversion step.
+    /// This normalizes Hong Kong variants before the general
+    /// Traditional-to-Simplified conversion step.
     ///
     /// # Arguments
     ///
-    /// * `text` - Simplified Chinese text.
-    /// * `hmm` - Whether to enable HMM segmentation.
+    /// * `input` - Hong Kong Traditional Chinese text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
     ///
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let hk = opencc.hk2s("「春眠不覺曉，處處聞啼鳥。」", true);
-    /// println!("{}", hk); // "「春眠不覺曉，處處聞啼鳥。」"
+    /// println!("{}", hk); // "“春眠不觉晓，处处闻啼鸟。”"
     /// ```
     pub fn hk2s(&self, input: &str, punctuation: bool) -> String {
         let round1 = [
@@ -1946,6 +1953,13 @@ impl OpenCC {
     /// Round 1 normalizes Hong Kong phrases, reverse variant phrases, and
     /// character variants together. Round 2 applies the standard
     /// Traditional-to-Simplified dictionaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Hong Kong Traditional Chinese text.
+    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    ///
+    /// # Example
     ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
@@ -1976,7 +1990,7 @@ impl OpenCC {
     /// The conversion performs:
     /// - Phrase-level segmentation via Jieba
     /// - Dictionary-based replacements using **`tw_variants_phrases`** before **`tw_variants`**
-    /// - Optional punctuation conversion (enabled)
+    /// - Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Traditional Chinese text.
@@ -2009,8 +2023,7 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, so dictionary precedence
-    /// remains deterministic without a second conversion round. Punctuation is
-    /// preserved.
+    /// remains deterministic without a second conversion round. Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Traditional Chinese text.
@@ -2045,7 +2058,7 @@ impl OpenCC {
     /// - A single-round dictionary replacement using:
     ///   - `tw_variants_rev` (reverse character variants)
     ///   - `tw_variants_rev_phrases` (reverse phrase-level variants)
-    /// - Punctuation conversion is enabled
+    /// - Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Taiwan Traditional Chinese text.
@@ -2080,7 +2093,7 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, avoiding a second
-    /// segmentation and conversion round. Punctuation is preserved.
+    /// segmentation and conversion round. Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Taiwan Traditional Chinese text.
@@ -2109,8 +2122,7 @@ impl OpenCC {
     /// This corresponds to the OpenCC configuration **`t2hk`**, applying
     /// Hong-Kong–specific character variants and phrase preferences.
     ///
-    /// Phrase-level segmentation is used internally, and punctuation conversion is
-    /// enabled.
+    /// Phrase-level segmentation is used internally. Punctuation is preserved by this direct conversion method.
     pub fn t2hk(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_phrases,
@@ -2131,8 +2143,7 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, preserving deterministic
-    /// dictionary precedence without a second conversion round. Punctuation is
-    /// preserved.
+    /// dictionary precedence without a second conversion round. Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     ///
@@ -2165,8 +2176,7 @@ impl OpenCC {
     /// - Hong-Kong–specific reverse phrase mappings (`hk_variants_rev_phrases`)
     /// - Reverse character-level mappings (`hk_variants_rev`)
     ///
-    /// Phrase segmentation is applied before replacement, with punctuation
-    /// conversion enabled.
+    /// Phrase segmentation is applied before replacement. Punctuation is preserved by this direct conversion method.
     pub fn hk2t(&self, input: &str) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
@@ -2187,7 +2197,7 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, avoiding a second
-    /// segmentation and conversion round. Punctuation is preserved.
+    /// segmentation and conversion round. Punctuation is preserved by this direct conversion method.
     ///
     /// # Arguments
     ///
@@ -2217,8 +2227,7 @@ impl OpenCC {
     /// This corresponds to the OpenCC configuration **`t2jp`**, applying the
     /// Japanese character-variant set (“Shinjitai”).
     ///
-    /// Phrase-level segmentation is performed, and punctuation conversion is
-    /// enabled.
+    /// Phrase-level segmentation is performed. Punctuation is preserved by this direct conversion method.
     /// Note that this is **not a Japanese translation**—only character forms are
     /// converted.
     ///
@@ -2247,7 +2256,7 @@ impl OpenCC {
     /// - Japanese phrase-level variants (`jps_phrases`)
     /// - Japanese character simplifications (`jps_characters`)
     ///
-    /// Phrase-level segmentation is applied, and punctuation conversion is enabled.
+    /// Phrase-level segmentation is applied. Punctuation is preserved by this direct conversion method.
     ///
     /// # Example
     /// ```
@@ -2328,26 +2337,10 @@ impl OpenCC {
         current
     }
 
-    /// Performs **fast character-level Simplified → Traditional** Chinese conversion.
+    /// Internal character-level Simplified → Traditional conversion.
     ///
-    /// This corresponds to OpenCC’s **`st`** character-variant mapping and uses
-    /// **only** the `st_characters` dictionary.
-    ///
-    /// Unlike phrase-level conversions (e.g., `s2t`, `s2tw`), this function:
-    /// - **does not** use Jieba segmentation
-    /// - **does not** perform phrase matching
-    /// - applies **single-character substitutions only**
-    ///
-    /// This makes it ideal for:
-    /// - punctuation or symbol normalization
-    /// - environments requiring minimal overhead
-    /// - preprocessing before higher-level conversion
-    ///
-    /// # Example
-    /// ```ignore
-    /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.st("后"), "後"); // Character-level only
-    /// ```
+    /// Uses only the `st_characters` dictionary, without segmentation or
+    /// phrase matching. This helper is not part of the public API.
     fn st(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.st_characters];
         let mut output = String::with_capacity(input.len());
@@ -2355,26 +2348,10 @@ impl OpenCC {
         output
     }
 
-    /// Performs **fast character-level Traditional → Simplified** Chinese conversion.
+    /// Internal character-level Traditional → Simplified conversion.
     ///
-    /// This corresponds to OpenCC’s **`ts`** character-variant mapping and uses
-    /// **only** the `ts_characters` dictionary.
-    ///
-    /// Unlike phrase-level conversions (e.g., `t2s`, `tw2s`), this function:
-    /// - **does not** use Jieba segmentation
-    /// - **does not** perform phrase matching
-    /// - applies **single-character substitutions only**
-    ///
-    /// This makes it ideal for:
-    /// - punctuation or symbol normalization
-    /// - environments requiring minimal overhead
-    /// - preprocessing before higher-level conversion
-    ///
-    /// # Example
-    /// ```ignore
-    /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.ts("後"), "后"); // Character-level only
-    /// ```
+    /// Uses only the `ts_characters` dictionary, without segmentation or
+    /// phrase matching. This helper is not part of the public API.
     fn ts(&self, input: &str) -> String {
         let dict_refs = [&self.dictionary.ts_characters];
         let mut output = String::with_capacity(input.len());
