@@ -69,6 +69,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   improves Zstd compression without affecting runtime conversion behavior.
 - Extracted the core `OpenCC` implementation from `lib.rs` into a dedicated `opencc.rs` module, leaving `lib.rs` as the
   crate entry point.
+- Extended the bundled Jieba dictionary with additional Traditional Chinese orthographic variants, improving phrase
+  segmentation for zh-Hant input while preserving the original dictionary entries, frequencies, and part-of-speech tags.
 
 ---
 
