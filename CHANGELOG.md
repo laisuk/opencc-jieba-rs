@@ -45,6 +45,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Unified all direct conversion methods to accept a `punctuation: bool` argument, matching `convert` and
+  `convert_with_config`. This is a source-breaking change for callers of the previously one-argument direct APIs
+  (`t2tw`, `t2twp`, `tw2t`, `tw2tp`, `t2hk`, `t2hkp`, `hk2t`, `hk2tp`, `t2jp`, and `jp2t`); pass `false` to preserve the
+  previous behavior. The signatures of `OpenCC::convert` and `OpenCC::convert_with_config` are unchanged.
 - Added forward variant phrase slots `hk_variants_phrases` and
   `tw_variants_phrases`.
 - Updated JSON schema 3 with backward compatibility for schema-2 custom packs.

@@ -1653,7 +1653,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Simplified Chinese input text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -1683,7 +1683,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Traditional Chinese input.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -1713,7 +1713,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Simplified Chinese input text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     /// ```
@@ -1744,7 +1744,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Taiwanese Traditional Chinese input.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -1786,7 +1786,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Simplified Chinese input.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     /// ```
@@ -1819,7 +1819,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - The Traditional Chinese input.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -1856,7 +1856,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - Simplified Chinese text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     /// ```
@@ -1890,7 +1890,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - Simplified Chinese text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     ///
@@ -1923,7 +1923,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - Hong Kong Traditional Chinese text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     /// ```
@@ -1957,7 +1957,7 @@ impl OpenCC {
     /// # Arguments
     ///
     /// * `input` - Hong Kong Traditional Chinese text.
-    /// * `punctuation` - Whether to apply Simplified/Traditional punctuation conversion where supported.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     ///
@@ -1990,10 +1990,11 @@ impl OpenCC {
     /// The conversion performs:
     /// - Phrase-level segmentation via Jieba
     /// - Dictionary-based replacements using **`tw_variants_phrases`** before **`tw_variants`**
-    /// - Punctuation is preserved by this direct conversion method.
+    /// - Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Traditional Chinese text.
+    /// - `punctuation` — Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     /// A `String` containing the converted Taiwan Traditional Chinese output.
@@ -2001,14 +2002,19 @@ impl OpenCC {
     /// # Example
     /// ```ignore
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let out = opencc.t2tw("繁體字");
+    /// let out = opencc.t2tw("繁體字", false);
     /// ```
-    pub fn t2tw(&self, input: &str) -> String {
+    pub fn t2tw(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_phrases,
             &self.dictionary.tw_variants,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Traditional Chinese (T) text to **Taiwan Traditional Chinese with
@@ -2023,10 +2029,11 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, so dictionary precedence
-    /// remains deterministic without a second conversion round. Punctuation is preserved by this direct conversion method.
+    /// remains deterministic without a second conversion round. Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Traditional Chinese text.
+    /// - `punctuation` — Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     /// A `String` containing the fully converted Taiwan Traditional Chinese result
@@ -2035,15 +2042,20 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.t2twp("鼠標"), "滑鼠");
+    /// assert_eq!(opencc.t2twp("鼠標", false), "滑鼠");
     /// ```
-    pub fn t2twp(&self, input: &str) -> String {
+    pub fn t2twp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.tw_phrases,
             &self.dictionary.tw_variants_phrases,
             &self.dictionary.tw_variants,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts **Taiwan Traditional Chinese (Tw)** text to **Standard Traditional
@@ -2058,10 +2070,11 @@ impl OpenCC {
     /// - A single-round dictionary replacement using:
     ///   - `tw_variants_rev` (reverse character variants)
     ///   - `tw_variants_rev_phrases` (reverse phrase-level variants)
-    /// - Punctuation is preserved by this direct conversion method.
+    /// - Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Taiwan Traditional Chinese text.
+    /// - `punctuation` — Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     /// A `String` containing the normalized Traditional Chinese output.
@@ -2070,15 +2083,20 @@ impl OpenCC {
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let text = "裡面"; // Taiwan variant
-    /// let out = opencc.tw2t(text);
+    /// let out = opencc.tw2t(text, false);
     /// assert_eq!(out, "裡面"); // Standard Traditional
     /// ```
-    pub fn tw2t(&self, input: &str) -> String {
+    pub fn tw2t(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts **Taiwan Traditional Chinese (Tw)** to **Standard Traditional Chinese
@@ -2093,10 +2111,11 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, avoiding a second
-    /// segmentation and conversion round. Punctuation is preserved by this direct conversion method.
+    /// segmentation and conversion round. Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     /// - `input` — UTF-8 Taiwan Traditional Chinese text.
+    /// - `punctuation` — Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     /// A `String` containing fully normalized Traditional Chinese with enhanced
@@ -2105,15 +2124,20 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.tw2tp("滑鼠"), "鼠標");
+    /// assert_eq!(opencc.tw2tp("滑鼠", false), "鼠標");
     /// ```
-    pub fn tw2tp(&self, input: &str) -> String {
+    pub fn tw2tp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.tw_variants_rev,
             &self.dictionary.tw_variants_rev_phrases,
             &self.dictionary.tw_phrases_rev,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Standard Traditional Chinese (T) text to **Hong Kong Traditional
@@ -2122,13 +2146,23 @@ impl OpenCC {
     /// This corresponds to the OpenCC configuration **`t2hk`**, applying
     /// Hong-Kong–specific character variants and phrase preferences.
     ///
-    /// Phrase-level segmentation is used internally. Punctuation is preserved by this direct conversion method.
-    pub fn t2hk(&self, input: &str) -> String {
+    /// Phrase-level segmentation is used internally.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Traditional Chinese text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
+    pub fn t2hk(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_phrases,
             &self.dictionary.hk_variants,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Traditional Chinese (T) to **Hong Kong Traditional Chinese with
@@ -2143,11 +2177,12 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, preserving deterministic
-    /// dictionary precedence without a second conversion round. Punctuation is preserved by this direct conversion method.
+    /// dictionary precedence without a second conversion round. Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     ///
     /// * `input` - UTF-8 Traditional Chinese text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -2157,15 +2192,20 @@ impl OpenCC {
     ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
+    /// assert_eq!(opencc.t2hkp("鼠標", false), "滑鼠");
     /// ```
-    pub fn t2hkp(&self, input: &str) -> String {
+    pub fn t2hkp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.hk_phrases,
             &self.dictionary.hk_variants_phrases,
             &self.dictionary.hk_variants,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Hong Kong Traditional Chinese text back to **Standard Traditional
@@ -2176,13 +2216,23 @@ impl OpenCC {
     /// - Hong-Kong–specific reverse phrase mappings (`hk_variants_rev_phrases`)
     /// - Reverse character-level mappings (`hk_variants_rev`)
     ///
-    /// Phrase segmentation is applied before replacement. Punctuation is preserved by this direct conversion method.
-    pub fn hk2t(&self, input: &str) -> String {
+    /// Phrase segmentation is applied before replacement.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Hong Kong Traditional Chinese text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
+    pub fn hk2t(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Hong Kong Traditional Chinese (HK) to **Standard Traditional
@@ -2197,11 +2247,12 @@ impl OpenCC {
     ///
     /// The first matching dictionary wins. A replacement is emitted directly and
     /// is not passed through the remaining dictionaries, avoiding a second
-    /// segmentation and conversion round. Punctuation is preserved by this direct conversion method.
+    /// segmentation and conversion round. Punctuation is normalized to the target Chinese writing style when requested.
     ///
     /// # Arguments
     ///
     /// * `input` - UTF-8 Hong Kong Traditional Chinese text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -2211,15 +2262,20 @@ impl OpenCC {
     ///
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
+    /// assert_eq!(opencc.hk2tp("滑鼠", false), "鼠標");
     /// ```
-    pub fn hk2tp(&self, input: &str) -> String {
+    pub fn hk2tp(&self, input: &str, punctuation: bool) -> String {
         let dict_refs = [
             &self.dictionary.hk_variants_rev_phrases,
             &self.dictionary.hk_variants_rev,
             &self.dictionary.hk_phrases_rev,
         ];
-        self.phrases_cut_convert(input, &dict_refs, true)
+        let result = self.phrases_cut_convert(input, &dict_refs, true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts Traditional Chinese (T) text to **Japanese Shinjitai (T→JP)**.
@@ -2227,17 +2283,22 @@ impl OpenCC {
     /// This corresponds to the OpenCC configuration **`t2jp`**, applying the
     /// Japanese character-variant set (“Shinjitai”).
     ///
-    /// Phrase-level segmentation is performed. Punctuation is preserved by this direct conversion method.
+    /// Phrase-level segmentation is performed.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Traditional Chinese text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     /// Note that this is **not a Japanese translation**—only character forms are
     /// converted.
     ///
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let out = opencc.t2jp("體育");    // 體 → 体
+    /// let out = opencc.t2jp("體育", false);    // 體 → 体
     /// assert_eq!(out, "体育");         // Standard Japanese Shinjitai form
     /// ```
-    pub fn t2jp(&self, input: &str) -> String {
+    pub fn t2jp(&self, input: &str, punctuation: bool) -> String {
         let dictionary = if self.dictionary.schema_version < 3
             && self.dictionary.jps_characters_rev.is_empty()
         {
@@ -2245,7 +2306,12 @@ impl OpenCC {
         } else {
             &self.dictionary.jps_characters_rev
         };
-        self.phrases_cut_convert(input, &[dictionary], true)
+        let result = self.phrases_cut_convert(input, &[dictionary], true);
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
+        }
     }
 
     /// Converts **Japanese Shinjitai (JP)** text back to **Traditional Chinese (T)**.
@@ -2256,19 +2322,25 @@ impl OpenCC {
     /// - Japanese phrase-level variants (`jps_phrases`)
     /// - Japanese character simplifications (`jps_characters`)
     ///
-    /// Phrase-level segmentation is applied. Punctuation is preserved by this direct conversion method.
+    /// Phrase-level segmentation is applied.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - UTF-8 Japanese Shinjitai text.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     ///
     /// // Common Shinjitai → Traditional:
-    /// assert_eq!(opencc.jp2t("教育"), "教育");       // unchanged (identical)
-    /// assert_eq!(opencc.jp2t("体力"), "體力");       // 体 → 體
-    /// assert_eq!(opencc.jp2t("図書"), "圖書");       // 図 → 圖
+    /// assert_eq!(opencc.jp2t("教育", false), "教育");       // unchanged (identical)
+    /// assert_eq!(opencc.jp2t("体力", false), "體力");       // 体 → 體
+    /// assert_eq!(opencc.jp2t("図書", false), "圖書");       // 図 → 圖
     /// ```
-    pub fn jp2t(&self, input: &str) -> String {
-        if self.dictionary.schema_version < 3 && !self.dictionary.legacy_jp_variants_rev.is_empty()
+    pub fn jp2t(&self, input: &str, punctuation: bool) -> String {
+        let result = if self.dictionary.schema_version < 3
+            && !self.dictionary.legacy_jp_variants_rev.is_empty()
         {
             let dict_refs = [
                 &self.dictionary.jps_phrases,
@@ -2282,6 +2354,11 @@ impl OpenCC {
                 &self.dictionary.jps_characters,
             ];
             self.phrases_cut_convert(input, &dict_refs, true)
+        };
+        if punctuation {
+            Self::convert_punctuation(&result, "s")
+        } else {
+            result
         }
     }
 
@@ -2397,10 +2474,7 @@ impl OpenCC {
     ///   - `"jp2t"`  — Japanese Shinjitai → Traditional Chinese
     ///   - `"t2jp"`  — Traditional Chinese → Japanese Shinjitai
     ///
-    /// * `punctuation` - Whether to convert punctuation marks (e.g. `“”` ↔ `「」`)
-    ///   when applicable.
-    ///   Some configurations ignore this flag if punctuation normalization does
-    ///   not apply to that conversion pipeline.
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Returns
     ///
@@ -2446,8 +2520,7 @@ impl OpenCC {
     ///
     /// * `input` - UTF-8 text to convert.
     /// * `config_id` - Conversion configuration.
-    /// * `punctuation` - Whether to apply punctuation conversion where supported.
-    ///   For some configs, this flag is **ignored** (see [`OpenccConfig`] table).
+    /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
     ///
     /// # Example
     ///
@@ -2471,20 +2544,20 @@ impl OpenCC {
             OpenccConfig::S2hk => self.s2hk(input, punctuation),
             OpenccConfig::S2hkp => self.s2hkp(input, punctuation),
             OpenccConfig::T2s => self.t2s(input, punctuation),
-            OpenccConfig::T2tw => self.t2tw(input),
-            OpenccConfig::T2twp => self.t2twp(input),
-            OpenccConfig::T2hk => self.t2hk(input),
-            OpenccConfig::T2hkp => self.t2hkp(input),
+            OpenccConfig::T2tw => self.t2tw(input, punctuation),
+            OpenccConfig::T2twp => self.t2twp(input, punctuation),
+            OpenccConfig::T2hk => self.t2hk(input, punctuation),
+            OpenccConfig::T2hkp => self.t2hkp(input, punctuation),
             OpenccConfig::Tw2s => self.tw2s(input, punctuation),
             OpenccConfig::Tw2sp => self.tw2sp(input, punctuation),
-            OpenccConfig::Tw2t => self.tw2t(input),
-            OpenccConfig::Tw2tp => self.tw2tp(input),
+            OpenccConfig::Tw2t => self.tw2t(input, punctuation),
+            OpenccConfig::Tw2tp => self.tw2tp(input, punctuation),
             OpenccConfig::Hk2s => self.hk2s(input, punctuation),
             OpenccConfig::Hk2sp => self.hk2sp(input, punctuation),
-            OpenccConfig::Hk2t => self.hk2t(input),
-            OpenccConfig::Hk2tp => self.hk2tp(input),
-            OpenccConfig::Jp2t => self.jp2t(input),
-            OpenccConfig::T2jp => self.t2jp(input),
+            OpenccConfig::Hk2t => self.hk2t(input, punctuation),
+            OpenccConfig::Hk2tp => self.hk2tp(input, punctuation),
+            OpenccConfig::Jp2t => self.jp2t(input, punctuation),
+            OpenccConfig::T2jp => self.t2jp(input, punctuation),
         }
     }
 
@@ -2534,43 +2607,50 @@ impl OpenCC {
         code
     }
 
-    /// Converts Chinese punctuation marks between Simplified and Traditional variants.
+    /// Converts Chinese punctuation between Simplified and Traditional styles.
     ///
-    /// This helper function replaces punctuation marks in the input text according to the specified configuration.
-    /// If `config` starts with `'s'`, it converts Simplified punctuation to Traditional; otherwise, it converts
-    /// Traditional punctuation to Simplified.
+    /// This helper normalizes punctuation according to the specified source style:
+    ///
+    /// - `"s"` converts Simplified-style punctuation to Traditional-style punctuation.
+    /// - `"t"` converts Traditional-style punctuation to Simplified-style punctuation.
     ///
     /// # Arguments
     ///
-    /// * `text` - The input string whose punctuation will be converted.
-    /// * `config` - The conversion configuration (`"s"` for Simplified to Traditional, otherwise Traditional to Simplified).
+    /// * `text` - The input text whose punctuation will be converted.
+    /// * `style` - The source punctuation style: `"s"` for Simplified or `"t"` for Traditional.
     ///
     /// # Returns
     ///
-    /// A `String` with punctuation marks converted according to the specified variant.
-    fn convert_punctuation(text: &str, config: &str) -> String {
+    /// A `String` with punctuation converted to the opposite style.
+    fn convert_punctuation(text: &str, style: &str) -> String {
         let mut out = String::with_capacity(text.len());
-        if config.starts_with('s') {
-            for ch in text.chars() {
-                out.push(match ch {
-                    '“' => '「',
-                    '”' => '」',
-                    '‘' => '『',
-                    '’' => '』',
-                    _ => ch,
-                });
+
+        match style {
+            "s" => {
+                for ch in text.chars() {
+                    out.push(match ch {
+                        '“' => '「',
+                        '”' => '」',
+                        '‘' => '『',
+                        '’' => '』',
+                        _ => ch,
+                    });
+                }
             }
-        } else {
-            for ch in text.chars() {
-                out.push(match ch {
-                    '「' => '“',
-                    '」' => '”',
-                    '『' => '‘',
-                    '』' => '’',
-                    _ => ch,
-                });
+            "t" => {
+                for ch in text.chars() {
+                    out.push(match ch {
+                        '「' => '“',
+                        '」' => '”',
+                        '『' => '‘',
+                        '』' => '’',
+                        _ => ch,
+                    });
+                }
             }
+            _ => return text.to_owned(),
         }
+
         out
     }
 
@@ -2958,8 +3038,8 @@ mod tests {
         dictionary.tw_variants = dict(&[("喫", "吃")]);
         let opencc = opencc_with_dictionary(dictionary, &["純喫茶"]);
 
-        assert_eq!(opencc.t2tw("純喫茶"), "純喫茶");
-        assert_eq!(opencc.t2tw("喫"), "吃");
+        assert_eq!(opencc.t2tw("純喫茶", false), "純喫茶");
+        assert_eq!(opencc.t2tw("喫", false), "吃");
     }
 
     #[test]
@@ -2983,7 +3063,7 @@ mod tests {
         dictionary.tw_variants = dict(&[("乙", "丙")]);
         let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
 
-        assert_eq!(opencc.t2twp("甲"), "乙");
+        assert_eq!(opencc.t2twp("甲", false), "乙");
     }
 
     #[test]
@@ -2994,7 +3074,7 @@ mod tests {
         dictionary.tw_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
         let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
 
-        assert_eq!(opencc.tw2tp("甲"), "乙");
+        assert_eq!(opencc.tw2tp("甲", false), "乙");
     }
 
     #[test]
@@ -3004,8 +3084,8 @@ mod tests {
         dictionary.hk_variants = dict(&[("線", "綫")]);
         let opencc = opencc_with_dictionary(dictionary, &["無線新聞"]);
 
-        assert_eq!(opencc.t2hk("無線新聞"), "無綫新聞");
-        assert_eq!(opencc.t2hk("線"), "綫");
+        assert_eq!(opencc.t2hk("無線新聞", false), "無綫新聞");
+        assert_eq!(opencc.t2hk("線", false), "綫");
     }
 
     #[test]
@@ -3016,7 +3096,7 @@ mod tests {
         dictionary.hk_variants = dict(&[("乙", "丙")]);
         let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
 
-        assert_eq!(opencc.t2hkp("甲"), "乙");
+        assert_eq!(opencc.t2hkp("甲", false), "乙");
     }
 
     #[test]
@@ -3027,7 +3107,7 @@ mod tests {
         dictionary.hk_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
         let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
 
-        assert_eq!(opencc.hk2tp("甲"), "乙");
+        assert_eq!(opencc.hk2tp("甲", false), "乙");
     }
 
     #[test]
@@ -3069,8 +3149,8 @@ mod tests {
         dictionary.legacy_jp_variants_rev = dict(&[("旧", "LEGACY")]);
         let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
 
-        assert_eq!(opencc.t2jp("舊"), "旧");
-        assert_eq!(opencc.jp2t("旧"), "舊");
+        assert_eq!(opencc.t2jp("舊", false), "旧");
+        assert_eq!(opencc.jp2t("旧", false), "舊");
     }
 
     #[test]
@@ -3081,8 +3161,8 @@ mod tests {
         dictionary.legacy_jp_variants_rev = dict(&[("旧", "舊")]);
         let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
 
-        assert_eq!(opencc.t2jp("舊"), "旧");
-        assert_eq!(opencc.jp2t("旧"), "舊");
+        assert_eq!(opencc.t2jp("舊", false), "旧");
+        assert_eq!(opencc.jp2t("旧", false), "舊");
     }
 
     #[test]

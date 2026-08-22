@@ -56,7 +56,7 @@
 //!
 //! let s = "这里进行着“汉字转换”测试。";
 //! let t = opencc.s2t(s, false);       // Simplified → Traditional (phrase-level)
-//! let tw = opencc.t2tw(&t);    // Traditional → Taiwan Traditional
+//! let tw = opencc.t2tw(&t, false); // Traditional → Taiwan Traditional
 //! ```
 //!
 //! ## Core Simplified ↔ Traditional
@@ -115,14 +115,10 @@
 //!
 //! ## Punctuation and Symbols
 //!
-//! Some Simplified/Traditional conversion methods accept a
-//! `punctuation: bool` argument. When enabled, supported methods apply the
-//! punctuation mapping after text conversion. Direct regional and variant
-//! methods without that argument preserve punctuation.
-//!
-//! [`OpenCC::convert`] and [`OpenCC::convert_with_config`] accept the same
-//! option generically, but ignore it for configurations whose direct method has
-//! no punctuation conversion stage.
+//! All direct Chinese conversion methods accept a `punctuation: bool` argument.
+//! When enabled, they normalize punctuation to the target Chinese writing style
+//! after text conversion. [`OpenCC::convert`] and [`OpenCC::convert_with_config`]
+//! honor the same option for every configuration.
 //!
 //! ## User Dictionaries
 //!

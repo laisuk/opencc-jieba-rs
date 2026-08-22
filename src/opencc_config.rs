@@ -25,21 +25,21 @@
 /// | 3       | `S2twp`| Simplified → Taiwan (with phrases)         | ✅                          |
 /// | 4       | `S2hk` | Simplified → Hong Kong                     | ✅                          |
 /// | 5       | `T2s`  | Traditional → Simplified                   | ✅                          |
-/// | 6       | `T2tw` | Traditional → Taiwan                       | ❌ (ignored)                |
-/// | 7       | `T2twp`| Traditional → Taiwan (with phrases)        | ❌ (ignored)                |
-/// | 8       | `T2hk` | Traditional → Hong Kong                    | ❌ (ignored)                |
+/// | 6       | `T2tw` | Traditional → Taiwan                       | ✅                          |
+/// | 7       | `T2twp`| Traditional → Taiwan (with phrases)        | ✅                          |
+/// | 8       | `T2hk` | Traditional → Hong Kong                    | ✅                          |
 /// | 9       | `Tw2s` | Taiwan → Simplified                        | ✅                          |
 /// | 10      | `Tw2sp`| Taiwan → Simplified (variant)              | ✅                          |
-/// | 11      | `Tw2t` | Taiwan → Traditional                       | ❌ (ignored)                |
-/// | 12      | `Tw2tp`| Taiwan → Traditional (variant)             | ❌ (ignored)                |
+/// | 11      | `Tw2t` | Taiwan → Traditional                       | ✅                          |
+/// | 12      | `Tw2tp`| Taiwan → Traditional (variant)             | ✅                          |
 /// | 13      | `Hk2s` | Hong Kong → Simplified                     | ✅                          |
-/// | 14      | `Hk2t` | Hong Kong → Traditional                    | ❌ (ignored)                |
-/// | 15      | `Jp2t` | Japanese (Kanji variants) → Traditional     | ❌ (ignored)                |
-/// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)     | ❌ (ignored)                |
-/// | 17      | `S2hkp`| Simplified → Hong Kong (with phrases)       | ✅                          |
-/// | 18      | `Hk2sp`| Hong Kong → Simplified (with phrases)       | ✅                          |
-/// | 19      | `T2hkp`| Traditional → Hong Kong (with phrases)    | ❌ (ignored)                |
-/// | 20      | `Hk2tp`| Hong Kong → Traditional (with phrases)    | ❌ (ignored)                |
+/// | 14      | `Hk2t` | Hong Kong → Traditional                    | ✅                          |
+/// | 15      | `Jp2t` | Japanese (Kanji variants) → Traditional    | ✅                          |
+/// | 16      | `T2jp` | Traditional → Japanese (Kanji variants)    | ✅                          |
+/// | 17      | `S2hkp`| Simplified → Hong Kong (with phrases)      | ✅                          |
+/// | 18      | `Hk2sp`| Hong Kong → Simplified (with phrases)      | ✅                          |
+/// | 19      | `T2hkp`| Traditional → Hong Kong (with phrases)     | ✅                          |
+/// | 20      | `Hk2tp`| Hong Kong → Traditional (with phrases)     | ✅                          |
 ///
 /// # Since
 /// v0.7.3

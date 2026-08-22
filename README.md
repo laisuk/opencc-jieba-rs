@@ -194,8 +194,8 @@ fn main() {
     assert_eq!(opencc.convert("这是一个测试", "s2t", false), "這是一個測試");
 
     // Direct one-pass Hong Kong phrase APIs.
-    assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
-    assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
+    assert_eq!(opencc.t2hkp("鼠標", false), "滑鼠");
+    assert_eq!(opencc.hk2tp("滑鼠", false), "鼠標");
 
     // The same conversion through the strongly typed public API.
     assert_eq!(

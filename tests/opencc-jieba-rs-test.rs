@@ -56,8 +56,8 @@ mod tests {
         assert_eq!(OpenccConfig::Hk2tp.as_str(), "hk2tp");
         assert_eq!(opencc.s2hkp("鼠标", false), "滑鼠");
         assert_eq!(opencc.hk2sp("滑鼠", false), "鼠标");
-        assert_eq!(opencc.t2hkp("鼠標"), "滑鼠");
-        assert_eq!(opencc.hk2tp("滑鼠"), "鼠標");
+        assert_eq!(opencc.t2hkp("鼠標", false), "滑鼠");
+        assert_eq!(opencc.hk2tp("滑鼠", false), "鼠標");
         assert_eq!(opencc.convert("鼠标", "s2hkp", false), "滑鼠");
         assert_eq!(opencc.convert("滑鼠", "hk2sp", false), "鼠标");
         assert_eq!(opencc.convert("鼠標", "t2hkp", false), "滑鼠");
@@ -94,7 +94,7 @@ mod tests {
         let input = "舊字體：廣國，讀賣。";
         let expected_output = "旧字体：広国，読売。";
         let opencc = OpenCC::new();
-        let actual_output = opencc.t2jp(input);
+        let actual_output = opencc.t2jp(input, false);
         assert_eq!(actual_output, expected_output);
     }
 
@@ -103,8 +103,30 @@ mod tests {
         let input = "広国，読売。";
         let expected_output = "廣國，讀賣。";
         let opencc = OpenCC::new();
-        let actual_output = opencc.jp2t(input);
+        let actual_output = opencc.jp2t(input, false);
         assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn newly_unified_direct_apis_honor_punctuation() {
+        let opencc = OpenCC::new();
+        let simplified_quotes = "“測試”";
+        let traditional_quotes = "「測試」";
+
+        assert_eq!(opencc.t2tw(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.t2tw(simplified_quotes, true), traditional_quotes);
+        assert_eq!(opencc.tw2t(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.tw2t(simplified_quotes, true), traditional_quotes);
+
+        assert_eq!(opencc.t2hk(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.t2hk(simplified_quotes, true), traditional_quotes);
+        assert_eq!(opencc.hk2t(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.hk2t(simplified_quotes, true), traditional_quotes);
+
+        assert_eq!(opencc.t2jp(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.t2jp(simplified_quotes, true), traditional_quotes);
+        assert_eq!(opencc.jp2t(simplified_quotes, false), simplified_quotes);
+        assert_eq!(opencc.jp2t(simplified_quotes, true), traditional_quotes);
     }
 
     #[test]
