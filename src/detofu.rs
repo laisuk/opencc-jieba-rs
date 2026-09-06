@@ -34,6 +34,9 @@ static TOFU_DATA: &[u8] = include_bytes!("data/CharactersTofu.txt");
 ///
 /// The CLI alias `all` maps to [`DetofuLevel::ExtB`], so `ExtB` is the
 /// broadest built-in fallback level.
+///
+/// # Since
+/// v0.8.1
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DetofuLevel {
     /// Replace CJK Extension B and all supported later extension mappings.
@@ -72,6 +75,9 @@ impl DetofuLevel {
     /// assert_eq!(DetofuLevel::parse(" ext-c "), Ok(DetofuLevel::ExtC));
     /// assert!(DetofuLevel::parse("unsupported").is_err());
     /// ```
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn parse(s: &str) -> Result<Self, String> {
         match s.trim().to_ascii_lowercase().as_str() {
             "all" | "ext-b" | "extb" | "b" => Ok(Self::ExtB),
@@ -195,6 +201,9 @@ fn detofu_builtin_into(input: &str, level: DetofuLevel, output: &mut String) {
 ///
 /// assert_eq!(safe, "這隻小狗有氄毛");
 /// ```
+///
+/// # Since
+/// v0.8.1
 #[derive(Debug, Clone)]
 pub struct DetofuMap {
     level: DetofuLevel,
@@ -221,6 +230,9 @@ impl DetofuMap {
     ///
     /// assert_eq!(map.detofu("骖𬴂"), "骖騑");
     /// ```
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn builtin(level: DetofuLevel) -> Self {
         Self {
             level,
@@ -248,6 +260,9 @@ impl DetofuMap {
     /// File entries below this map's threshold are ignored. Eligible entries
     /// are stored only in this map's custom overlay and take precedence over
     /// the shared built-in table.
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn with_custom_file<P: AsRef<Path>>(mut self, path: P) -> std::io::Result<Self> {
         let text = std::fs::read_to_string(path)?;
 
@@ -292,6 +307,9 @@ impl DetofuMap {
     ///
     /// assert_eq!(map.detofu("𬴂"), "馬");
     /// ```
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn with_custom_pairs(mut self, pairs: &[(char, char)]) -> Self {
         self.custom.extend(pairs.iter().copied());
         self
@@ -323,6 +341,9 @@ impl DetofuMap {
     ///
     /// assert_eq!(output, "結果：氄毛");
     /// ```
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn detofu_into(&self, input: &str, output: &mut String) {
         if self.custom.is_empty() {
             detofu_builtin_into(input, self.level, output);
@@ -373,6 +394,9 @@ impl DetofuMap {
     ///
     /// assert_eq!(map.detofu("這隻小狗有𣭲毛"), "這隻小狗有氄毛");
     /// ```
+    ///
+    /// # Since
+    /// v0.8.1
     pub fn detofu(&self, input: &str) -> String {
         let mut output = String::with_capacity(input.len());
         self.detofu_into(input, &mut output);

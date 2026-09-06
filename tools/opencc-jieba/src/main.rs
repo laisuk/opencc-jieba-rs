@@ -2,7 +2,7 @@ use clap::builder::{StringValueParser, TypedValueParser, ValueParser};
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use opencc_jieba_rs::{OpenCC, OpenccConfig};
+use opencc_jieba_rs::{DetofuLevel, OpenCC, OpenccConfig};
 use opencc_tool_common::parse_custom_dict_spec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -45,6 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ))
                 .args(common_args())
                 .args(normalization_args())
+                .arg(
+                    Arg::new("detofu")
+                        .long("detofu")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Apply DeTofu fallback for CJK Extension B-I characters after conversion"),
+                )
                 .args(enc_args())
         )
         .subcommand(
@@ -301,7 +307,13 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
         matches.get_flag("norm-compat"),
         matches.get_flag("norm-compat-extended"),
     );
-    let output_str = opencc.convert(convert_input.as_ref(), config, punctuation);
+    let converted = opencc.convert(convert_input.as_ref(), config, punctuation);
+
+    let output_str = if matches.get_flag("detofu") {
+        opencc.detofu(&converted, DetofuLevel::ExtB)
+    } else {
+        converted
+    };
 
     let (is_console_output, mut output) = open_output(output_file)?;
 

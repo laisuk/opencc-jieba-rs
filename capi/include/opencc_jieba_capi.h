@@ -23,6 +23,109 @@ typedef struct OpenccJiebaTag {
     char *tag;
 } OpenccJiebaTag;
 
+
+typedef struct OpenccJiebaUserDictEntry {
+    const char *word;
+    size_t freq;
+    const char *tag;
+} OpenccJiebaUserDictEntry;
+
+typedef uint32_t opencc_jieba_dict_slot_t;
+
+enum {
+    OPENCC_JIEBA_DICT_SLOT_ST_CHARACTERS = 1,
+    OPENCC_JIEBA_DICT_SLOT_ST_PHRASES = 2,
+    OPENCC_JIEBA_DICT_SLOT_TS_CHARACTERS = 3,
+    OPENCC_JIEBA_DICT_SLOT_TS_PHRASES = 4,
+    OPENCC_JIEBA_DICT_SLOT_TW_PHRASES = 5,
+    OPENCC_JIEBA_DICT_SLOT_TW_PHRASES_REV = 6,
+    OPENCC_JIEBA_DICT_SLOT_HK_PHRASES = 7,
+    OPENCC_JIEBA_DICT_SLOT_HK_PHRASES_REV = 8,
+    OPENCC_JIEBA_DICT_SLOT_TW_VARIANTS = 9,
+    OPENCC_JIEBA_DICT_SLOT_TW_VARIANTS_PHRASES = 10,
+    OPENCC_JIEBA_DICT_SLOT_TW_VARIANTS_REV = 11,
+    OPENCC_JIEBA_DICT_SLOT_TW_VARIANTS_REV_PHRASES = 12,
+    OPENCC_JIEBA_DICT_SLOT_HK_VARIANTS = 13,
+    OPENCC_JIEBA_DICT_SLOT_HK_VARIANTS_PHRASES = 14,
+    OPENCC_JIEBA_DICT_SLOT_HK_VARIANTS_REV = 15,
+    OPENCC_JIEBA_DICT_SLOT_HK_VARIANTS_REV_PHRASES = 16,
+    OPENCC_JIEBA_DICT_SLOT_JPS_CHARACTERS = 17,
+    OPENCC_JIEBA_DICT_SLOT_JPS_CHARACTERS_REV = 18,
+    OPENCC_JIEBA_DICT_SLOT_JPS_PHRASES = 19
+};
+
+typedef uint32_t opencc_jieba_custom_dict_mode_t;
+
+enum {
+    OPENCC_JIEBA_CUSTOM_DICT_APPEND = 1,
+    OPENCC_JIEBA_CUSTOM_DICT_OVERRIDE = 2
+};
+
+typedef struct OpenccJiebaCustomPair {
+    const char *source;
+    const char *target;
+} OpenccJiebaCustomPair;
+
+typedef struct OpenccJiebaCustomDictSpec {
+    opencc_jieba_dict_slot_t slot;
+    opencc_jieba_custom_dict_mode_t mode;
+    const OpenccJiebaCustomPair *pairs;
+    size_t pair_count;
+} OpenccJiebaCustomDictSpec;
+
+/**
+ * @typedef opencc_jieba_detofu_level_t
+ *
+ * @brief ABI-stable DeToFu threshold level.
+ *
+ * This type is a 32-bit unsigned integer. Level values are stable ABI
+ * identifiers and will not be reordered or reused.
+ *
+ * DeToFu levels are threshold-based rather than dictionary-slot IDs, so the
+ * first valid level intentionally starts at zero.
+ *
+ * @since Available since v0.8.1.
+ */
+typedef uint32_t opencc_jieba_detofu_level_t;
+
+/**
+ * @brief DeToFu fallback threshold values.
+ *
+ * The selected level is inclusive: the selected CJK extension and every
+ * supported later extension are eligible for fallback replacement.
+ *
+ * `OPENCC_JIEBA_DETOFU_EXT_B` is the broadest level and covers all built-in
+ * mappings from Extension B through Extension I. `OPENCC_JIEBA_DETOFU_EXT_I`
+ * is the narrowest level and enables Extension I mappings only.
+ *
+ * @since Available since v0.8.1.
+ */
+enum {
+    /** Replace Extension B and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_B = 0,
+
+    /** Replace Extension C and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_C = 1,
+
+    /** Replace Extension D and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_D = 2,
+
+    /** Replace Extension E and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_E = 3,
+
+    /** Replace Extension F and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_F = 4,
+
+    /** Replace Extension G and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_G = 5,
+
+    /** Replace Extension H and all supported later extension mappings. */
+    OPENCC_JIEBA_DETOFU_EXT_H = 6,
+
+    /** Replace Extension I mappings only. */
+    OPENCC_JIEBA_DETOFU_EXT_I = 7
+};
+
 /* =========================================================================
  * Metadata
  * ========================================================================= */
@@ -65,12 +168,29 @@ const char *opencc_jieba_version_string(void);
  */
 void *opencc_jieba_new(void);
 
+void *opencc_jieba_new_user_dict(
+    const OpenccJiebaUserDictEntry *entries,
+    size_t entry_count
+);
+
+void *opencc_jieba_new_custom(
+    const OpenccJiebaCustomDictSpec *specs,
+    size_t spec_count
+);
+
+void *opencc_jieba_new_user_dict_custom(
+    const OpenccJiebaUserDictEntry *entries,
+    size_t entry_count,
+    const OpenccJiebaCustomDictSpec *specs,
+    size_t spec_count
+);
+
 /**
  * @brief Destroys an OpenCC-Jieba instance.
  *
  * Passing NULL is safe and has no effect.
  *
- * @param instance Instance previously returned by `opencc_jieba_new()`.
+ * @param instance Instance previously returned by any `opencc_jieba_new*()` constructor.
  */
 void opencc_jieba_delete(void *instance);
 
@@ -79,7 +199,7 @@ void opencc_jieba_delete(void *instance);
  *
  * Passing NULL is safe and has no effect.
  *
- * @param instance Instance previously returned by `opencc_jieba_new()`.
+ * @param instance Instance previously returned by any `opencc_jieba_new*()` constructor.
  */
 void opencc_jieba_free(void *instance);
 
@@ -123,6 +243,144 @@ char *opencc_jieba_convert(
  * @return Status code described above.
  */
 int opencc_jieba_zho_check(const void *instance, const char *input);
+
+/* =========================================================================
+ * Compatibility normalization
+ * ========================================================================= */
+
+/**
+ * @brief Normalizes CJK Compatibility Ideographs in a UTF-8 string.
+ *
+ * This is the C API counterpart of `OpenCC::normalize_compat()`.
+ *
+ * The operation replaces Unicode CJK Compatibility Ideographs with their
+ * canonical unified ideograph forms using the built-in normalization table.
+ * It is direction-independent and does not perform Simplified/Traditional
+ * conversion, Jieba segmentation, punctuation conversion, or dictionary
+ * mutation.
+ *
+ * This function is typically used as a preprocessing step before
+ * `opencc_jieba_convert()` when input may contain CJK Compatibility
+ * Ideographs, for example text extracted from PDFs or legacy documents.
+ *
+ * @param instance
+ *     An OpenCC-Jieba instance returned by any `opencc_jieba_new*()`
+ *     constructor.
+ * @param input
+ *     Input null-terminated UTF-8 string.
+ *
+ * @return
+ *     A newly allocated null-terminated UTF-8 string on success.
+ *
+ *     Returns NULL if `instance` or `input` is NULL, or if `input` is not
+ *     valid UTF-8. Retrieve the error immediately on the same calling thread
+ *     using `opencc_jieba_last_error()`.
+ *
+ * @ownership
+ *     The returned string is owned by the caller and must be released with
+ *     `opencc_jieba_free_string()`.
+ *
+ * @since Available since v0.8.1.
+ */
+char *opencc_jieba_normalize_compat(
+    const void *instance,
+    const char *input
+);
+
+/**
+ * @brief Applies the full built-in compatibility normalization pre-pass.
+ *
+ * This is the C API counterpart of `OpenCC::normalize_compat_extended()`.
+ * It combines CJK Compatibility Ideograph normalization with the curated
+ * Unicode compatibility mappings built into opencc-jieba-rs.
+ *
+ * In addition to CJK Compatibility Ideographs, the extended pass normalizes
+ * selected Unicode radicals, glyph variants, punctuation forms, and known
+ * text-extraction artifacts covered by the library's curated compatibility
+ * table. Unmapped characters are preserved unchanged.
+ *
+ * The operation is independent of OpenCC conversion and does not modify the
+ * instance, selected conversion config, dictionaries, Jieba segmentation,
+ * script detection, IDS handling, or punctuation-conversion setting.
+ *
+ * For applications that want the complete compatibility preprocessing path,
+ * this function is generally preferred over `opencc_jieba_normalize_compat()`.
+ * Apply it before `opencc_jieba_convert()`; DeToFu, when desired, is normally
+ * applied after conversion.
+ *
+ * @param instance
+ *     An OpenCC-Jieba instance returned by any `opencc_jieba_new*()`
+ *     constructor.
+ * @param input
+ *     Input null-terminated UTF-8 string.
+ *
+ * @return
+ *     A newly allocated null-terminated UTF-8 string on success.
+ *
+ *     Returns NULL if `instance` or `input` is NULL, or if `input` is not
+ *     valid UTF-8. Retrieve the error immediately on the same calling thread
+ *     using `opencc_jieba_last_error()`.
+ *
+ * @ownership
+ *     The returned string is owned by the caller and must be released with
+ *     `opencc_jieba_free_string()`.
+ *
+ * @since Available since v0.8.1.
+ */
+char *opencc_jieba_normalize_compat_extended(
+    const void *instance,
+    const char *input
+);
+
+/* =========================================================================
+ * DeToFu
+ * ========================================================================= */
+
+/**
+ * @brief Applies the built-in DeToFu display-compatibility fallback.
+ *
+ * DeToFu replaces selected rare non-BMP CJK extension characters with
+ * display-safer fallback characters from the built-in table. It is intended
+ * for environments where rare extension characters may render as tofu boxes,
+ * missing-glyph placeholders, or otherwise unsupported glyphs.
+ *
+ * DeToFu is direction-independent and does not modify OpenCC conversion
+ * dictionaries, Jieba segmentation, phrase matching, regional variants, or
+ * punctuation conversion. In a normal conversion pipeline, apply it after
+ * `opencc_jieba_convert()`.
+ *
+ * The threshold is inclusive. For example,
+ * `OPENCC_JIEBA_DETOFU_EXT_B` enables all supported built-in mappings from
+ * Extension B through Extension I, while `OPENCC_JIEBA_DETOFU_EXT_I` enables
+ * Extension I mappings only.
+ *
+ * @param instance
+ *     An OpenCC-Jieba instance returned by any `opencc_jieba_new*()`
+ *     constructor.
+ * @param input
+ *     Input null-terminated UTF-8 string.
+ * @param level
+ *     DeToFu threshold such as `OPENCC_JIEBA_DETOFU_EXT_B`.
+ *
+ * @return
+ *     A newly allocated null-terminated UTF-8 string on success.
+ *
+ *     Returns NULL if `instance` or `input` is NULL, if `input` is not valid
+ *     UTF-8, or if `level` is not a recognized
+ *     `opencc_jieba_detofu_level_t` value. Retrieve the error immediately on
+ *     the same calling thread with `opencc_jieba_last_error()`.
+ *
+ * @ownership
+ *     The returned string is owned by the caller and must be released with
+ *     `opencc_jieba_free_string()`.
+ *
+ * @since Available since v0.8.1.
+ */
+char *opencc_jieba_detofu(
+    const void *instance,
+    const char *input,
+    opencc_jieba_detofu_level_t level
+);
 
 /* =========================================================================
  * Segmentation and tagging
@@ -336,13 +594,34 @@ int32_t opencc_jieba_keywords_and_weights_pos(
 );
 
 /* =========================================================================
+ * Error state
+ * ========================================================================= */
+
+/**
+ * @brief Returns the calling thread's last C API error.
+ *
+ * The returned string is newly allocated and must be released with
+ * `opencc_jieba_free_string()`.
+ */
+char *opencc_jieba_last_error(void);
+
+/** @brief Clears the calling thread's last C API error. */
+void opencc_jieba_clear_last_error(void);
+
+/* =========================================================================
  * Memory management
  * ========================================================================= */
 
 /**
  * @brief Frees a string returned by this API.
  *
- * Safe to call with NULL.
+ * This includes strings returned by `opencc_jieba_convert()`,
+ * `opencc_jieba_normalize_compat()`,
+ * `opencc_jieba_normalize_compat_extended()`, `opencc_jieba_detofu()`,
+ * `opencc_jieba_cut_and_join()`,
+ * `opencc_jieba_join_str()`, and `opencc_jieba_last_error()`.
+ *
+ * Passing NULL is safe and has no effect.
  *
  * @param ptr String pointer previously returned by this API.
  */

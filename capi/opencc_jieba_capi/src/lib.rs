@@ -1,4 +1,7 @@
-use opencc_jieba_rs::{KeywordMethod, OpenCC};
+use opencc_jieba_rs::{
+    CustomDictMode, CustomDictSpec, DetofuLevel, DictSlot, KeywordMethod, OpenCC, UserDictEntry,
+};
+use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
 use std::ptr;
@@ -9,6 +12,54 @@ const OPENCC_JIEBA_ABI_NUMBER: u32 = 1;
 pub struct OpenccJiebaTag {
     pub word: *mut c_char,
     pub tag: *mut c_char,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct OpenccJiebaUserDictEntry {
+    pub word: *const c_char,
+    pub freq: usize,
+    pub tag: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct OpenccJiebaCustomPair {
+    pub source: *const c_char,
+    pub target: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct OpenccJiebaCustomDictSpec {
+    pub slot: u32,
+    pub mode: u32,
+    pub pairs: *const OpenccJiebaCustomPair,
+    pub pair_count: usize,
+}
+
+const OPENCC_JIEBA_CUSTOM_DICT_APPEND: u32 = 1;
+const OPENCC_JIEBA_CUSTOM_DICT_OVERRIDE: u32 = 2;
+
+thread_local! {
+    static C_API_LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+#[inline]
+fn set_c_api_last_error(message: impl Into<String>) {
+    C_API_LAST_ERROR.with(|last_error| {
+        *last_error.borrow_mut() = Some(message.into());
+    });
+}
+
+#[inline]
+fn get_c_api_last_error() -> Option<String> {
+    C_API_LAST_ERROR.with(|last_error| last_error.borrow().clone())
+}
+
+#[inline]
+fn clear_c_api_last_error() {
+    C_API_LAST_ERROR.with(|last_error| *last_error.borrow_mut() = None);
 }
 
 // === Public FFI: metadata ===
@@ -33,7 +84,36 @@ pub extern "C" fn opencc_jieba_version_string() -> *const c_char {
 
 #[no_mangle]
 pub extern "C" fn opencc_jieba_new() -> *mut OpenCC {
-    Box::into_raw(Box::new(OpenCC::new()))
+    finish_constructor(
+        OpenCC::try_new_with_user_dict_entries(&[])
+            .map_err(|err| format!("Failed to initialize OpenCC-Jieba: {err}")),
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn opencc_jieba_new_user_dict(
+    entries: *const OpenccJiebaUserDictEntry,
+    entry_count: usize,
+) -> *mut OpenCC {
+    finish_constructor(build_opencc_jieba(entries, entry_count, ptr::null(), 0))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn opencc_jieba_new_custom(
+    specs: *const OpenccJiebaCustomDictSpec,
+    spec_count: usize,
+) -> *mut OpenCC {
+    finish_constructor(build_opencc_jieba(ptr::null(), 0, specs, spec_count))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn opencc_jieba_new_user_dict_custom(
+    entries: *const OpenccJiebaUserDictEntry,
+    entry_count: usize,
+    specs: *const OpenccJiebaCustomDictSpec,
+    spec_count: usize,
+) -> *mut OpenCC {
+    finish_constructor(build_opencc_jieba(entries, entry_count, specs, spec_count))
 }
 
 #[no_mangle]
@@ -90,6 +170,120 @@ pub extern "C" fn opencc_jieba_zho_check(instance: *const OpenCC, input: *const 
     };
 
     opencc.zho_check(input_str)
+}
+
+// === Public FFI: compatibility normalization ===
+
+/// Normalizes CJK Compatibility Ideographs in a UTF-8 string.
+///
+/// This is the C API counterpart of [`OpenCC::normalize_compat`]. It is a
+/// direction-independent preprocessing operation and does not modify the
+/// instance, Jieba segmentation, conversion dictionaries, or punctuation
+/// behavior.
+///
+/// The returned string must be released with [`opencc_jieba_free_string`].
+///
+/// Returns NULL and records a thread-local C API error when `instance` or
+/// `input` is NULL or `input` is not valid UTF-8.
+#[no_mangle]
+pub extern "C" fn opencc_jieba_normalize_compat(
+    instance: *const OpenCC,
+    input: *const c_char,
+) -> *mut c_char {
+    if instance.is_null() || input.is_null() {
+        set_c_api_last_error("Invalid argument: instance/input is NULL");
+        return ptr::null_mut();
+    }
+
+    let opencc = unsafe { &*instance };
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(input_str) => input_str,
+        Err(_) => {
+            set_c_api_last_error("Invalid UTF-8 input");
+            return ptr::null_mut();
+        }
+    };
+
+    clear_c_api_last_error();
+    str_to_raw_c_char_strict(opencc.normalize_compat(input_str))
+}
+
+/// Applies the full built-in compatibility normalization pre-pass.
+///
+/// This is the C API counterpart of [`OpenCC::normalize_compat_extended`]. It
+/// combines CJK Compatibility Ideograph normalization with the crate's curated
+/// Unicode compatibility mappings, including selected radicals, glyph
+/// variants, punctuation forms, and known text-extraction artifacts.
+///
+/// The returned string must be released with [`opencc_jieba_free_string`].
+///
+/// Returns NULL and records a thread-local C API error when `instance` or
+/// `input` is NULL or `input` is not valid UTF-8.
+#[no_mangle]
+pub extern "C" fn opencc_jieba_normalize_compat_extended(
+    instance: *const OpenCC,
+    input: *const c_char,
+) -> *mut c_char {
+    if instance.is_null() || input.is_null() {
+        set_c_api_last_error("Invalid argument: instance/input is NULL");
+        return ptr::null_mut();
+    }
+
+    let opencc = unsafe { &*instance };
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(input_str) => input_str,
+        Err(_) => {
+            set_c_api_last_error("Invalid UTF-8 input");
+            return ptr::null_mut();
+        }
+    };
+
+    clear_c_api_last_error();
+    str_to_raw_c_char_strict(opencc.normalize_compat_extended(input_str))
+}
+
+// === Public FFI: DeToFu ===
+
+/// Applies the built-in DeToFu display-compatibility fallback.
+///
+/// `level` uses the stable C ABI values `0..=7`, corresponding to ExtB
+/// through ExtI respectively. The selected level is inclusive: the selected
+/// extension and every supported later extension are eligible for replacement.
+///
+/// The returned string must be released with [`opencc_jieba_free_string`].
+///
+/// Returns NULL and records a thread-local C API error when `instance` or
+/// `input` is NULL, `input` is not valid UTF-8, or `level` is not recognized.
+#[no_mangle]
+pub extern "C" fn opencc_jieba_detofu(
+    instance: *const OpenCC,
+    input: *const c_char,
+    level: u32,
+) -> *mut c_char {
+    if instance.is_null() || input.is_null() {
+        set_c_api_last_error("Invalid argument: instance/input is NULL");
+        return ptr::null_mut();
+    }
+
+    let opencc = unsafe { &*instance };
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(input_str) => input_str,
+        Err(_) => {
+            set_c_api_last_error("Invalid UTF-8 input");
+            return ptr::null_mut();
+        }
+    };
+
+    let level = match detofu_level_from_ffi(level) {
+        Some(level) => level,
+        None => {
+            set_c_api_last_error(format!("Invalid DeToFu level: {level}"));
+            return ptr::null_mut();
+        }
+    };
+
+    clear_c_api_last_error();
+    str_to_raw_c_char_strict(opencc.detofu(input_str, level))
 }
 
 // === Public FFI: segmentation and tagging ===
@@ -337,6 +531,19 @@ pub extern "C" fn opencc_jieba_keywords_and_weights_pos(
     })
 }
 
+// === Public FFI: error state ===
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_last_error() -> *mut c_char {
+    let message = get_c_api_last_error().unwrap_or_else(|| "No error".to_string());
+    str_to_raw_c_char_strict(message)
+}
+
+#[no_mangle]
+pub extern "C" fn opencc_jieba_clear_last_error() {
+    clear_c_api_last_error();
+}
+
 // === Public FFI: memory management ===
 
 #[no_mangle]
@@ -424,6 +631,236 @@ pub extern "C" fn opencc_jieba_free_tag_array(array: *mut OpenccJiebaTag) {
 }
 
 // === Internal helpers ===
+
+#[inline]
+fn detofu_level_from_ffi(level: u32) -> Option<DetofuLevel> {
+    match level {
+        0 => Some(DetofuLevel::ExtB),
+        1 => Some(DetofuLevel::ExtC),
+        2 => Some(DetofuLevel::ExtD),
+        3 => Some(DetofuLevel::ExtE),
+        4 => Some(DetofuLevel::ExtF),
+        5 => Some(DetofuLevel::ExtG),
+        6 => Some(DetofuLevel::ExtH),
+        7 => Some(DetofuLevel::ExtI),
+        _ => None,
+    }
+}
+
+fn finish_constructor(result: Result<OpenCC, String>) -> *mut OpenCC {
+    match result {
+        Ok(opencc) => {
+            clear_c_api_last_error();
+            Box::into_raw(Box::new(opencc))
+        }
+        Err(message) => {
+            set_c_api_last_error(message);
+            ptr::null_mut()
+        }
+    }
+}
+
+unsafe fn build_opencc_jieba(
+    entries: *const OpenccJiebaUserDictEntry,
+    entry_count: usize,
+    specs: *const OpenccJiebaCustomDictSpec,
+    spec_count: usize,
+) -> Result<OpenCC, String> {
+    let user_entries = parse_user_dict_entries(entries, entry_count)?;
+    let custom_specs = parse_custom_dict_specs(specs, spec_count)?;
+
+    let mut opencc = OpenCC::try_new_with_user_dict_entries(&user_entries)
+        .map_err(|err| format!("Failed to initialize OpenCC-Jieba: {err}"))?;
+
+    if !custom_specs.is_empty() {
+        opencc
+            .load_custom_dicts(&custom_specs)
+            .map_err(|err| format!("Failed to apply custom conversion dictionaries: {err}"))?;
+    }
+
+    Ok(opencc)
+}
+
+unsafe fn parse_user_dict_entries(
+    entries: *const OpenccJiebaUserDictEntry,
+    entry_count: usize,
+) -> Result<Vec<UserDictEntry>, String> {
+    if entry_count == 0 {
+        return Ok(Vec::new());
+    }
+
+    if entries.is_null() {
+        return Err(format!(
+            "Invalid argument: entries is NULL while entry_count is {entry_count}"
+        ));
+    }
+
+    let ffi_entries = std::slice::from_raw_parts(entries, entry_count);
+    let mut result = Vec::with_capacity(ffi_entries.len());
+
+    for (index, entry) in ffi_entries.iter().enumerate() {
+        if entry.word.is_null() {
+            return Err(format!(
+                "Invalid Jieba user dictionary entry {index}: word is NULL"
+            ));
+        }
+
+        let word = CStr::from_ptr(entry.word)
+            .to_str()
+            .map_err(|_| {
+                format!("Invalid Jieba user dictionary entry {index}: word is not valid UTF-8")
+            })?
+            .to_owned();
+
+        if word.is_empty() {
+            return Err(format!(
+                "Invalid Jieba user dictionary entry {index}: word is empty"
+            ));
+        }
+
+        let tag = if entry.tag.is_null() {
+            None
+        } else {
+            Some(
+                CStr::from_ptr(entry.tag)
+                    .to_str()
+                    .map_err(|_| {
+                        format!(
+                            "Invalid Jieba user dictionary entry {index}: tag is not valid UTF-8"
+                        )
+                    })?
+                    .to_owned(),
+            )
+        };
+
+        result.push(UserDictEntry {
+            word,
+            freq: entry.freq,
+            tag,
+        });
+    }
+
+    Ok(result)
+}
+
+unsafe fn parse_custom_dict_specs(
+    specs: *const OpenccJiebaCustomDictSpec,
+    spec_count: usize,
+) -> Result<Vec<CustomDictSpec>, String> {
+    if spec_count == 0 {
+        return Ok(Vec::new());
+    }
+
+    if specs.is_null() {
+        return Err(format!(
+            "Invalid argument: specs is NULL while spec_count is {spec_count}"
+        ));
+    }
+
+    let ffi_specs = std::slice::from_raw_parts(specs, spec_count);
+    let mut result = Vec::with_capacity(ffi_specs.len());
+
+    for (spec_index, spec) in ffi_specs.iter().enumerate() {
+        let slot = dict_slot_from_ffi(spec.slot).ok_or_else(|| {
+            format!(
+                "Invalid custom dictionary slot {} in spec {}",
+                spec.slot, spec_index
+            )
+        })?;
+
+        let mode = match spec.mode {
+            OPENCC_JIEBA_CUSTOM_DICT_APPEND => CustomDictMode::Append,
+            OPENCC_JIEBA_CUSTOM_DICT_OVERRIDE => CustomDictMode::Override,
+            _ => {
+                return Err(format!(
+                    "Invalid custom dictionary mode {} in spec {}",
+                    spec.mode, spec_index
+                ))
+            }
+        };
+
+        if spec.pair_count > 0 && spec.pairs.is_null() {
+            return Err(format!(
+                "Invalid custom dictionary spec {}: pairs is NULL while pair_count is {}",
+                spec_index, spec.pair_count
+            ));
+        }
+
+        let mut pairs = Vec::with_capacity(spec.pair_count);
+
+        if spec.pair_count > 0 {
+            let ffi_pairs = std::slice::from_raw_parts(spec.pairs, spec.pair_count);
+
+            for (pair_index, pair) in ffi_pairs.iter().enumerate() {
+                if pair.source.is_null() {
+                    return Err(format!(
+                        "Invalid custom dictionary spec {} pair {}: source is NULL",
+                        spec_index, pair_index
+                    ));
+                }
+
+                if pair.target.is_null() {
+                    return Err(format!(
+                        "Invalid custom dictionary spec {} pair {}: target is NULL",
+                        spec_index, pair_index
+                    ));
+                }
+
+                let source = CStr::from_ptr(pair.source)
+                    .to_str()
+                    .map_err(|_| {
+                        format!(
+                            "Invalid custom dictionary spec {} pair {}: source is not valid UTF-8",
+                            spec_index, pair_index
+                        )
+                    })?
+                    .to_owned();
+
+                let target = CStr::from_ptr(pair.target)
+                    .to_str()
+                    .map_err(|_| {
+                        format!(
+                            "Invalid custom dictionary spec {} pair {}: target is not valid UTF-8",
+                            spec_index, pair_index
+                        )
+                    })?
+                    .to_owned();
+
+                pairs.push((source, target));
+            }
+        }
+
+        result.push(CustomDictSpec { slot, pairs, mode });
+    }
+
+    Ok(result)
+}
+
+#[inline]
+fn dict_slot_from_ffi(slot: u32) -> Option<DictSlot> {
+    match slot {
+        1 => Some(DictSlot::STCharacters),
+        2 => Some(DictSlot::STPhrases),
+        3 => Some(DictSlot::TSCharacters),
+        4 => Some(DictSlot::TSPhrases),
+        5 => Some(DictSlot::TWPhrases),
+        6 => Some(DictSlot::TWPhrasesRev),
+        7 => Some(DictSlot::HKPhrases),
+        8 => Some(DictSlot::HKPhrasesRev),
+        9 => Some(DictSlot::TWVariants),
+        10 => Some(DictSlot::TWVariantsPhrases),
+        11 => Some(DictSlot::TWVariantsRev),
+        12 => Some(DictSlot::TWVariantsRevPhrases),
+        13 => Some(DictSlot::HKVariants),
+        14 => Some(DictSlot::HKVariantsPhrases),
+        15 => Some(DictSlot::HKVariantsRev),
+        16 => Some(DictSlot::HKVariantsRevPhrases),
+        17 => Some(DictSlot::JPSCharacters),
+        18 => Some(DictSlot::JPSCharactersRev),
+        19 => Some(DictSlot::JPSPhrases),
+        _ => None,
+    }
+}
 
 fn borrow_opencc<'a>(instance: *const OpenCC) -> Option<&'a OpenCC> {
     if instance.is_null() {
@@ -1172,5 +1609,227 @@ mod tests {
 
         opencc_jieba_free_tag_array(array);
         opencc_jieba_delete(instance);
+    }
+}
+
+#[cfg(test)]
+mod compatibility_normalization_capi_tests {
+    use super::*;
+
+    fn read_owned_string(ptr: *mut c_char) -> String {
+        assert!(!ptr.is_null());
+        let value = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
+        opencc_jieba_free_string(ptr);
+        value
+    }
+
+    #[test]
+    fn normalize_compat_replaces_cjk_compatibility_ideographs() {
+        let opencc = OpenCC::new();
+        let input = CString::new("天龍八部書").unwrap();
+
+        let result = opencc_jieba_normalize_compat(&opencc, input.as_ptr());
+
+        assert_eq!(read_owned_string(result), "天龍八部書");
+    }
+
+    #[test]
+    fn normalize_compat_extended_then_t2s() {
+        let opencc = OpenCC::new();
+        let input = CString::new("天龍八部書裡的聼眾‧聼聼竒羙⽟䂖甁噐⾳").unwrap();
+
+        let normalized_ptr = opencc_jieba_normalize_compat_extended(&opencc, input.as_ptr());
+        assert!(!normalized_ptr.is_null());
+
+        let normalized = unsafe { CStr::from_ptr(normalized_ptr) }
+            .to_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(normalized, "天龍八部書裡的聽眾·聽聽奇美玉石瓶器音");
+
+        let normalized_input = CString::new(normalized).unwrap();
+        let config = CString::new("t2s").unwrap();
+        let simplified_ptr =
+            opencc_jieba_convert(&opencc, normalized_input.as_ptr(), config.as_ptr(), false);
+        assert!(!simplified_ptr.is_null());
+
+        assert_eq!(
+            read_owned_string(simplified_ptr),
+            "天龙八部书里的听众·听听奇美玉石瓶器音"
+        );
+
+        opencc_jieba_free_string(normalized_ptr);
+    }
+
+    #[test]
+    fn normalize_compat_rejects_null_argument() {
+        opencc_jieba_clear_last_error();
+        let input = CString::new("天龍八部").unwrap();
+
+        let result = opencc_jieba_normalize_compat(ptr::null(), input.as_ptr());
+
+        assert!(result.is_null());
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid argument: instance/input is NULL"
+        );
+    }
+
+    #[test]
+    fn normalize_compat_rejects_invalid_utf8() {
+        opencc_jieba_clear_last_error();
+        let opencc = OpenCC::new();
+        let input = [0xff_u8, 0];
+
+        let result = opencc_jieba_normalize_compat(&opencc, input.as_ptr() as *const c_char);
+
+        assert!(result.is_null());
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid UTF-8 input"
+        );
+    }
+}
+
+#[cfg(test)]
+mod detofu_capi_tests {
+    use super::*;
+
+    fn read_owned_string(ptr: *mut c_char) -> String {
+        assert!(!ptr.is_null());
+        let value = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
+        opencc_jieba_free_string(ptr);
+        value
+    }
+
+    #[test]
+    fn detofu_ext_b_replaces_known_mapping() {
+        let opencc = OpenCC::new();
+        let input = CString::new("骖𬴂").unwrap();
+
+        let result = opencc_jieba_detofu(&opencc, input.as_ptr(), 0);
+
+        assert_eq!(read_owned_string(result), "骖騑");
+    }
+
+    #[test]
+    fn detofu_all_ffi_levels_are_valid() {
+        let opencc = OpenCC::new();
+        let input = CString::new("普通中文").unwrap();
+
+        for level in 0..=7 {
+            let result = opencc_jieba_detofu(&opencc, input.as_ptr(), level);
+            assert_eq!(read_owned_string(result), "普通中文");
+        }
+    }
+
+    #[test]
+    fn detofu_rejects_invalid_level() {
+        opencc_jieba_clear_last_error();
+        let opencc = OpenCC::new();
+        let input = CString::new("骖𬴂").unwrap();
+
+        let result = opencc_jieba_detofu(&opencc, input.as_ptr(), 99);
+
+        assert!(result.is_null());
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid DeToFu level: 99"
+        );
+    }
+
+    #[test]
+    fn detofu_rejects_null_and_invalid_utf8() {
+        opencc_jieba_clear_last_error();
+        let opencc = OpenCC::new();
+        let valid = CString::new("骖𬴂").unwrap();
+
+        assert!(opencc_jieba_detofu(ptr::null(), valid.as_ptr(), 0).is_null());
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid argument: instance/input is NULL"
+        );
+
+        let invalid = [0xff_u8, 0];
+        assert!(opencc_jieba_detofu(&opencc, invalid.as_ptr() as *const c_char, 0,).is_null());
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid UTF-8 input"
+        );
+    }
+}
+
+#[cfg(test)]
+mod constructor_tests {
+    use super::*;
+
+    #[test]
+    fn user_dict_constructor_accepts_null_zero() {
+        let instance = unsafe { opencc_jieba_new_user_dict(ptr::null(), 0) };
+        assert!(!instance.is_null());
+        opencc_jieba_delete(instance);
+    }
+
+    #[test]
+    fn custom_constructor_accepts_null_zero() {
+        let instance = unsafe { opencc_jieba_new_custom(ptr::null(), 0) };
+        assert!(!instance.is_null());
+        opencc_jieba_delete(instance);
+    }
+
+    #[test]
+    fn combined_constructor_applies_user_entry_and_custom_mapping() {
+        let word = CString::new("帕兰蒂尔").unwrap();
+        let user_entry = OpenccJiebaUserDictEntry {
+            word: word.as_ptr(),
+            freq: 100_000,
+            tag: ptr::null(),
+        };
+
+        let source = CString::new("帕兰蒂尔").unwrap();
+        let target = CString::new("柏蘭蒂爾").unwrap();
+        let pair = OpenccJiebaCustomPair {
+            source: source.as_ptr(),
+            target: target.as_ptr(),
+        };
+        let spec = OpenccJiebaCustomDictSpec {
+            slot: 2,
+            mode: OPENCC_JIEBA_CUSTOM_DICT_APPEND,
+            pairs: &pair,
+            pair_count: 1,
+        };
+
+        let instance = unsafe { opencc_jieba_new_user_dict_custom(&user_entry, 1, &spec, 1) };
+        assert!(!instance.is_null());
+
+        let input = CString::new("帕兰蒂尔").unwrap();
+        let config = CString::new("s2t").unwrap();
+        let output = opencc_jieba_convert(instance, input.as_ptr(), config.as_ptr(), false);
+
+        assert!(!output.is_null());
+        unsafe {
+            assert_eq!(CStr::from_ptr(output).to_str().unwrap(), "柏蘭蒂爾");
+        }
+
+        opencc_jieba_free_string(output);
+        opencc_jieba_delete(instance);
+    }
+
+    #[test]
+    fn constructor_reports_invalid_null_nonempty_array() {
+        let instance = unsafe { opencc_jieba_new_user_dict(ptr::null(), 1) };
+        assert!(instance.is_null());
+
+        let error = opencc_jieba_last_error();
+        assert!(!error.is_null());
+
+        unsafe {
+            assert_eq!(
+                CStr::from_ptr(error).to_str().unwrap(),
+                "Invalid argument: entries is NULL while entry_count is 1"
+            );
+        }
+
+        opencc_jieba_free_string(error);
     }
 }
