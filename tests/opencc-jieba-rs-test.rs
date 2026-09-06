@@ -3,7 +3,7 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opencc_jieba_rs::{OpenccError, UserDictEntry};
+    use opencc_jieba_rs::{DetofuLevel, DetofuMap, OpenccError, UserDictEntry};
     use std::sync::Arc;
 
     #[test]
@@ -560,5 +560,151 @@ mod tests {
             cc.jieba_cut(&normalized, true),
             vec!["聽聽", "奇美", "玉石", "瓶器音"]
         );
+    }
+
+    // DeTofu Tests
+
+    #[test]
+    fn test_opencc_detofu() {
+        let cc = OpenCC::new();
+        let input = "𠉂𪠟𫝈𫬐";
+
+        assert_eq!(cc.detofu(input, DetofuLevel::ExtE), "𠉂𪠟𫝈㘔");
+        assert_eq!(cc.detofu(input, DetofuLevel::ExtB), "㒓㓄㑮㘔");
+    }
+
+    #[test]
+    fn test_opencc_t2s_detofu() {
+        let cc = OpenCC::new();
+
+        let output = cc.detofu(
+            &cc.convert("儼驂騑於上路，訪風景於崇阿", "t2s", false),
+            DetofuLevel::ExtB,
+        );
+
+        assert_eq!(output, "俨骖騑于上路，访风景于崇阿");
+    }
+
+    #[test]
+    fn test_opencc_t2s_detofu_into() {
+        let cc = OpenCC::new();
+        let mut output = String::new();
+
+        cc.detofu_into(
+            &cc.convert("儼驂騑於上路，訪風景於崇阿", "t2s", false),
+            DetofuLevel::ExtB,
+            &mut output,
+        );
+
+        assert_eq!(output, "俨骖騑于上路，访风景于崇阿");
+    }
+
+    #[test]
+    fn test_opencc_t2s_detofu_preserves_unmapped_character() {
+        let cc = OpenCC::new();
+
+        let converted = cc.convert("儼驂騑於上路，訪風景於崇阿，𱁬", "t2s", false);
+
+        let output = cc.detofu(&converted, DetofuLevel::ExtB);
+
+        assert_eq!(output, "俨骖騑于上路，访风景于崇阿，𱁬");
+    }
+
+    #[test]
+    fn test_detofu_custom_pairs_override_builtin_mapping() {
+        let input = "這隻小狗有𣭲毛";
+
+        assert_eq!(
+            DetofuMap::builtin(DetofuLevel::ExtB).detofu(input),
+            "這隻小狗有氄毛"
+        );
+
+        let map = DetofuMap::builtin(DetofuLevel::ExtB).with_custom_pairs(&[('𣭲', '氂')]);
+
+        assert_eq!(map.detofu(input), "這隻小狗有氂毛");
+    }
+
+    #[test]
+    fn detofu_with_custom_file_loads_user_mapping() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let mut path = std::env::temp_dir();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
+        path.push(format!("opencc_fmmseg_custom_tofu_{unique}.txt"));
+
+        fs::write(&path, "𣭲\t氄\tB\n").unwrap();
+
+        let cc = OpenCC::new();
+        let result = cc
+            .detofu_with_custom_file("𣭲毛", DetofuLevel::ExtB, &path)
+            .unwrap();
+
+        fs::remove_file(&path).ok();
+
+        assert_eq!(result, "氄毛");
+    }
+
+    #[test]
+    fn test_detofu_map_with_custom_pairs() {
+        let map = DetofuMap::builtin(DetofuLevel::ExtB).with_custom_pairs(&[('𣭲', '氄')]);
+
+        assert_eq!(map.detofu("𣭲毛"), "氄毛");
+    }
+
+    #[test]
+    fn test_detofu_map_with_custom_pairs_overrides_builtin() {
+        let map = DetofuMap::builtin(DetofuLevel::ExtB).with_custom_pairs(&[('𬴂', '騑')]);
+
+        assert_eq!(map.detofu("骖𬴂"), "骖騑");
+    }
+
+    #[test]
+    fn test_opencc_detofu_with_custom_pairs() {
+        let cc = OpenCC::new();
+
+        let output = cc.detofu_with_custom_pairs(
+            "𣭲毛 骖𬴂",
+            DetofuLevel::ExtB,
+            &[('𣭲', '氄'), ('𬴂', '騑')],
+        );
+
+        assert_eq!(output, "氄毛 骖騑");
+    }
+
+    #[test]
+    fn test_detofu_custom_pairs_later_wins() {
+        let map =
+            DetofuMap::builtin(DetofuLevel::ExtB).with_custom_pairs(&[('𣭲', '氂'), ('𣭲', '氄')]);
+
+        assert_eq!(map.detofu("𣭲毛"), "氄毛");
+    }
+
+    #[test]
+    fn test_detofu_custom_pairs_support_bmp_characters() {
+        let map = DetofuMap::builtin(DetofuLevel::ExtB).with_custom_pairs(&[('A', 'B')]);
+
+        assert_eq!(map.detofu("A𬴂"), "B騑");
+    }
+
+    #[test]
+    fn builtin_detofu_replaces_known_st_mappings() {
+        let map = DetofuMap::builtin(DetofuLevel::ExtB);
+
+        assert_eq!(map.detofu("𠗣𧜗"), "㓆䘞");
+    }
+
+    #[test]
+    fn test_opencc_s2t_detofu() {
+        let cc = OpenCC::new();
+
+        let converted = cc.convert("㓆䘞", "s2t", false);
+        assert_eq!(converted, "𠗣𧜗");
+
+        assert_eq!(cc.detofu(&converted, DetofuLevel::ExtB), "㓆䘞");
     }
 }

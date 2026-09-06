@@ -197,7 +197,7 @@ cargo add opencc-jieba-rs
 Or add the following line to your `Cargo.toml`:
 
 ```toml
-opencc-jieba-rs = "0.8.0"
+opencc-jieba-rs = "0.8.1"
 ```
 
 Use `opencc-jieba-rs` as a library:
@@ -310,6 +310,17 @@ fn main() {
 
 This is a curated, position-stable one-Unicode-scalar-to-one-Unicode-scalar normalization pass. It is not a general NFC,
 NFD, NFKC, or NFKD implementation. Unmapped characters are preserved.
+
+---
+
+## DeTofu: tofu-safe fallback for rare CJK characters
+
+DeTofu is an optional post-conversion display-compatibility pass for rare CJK extension characters that may render as
+tofu boxes on some systems, fonts, browsers, document viewers, mobile devices, or e-book readers.
+
+This is an advanced compatibility feature rather than common OpenCC conversion usage. See the
+[DeTofu User Guide](DETOFU_USER_GUIDE.md) for Rust APIs, threshold behavior, custom fallback pairs, and custom fallback
+files.
 
 ---
 

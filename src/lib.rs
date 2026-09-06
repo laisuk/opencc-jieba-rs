@@ -232,16 +232,18 @@ mod keyword;
 mod opencc;
 mod opencc_config;
 
-pub(crate) mod compat_ideographs;
+mod compat_ideographs;
+mod detofu;
 #[cfg(feature = "dictionary-build")]
 pub mod dictionary_build;
-pub(crate) mod unicode_compat;
+mod unicode_compat;
 
 pub use dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};
 pub use jieba_rs::Keyword;
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 pub use opencc::{find_max_utf8_length, is_delimiter, OpenCC, OpenccError, UserDictEntry};
 pub use opencc_config::OpenccConfig;
-
+// DeTofu API
+pub use crate::detofu::{DetofuLevel, DetofuMap};
 // Kept at the crate root for the internal keyword module's existing call path.
 pub(crate) use opencc::strip_newlines_cow;

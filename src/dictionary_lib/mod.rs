@@ -381,31 +381,14 @@ impl Dictionary {
         let path = filename.as_ref();
         let file = File::open(path)?;
         let mut dict = DictMap::default();
-
         let mut saw_data_line = false;
 
         for (lineno, line_res) in BufReader::new(file).lines().enumerate() {
             let line = line_res?;
-            let mut s = line.trim_end();
 
-            if s.is_empty() {
+            let Some(s) = prepare_dictionary_line(&line, &mut saw_data_line) else {
                 continue;
-            }
-
-            if s.trim_start().starts_with('#') {
-                continue;
-            }
-
-            if !saw_data_line {
-                if let Some(rest) = s.strip_prefix('\u{FEFF}') {
-                    s = rest;
-                }
-                saw_data_line = true;
-
-                if s.is_empty() {
-                    continue;
-                }
-            }
+            };
 
             let Some((k, v)) = s.split_once('\t') else {
                 eprintln!(
@@ -417,7 +400,6 @@ impl Dictionary {
                 continue;
             };
 
-            // Keep first candidate if multiple values exist.
             let val = v.split_whitespace().next().unwrap_or("");
 
             if k.is_empty() || val.is_empty() {
@@ -448,31 +430,14 @@ impl Dictionary {
         let path = filename.as_ref();
         let file = File::open(path)?;
         let mut dict = DictMap::default();
-
         let mut saw_data_line = false;
 
         for (lineno, line_res) in BufReader::new(file).lines().enumerate() {
             let line = line_res?;
-            let mut s = line.trim_end();
 
-            if s.is_empty() {
+            let Some(s) = prepare_dictionary_line(&line, &mut saw_data_line) else {
                 continue;
-            }
-
-            if s.trim_start().starts_with('#') {
-                continue;
-            }
-
-            if !saw_data_line {
-                if let Some(rest) = s.strip_prefix('\u{FEFF}') {
-                    s = rest;
-                }
-                saw_data_line = true;
-
-                if s.is_empty() {
-                    continue;
-                }
-            }
+            };
 
             let Some((k, v)) = s.split_once('\t') else {
                 return Err(io::Error::new(
@@ -492,6 +457,7 @@ impl Dictionary {
 
             let key = k.to_string();
             let value = val.to_string();
+
             let len_chars = u16::try_from(key.chars().count()).map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -562,6 +528,31 @@ impl Dictionary {
 
         Ok(dictionary)
     }
+}
+
+#[cfg(feature = "dictionary-build")]
+#[inline]
+fn prepare_dictionary_line<'a>(line: &'a str, saw_data_line: &mut bool) -> Option<&'a str> {
+    let mut s = line.trim_end();
+
+    if s.is_empty() {
+        return None;
+    }
+
+    if s.trim_start().starts_with('#') {
+        return None;
+    }
+
+    if !*saw_data_line {
+        s = s.strip_prefix('\u{FEFF}').unwrap_or(s);
+        *saw_data_line = true;
+
+        if s.is_empty() {
+            return None;
+        }
+    }
+
+    Some(s)
 }
 
 #[cfg(all(test, feature = "dictionary-build"))]

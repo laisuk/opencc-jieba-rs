@@ -9,7 +9,7 @@ members = [
 
 [package]
 name = "opencc-jieba-rs"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 authors = ["Laisuk Lai <laisuk@yahoo.com>"]
 description = "High-performance Chinese text conversion and segmentation using Jieba and OpenCC-style dictionaries."
@@ -41,7 +41,7 @@ jieba-rs = { version = "=0.7.4", features = ["tfidf", "textrank"] }
 regex = "1.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-zstd = "0.13"
+zstd = "0.14"
 
 # Exact direct dependency pins to preserve behavior and Rust 2021/MSRV compatibility.
 # Older toolchains may require a locked dependency graph; see MSRV-1.75.0-GUIDE.md.

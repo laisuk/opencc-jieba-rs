@@ -3,7 +3,7 @@ use crate::dictionary_lib::{
 };
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
-use crate::{compat_ideographs, dictionary_lib, unicode_compat};
+use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
 use jieba_rs::{Jieba, Keyword};
 use rayon::prelude::*;
 use regex::Regex;
@@ -3130,6 +3130,198 @@ impl OpenCC {
     /// ```
     pub fn normalize_unicode_compat(&self, text: &str) -> String {
         unicode_compat::normalize_unicode_compat(text)
+    }
+
+    // DeTofu
+
+    /// Converts non-BMP CJK extension characters to display-safe fallbacks.
+    ///
+    /// This is a convenience wrapper around [`detofu::detofu`]. It is intended
+    /// for environments with incomplete rare-character font coverage, such as
+    /// some systems, browsers, e-book readers, document viewers, or mobile
+    /// platforms where non-BMP CJK extension characters may render as tofu boxes
+    /// (□) or missing-glyph placeholders.
+    ///
+    /// DeTofu is a display compatibility pass. It does not modify OpenCC
+    /// conversion dictionaries, phrase matching, regional variant selection,
+    /// script detection, or punctuation conversion.
+    ///
+    /// For converted text, apply DeTofu after [`OpenCC::convert`] or
+    /// [`OpenCC::convert_with_config`].
+    ///
+    /// The `level` parameter controls which CJK Extension blocks are replaced:
+    ///
+    /// - `ExtB` → ExtB and above
+    /// - `ExtC` → ExtC and above
+    /// - `ExtD` → ExtD and above
+    /// - ...
+    /// - `ExtI` → ExtI only
+    ///
+    /// # Examples
+    ///
+    /// Convert text normally:
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let cc = OpenCC::new();
+    ///
+    /// let converted = cc.convert(
+    ///     "儼驂騑於上路，訪風景於崇阿",
+    ///     "t2s",
+    ///     false,
+    /// );
+    ///
+    /// assert_eq!(converted, "俨骖𬴂于上路，访风景于崇阿");
+    /// ```
+    ///
+    /// Apply DeTofu directly when text already contains rare extension
+    /// characters:
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::{DetofuLevel, OpenCC};
+    ///
+    /// let cc = OpenCC::new();
+    /// let safe = cc.detofu("骖𬴂", DetofuLevel::ExtB);
+    ///
+    /// assert_eq!(safe, "骖騑");
+    /// ```
+    ///
+    /// Combine OpenCC conversion and DeTofu for tofu-safe display output:
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::{DetofuLevel, OpenCC};
+    ///
+    /// let cc = OpenCC::new();
+    ///
+    /// let converted = cc.convert(
+    ///     "儼驂騑於上路，訪風景於崇阿",
+    ///     "t2s",
+    ///     false,
+    /// );
+    ///
+    /// let safe = cc.detofu(&converted, DetofuLevel::ExtB);
+    ///
+    /// assert_eq!(safe, "俨骖騑于上路，访风景于崇阿");
+    /// ```
+    pub fn detofu(&self, text: &str, level: DetofuLevel) -> String {
+        detofu::detofu(text, level)
+    }
+
+    /// Converts built-in non-BMP CJK extension characters into
+    /// display-compatible fallback characters and appends the result to
+    /// `output`.
+    ///
+    /// This is the allocation-reuse counterpart of [`OpenCC::detofu`].
+    /// The built-in DeTofu table is initialized once and shared across calls.
+    ///
+    /// The function appends to `output`; it does not clear existing contents.
+    /// Call [`String::clear`] first when reusing a buffer for an independent
+    /// result.
+    ///
+    /// DeTofu is independent of this `OpenCC` instance's conversion
+    /// dictionaries. The method is provided as a convenient high-level entry
+    /// point for callers that already use `OpenCC`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::{DetofuLevel, OpenCC};
+    ///
+    /// let cc = OpenCC::new();
+    /// let mut output = String::new();
+    ///
+    /// cc.detofu_into("骖𬴂", DetofuLevel::ExtB, &mut output);
+    ///
+    /// assert_eq!(output, "骖騑");
+    /// ```
+    pub fn detofu_into(&self, input: &str, level: DetofuLevel, output: &mut String) {
+        detofu::detofu_into(input, level, output);
+    }
+
+    /// Converts non-BMP CJK extension characters using the built-in DeTofu
+    /// mappings plus a user-supplied fallback file.
+    ///
+    /// Custom mappings are merged with the built-in table. If the same tofu-risk
+    /// character exists in both sources, the custom file takes precedence.
+    ///
+    /// The file format is UTF-8 text with one mapping per line:
+    ///
+    /// ```text
+    /// 𣭲    氄    B
+    /// ```
+    ///
+    /// Format:
+    ///
+    /// ```text
+    /// tofu_char<TAB>fallback_char<TAB>extension
+    /// ```
+    ///
+    /// The extension column accepts either the compact form (`B`–`I`) or the
+    /// legacy form (`ExtB`–`ExtI`).
+    ///
+    /// Lines beginning with `#` and blank lines are ignored.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use opencc_jieba_rs::{DetofuLevel, OpenCC};
+    ///
+    /// let cc = OpenCC::new();
+    ///
+    /// let safe = cc.detofu_with_custom_file(
+    ///     "𣭲毛",
+    ///     DetofuLevel::ExtB,
+    ///     "custom_tofu.txt",
+    /// )?;
+    ///
+    /// assert_eq!(safe, "氄毛");
+    ///
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
+    pub fn detofu_with_custom_file<P: AsRef<Path>>(
+        &self,
+        input: &str,
+        level: DetofuLevel,
+        path: P,
+    ) -> std::io::Result<String> {
+        let map = DetofuMap::builtin(level).with_custom_file(path)?;
+        Ok(map.detofu(input))
+    }
+
+    /// Converts non-BMP CJK extension characters using the built-in DeTofu
+    /// mappings plus user-supplied fallback pairs.
+    ///
+    /// Custom pairs are merged with the built-in table. If the same tofu-risk
+    /// character exists in both sources, the custom pair takes precedence.
+    ///
+    /// Unlike custom fallback files, direct pairs do not carry an extension column,
+    /// so they are always added to the selected map.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use opencc_jieba_rs::{DetofuLevel, OpenCC};
+    ///
+    /// let cc = OpenCC::new();
+    ///
+    /// let safe = cc.detofu_with_custom_pairs(
+    ///     "𣭲毛",
+    ///     DetofuLevel::ExtB,
+    ///     &[('𣭲', '氄')],
+    /// );
+    ///
+    /// assert_eq!(safe, "氄毛");
+    /// ```
+    pub fn detofu_with_custom_pairs(
+        &self,
+        input: &str,
+        level: DetofuLevel,
+        pairs: &[(char, char)],
+    ) -> String {
+        DetofuMap::builtin(level)
+            .with_custom_pairs(pairs)
+            .detofu(input)
     }
 }
 

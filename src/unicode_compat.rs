@@ -256,6 +256,7 @@ impl UnicodeCompat {
     ///
     ///
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn normalize_in_place(&self, chars: &mut [char]) {
         for ch in chars {
             *ch = self.normalize_char(*ch);
