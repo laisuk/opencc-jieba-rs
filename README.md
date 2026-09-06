@@ -58,10 +58,11 @@ Options:
   -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
   -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
   -p, --punct                         Enable punctuation conversion
-  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before conversion
-  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before conversion
   -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
   -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
+  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
+  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
+      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
       --in-enc <encoding>             Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
       --out-enc <encoding>            Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
   -h, --help                          Print help
