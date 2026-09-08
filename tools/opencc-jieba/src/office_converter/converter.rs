@@ -967,28 +967,19 @@ mod tests {
 </w:document>"#
         );
 
-        let zip = make_zip(&[
-            ("word/document.xml", xml.as_bytes()),
-        ]);
+        let zip = make_zip(&[("word/document.xml", xml.as_bytes())]);
 
         let helper = OpenCC::new();
 
-        let text_converter = OfficeTextConverter::new(
-            |text: &str, config: &str, punctuation: bool| {
+        let text_converter =
+            OfficeTextConverter::new(|text: &str, config: &str, punctuation: bool| {
                 let normalized = helper.normalize_compat_extended(text);
                 helper.convert(&normalized, config, punctuation)
-            },
-        );
+            });
 
-        let (out_bytes, converted_count) = OfficeConverter::convert_bytes(
-            &zip,
-            "docx",
-            "t2s",
-            true,
-            false,
-            &text_converter,
-        )
-            .expect("DOCX extended compatibility conversion failed");
+        let (out_bytes, converted_count) =
+            OfficeConverter::convert_bytes(&zip, "docx", "t2s", true, false, &text_converter)
+                .expect("DOCX extended compatibility conversion failed");
 
         assert_eq!(converted_count, 1);
 
