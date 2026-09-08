@@ -7,7 +7,7 @@ edition = "2021"
 opencc-jieba-rs = { path = "../.." }
 opencc-tool-common = { path = "../opencc-tool-common" }
 clap = "=4.5"
-encoding_rs = "0.8"
+encoding_rs = "=0.8.35"
 encoding_rs_io = "0.1"
 regex = "1.12"
 zip = { version = "=3.0", default-features = false, features = ["deflate"] }
