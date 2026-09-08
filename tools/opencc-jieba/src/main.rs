@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 mod office_converter;
-use office_converter::OfficeConverter;
+use office_converter::{OfficeConverter, OfficeTextConverter};
 
 const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
@@ -60,6 +60,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     BLUE, RESET
                 ))
                 .args(common_args())
+                .args(normalization_args())
+                .arg(
+                    Arg::new("detofu")
+                        .long("detofu")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Apply DeTofu fallback for CJK Extension B-I characters after conversion"),
+                )
                 .arg(
                     Arg::new("format")
                         .short('f')
@@ -432,15 +439,31 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         return Err(format!("❌  Unsupported Office format: {office_format}").into());
     }
 
-    // let helper = OpenCC::new();
     let helper = build_opencc(matches)?;
+
+    let normalize_compat = matches.get_flag("norm-compat");
+    let normalize_compat_extended = matches.get_flag("norm-compat-extended");
+    let detofu = matches.get_flag("detofu");
+
+    let text_converter = OfficeTextConverter::new(|text: &str, config: &str, punctuation: bool| {
+        let normalized =
+            normalize_cli_input(&helper, text, normalize_compat, normalize_compat_extended);
+
+        let converted = helper.convert(normalized.as_ref(), config, punctuation);
+
+        if detofu {
+            helper.detofu(&converted, DetofuLevel::ExtB)
+        } else {
+            converted
+        }
+    });
 
     let final_output = match output_file {
         Some(path) => {
             let output_path = Path::new(path);
 
             if output_path.extension().is_none() {
-                format!("{path}.{}", office_format)
+                format!("{path}.{office_format}")
             } else {
                 path.clone()
             }
@@ -453,8 +476,11 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
                 .unwrap_or("converted");
 
             let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
+
             let final_stem = if convert_filename {
-                let file_stem_converted = helper.convert(file_stem, config, punctuation);
+                let file_stem_converted =
+                    text_converter.convert_text(file_stem, config, punctuation);
+
                 format!("{file_stem_converted}_converted")
             } else {
                 format!("{file_stem}_converted")
@@ -466,6 +492,7 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
                 .to_string()
         }
     };
+
     validate_output_path(&final_output)?;
     validate_distinct_input_output(input_file, &final_output)?;
 
@@ -473,10 +500,10 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         input_file,
         &final_output,
         &office_format,
-        &helper,
         config,
         punctuation,
         keep_font,
+        &text_converter,
     ) {
         Ok(result) if result.success => {
             eprintln!("{}\n📁  Output saved to: {}", result.message, final_output);
