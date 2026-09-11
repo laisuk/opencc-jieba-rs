@@ -16,7 +16,7 @@ jobs:
     steps:
       # Checkout: allow building a specific ref if provided
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
 
@@ -90,7 +90,7 @@ jobs:
           (cd dist && zip -r "../${ARTIFACT_ZIP}" .)
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: opencc_jieba_capi-run${{ github.run_id }}-macos-universal
           path: opencc_jieba_capi-run${{ github.run_id }}-macos-universal.zip
