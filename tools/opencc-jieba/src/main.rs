@@ -2,7 +2,7 @@ use clap::builder::{StringValueParser, TypedValueParser, ValueParser};
 use clap::{Arg, ArgMatches, Command};
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use opencc_jieba_rs::{DetofuLevel, OpenCC, OpenccConfig};
+use opencc_jieba_rs::{OpenCC, OpenccConfig};
 use opencc_tool_common::parse_custom_dict_spec;
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -12,7 +12,12 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 mod office_converter;
-use office_converter::{OfficeConverter, OfficeTextConverter};
+mod text_converter;
+
+use office_converter::OfficeConverter;
+use text_converter::{
+    create_text_converter, NormalizationMode, TextConverterOptions,
+};
 
 const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
@@ -85,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .arg(
                     Arg::new("convert_filename")
+                        .short('F')
                         .long("convert-filename")
                         .action(clap::ArgAction::SetTrue)
                         .help(
@@ -290,6 +296,16 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
 
     let opencc = build_opencc(matches)?;
 
+    let text_converter = create_text_converter(
+        &opencc,
+        TextConverterOptions {
+            config,
+            punctuation,
+            normalization: normalization_mode(matches),
+            detofu: matches.get_flag("detofu"),
+        },
+    );
+
     let is_console = input_file.is_none();
     let mut input: Box<dyn Read> = match input_file {
         Some(file_name) => Box::new(open_input_file(file_name)?),
@@ -307,20 +323,7 @@ fn handle_convert(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
     }
 
     let input_str = decode_input(&buffer, in_enc)?;
-
-    let convert_input = normalize_cli_input(
-        &opencc,
-        &input_str,
-        matches.get_flag("norm-compat"),
-        matches.get_flag("norm-compat-extended"),
-    );
-    let converted = opencc.convert(convert_input.as_ref(), config, punctuation);
-
-    let output_str = if matches.get_flag("detofu") {
-        opencc.detofu(&converted, DetofuLevel::ExtB)
-    } else {
-        converted
-    };
+    let output_str = text_converter.convert(&input_str);
 
     let (is_console_output, mut output) = open_output(output_file)?;
 
@@ -352,6 +355,16 @@ fn normalize_cli_input<'a>(
         Cow::Owned(opencc.normalize_compat(input))
     } else {
         Cow::Borrowed(input)
+    }
+}
+
+fn normalization_mode(matches: &ArgMatches) -> NormalizationMode {
+    if matches.get_flag("norm-compat-extended") {
+        NormalizationMode::CompatExtended
+    } else if matches.get_flag("norm-compat") {
+        NormalizationMode::Compat
+    } else {
+        NormalizationMode::None
     }
 }
 
@@ -441,22 +454,15 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
 
     let helper = build_opencc(matches)?;
 
-    let normalize_compat = matches.get_flag("norm-compat");
-    let normalize_compat_extended = matches.get_flag("norm-compat-extended");
-    let detofu = matches.get_flag("detofu");
-
-    let text_converter = OfficeTextConverter::new(|text: &str, config: &str, punctuation: bool| {
-        let normalized =
-            normalize_cli_input(&helper, text, normalize_compat, normalize_compat_extended);
-
-        let converted = helper.convert(normalized.as_ref(), config, punctuation);
-
-        if detofu {
-            helper.detofu(&converted, DetofuLevel::ExtB)
-        } else {
-            converted
-        }
-    });
+    let text_converter = create_text_converter(
+        &helper,
+        TextConverterOptions {
+            config,
+            punctuation,
+            normalization: normalization_mode(matches),
+            detofu: matches.get_flag("detofu"),
+        },
+    );
 
     let final_output = match output_file {
         Some(path) => {
@@ -478,8 +484,7 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
             let parent = input_path.parent().unwrap_or_else(|| ".".as_ref());
 
             let final_stem = if convert_filename {
-                let file_stem_converted =
-                    text_converter.convert_text(file_stem, config, punctuation);
+                let file_stem_converted = text_converter.convert(file_stem);
 
                 format!("{file_stem_converted}_converted")
             } else {
@@ -500,8 +505,6 @@ fn handle_office(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         input_file,
         &final_output,
         &office_format,
-        config,
-        punctuation,
         keep_font,
         &text_converter,
     ) {
@@ -879,6 +882,23 @@ mod tests {
                 .kind(),
             io::ErrorKind::InvalidInput
         );
+    }
+
+    #[test]
+    fn text_converter_applies_normalize_convert_detofu_pipeline() {
+        let opencc = OpenCC::new();
+
+        let converter = create_text_converter(
+            &opencc,
+            TextConverterOptions {
+                config: "t2s",
+                punctuation: false,
+                normalization: NormalizationMode::CompatExtended,
+                detofu: true,
+            },
+        );
+
+        assert_eq!(converter.convert("聼𧜗"), "听䘞");
     }
 
     #[test]

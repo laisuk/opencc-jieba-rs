@@ -169,7 +169,7 @@ fn main() {
     let detofued = opencc.detofu(detofu_source, DetofuLevel::ExtB);
 
     println!("Source:      {}", detofu_source);
-    println!("DeToFu:      {}", detofued);
+    println!("DeTofu:      {}", detofued);
     println!(
         "Result:      {}",
         if detofued == "骖騑" { "PASS" } else { "FAIL" }

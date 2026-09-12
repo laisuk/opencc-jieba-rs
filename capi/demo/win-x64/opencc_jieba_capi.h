@@ -76,12 +76,12 @@ typedef struct OpenccJiebaCustomDictSpec {
 /**
  * @typedef opencc_jieba_detofu_level_t
  *
- * @brief ABI-stable DeToFu threshold level.
+ * @brief ABI-stable DeTofu threshold level.
  *
  * This type is a 32-bit unsigned integer. Level values are stable ABI
  * identifiers and will not be reordered or reused.
  *
- * DeToFu levels are threshold-based rather than dictionary-slot IDs, so the
+ * DeTofu levels are threshold-based rather than dictionary-slot IDs, so the
  * first valid level intentionally starts at zero.
  *
  * @since Available since v0.8.1.
@@ -89,7 +89,7 @@ typedef struct OpenccJiebaCustomDictSpec {
 typedef uint32_t opencc_jieba_detofu_level_t;
 
 /**
- * @brief DeToFu fallback threshold values.
+ * @brief DeTofu fallback threshold values.
  *
  * The selected level is inclusive: the selected CJK extension and every
  * supported later extension are eligible for fallback replacement.
@@ -305,7 +305,7 @@ char *opencc_jieba_normalize_compat(
  *
  * For applications that want the complete compatibility preprocessing path,
  * this function is generally preferred over `opencc_jieba_normalize_compat()`.
- * Apply it before `opencc_jieba_convert()`; DeToFu, when desired, is normally
+ * Apply it before `opencc_jieba_convert()`; DeTofu, when desired, is normally
  * applied after conversion.
  *
  * @param instance
@@ -333,18 +333,18 @@ char *opencc_jieba_normalize_compat_extended(
 );
 
 /* =========================================================================
- * DeToFu
+ * DeTofu
  * ========================================================================= */
 
 /**
- * @brief Applies the built-in DeToFu display-compatibility fallback.
+ * @brief Applies the built-in DeTofu display-compatibility fallback.
  *
- * DeToFu replaces selected rare non-BMP CJK extension characters with
+ * DeTofu replaces selected rare non-BMP CJK extension characters with
  * display-safer fallback characters from the built-in table. It is intended
  * for environments where rare extension characters may render as tofu boxes,
  * missing-glyph placeholders, or otherwise unsupported glyphs.
  *
- * DeToFu is direction-independent and does not modify OpenCC conversion
+ * DeTofu is direction-independent and does not modify OpenCC conversion
  * dictionaries, Jieba segmentation, phrase matching, regional variants, or
  * punctuation conversion. In a normal conversion pipeline, apply it after
  * `opencc_jieba_convert()`.
@@ -360,7 +360,7 @@ char *opencc_jieba_normalize_compat_extended(
  * @param input
  *     Input null-terminated UTF-8 string.
  * @param level
- *     DeToFu threshold such as `OPENCC_JIEBA_DETOFU_EXT_B`.
+ *     DeTofu threshold such as `OPENCC_JIEBA_DETOFU_EXT_B`.
  *
  * @return
  *     A newly allocated null-terminated UTF-8 string on success.

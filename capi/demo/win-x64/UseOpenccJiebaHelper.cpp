@@ -173,7 +173,7 @@ int main(int argc, char** argv)
             detofued == u8"骖騑";
 
         std::cout << "Source:      " << detofuSource << "\n";
-        std::cout << "DeToFu:      " << detofued << "\n";
+        std::cout << "DeTofu:      " << detofued << "\n";
         std::cout << "Result:      "
                   << (detofuPass ? "PASS" : "FAIL")
                   << "\n";

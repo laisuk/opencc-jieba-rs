@@ -242,9 +242,9 @@ pub extern "C" fn opencc_jieba_normalize_compat_extended(
     str_to_raw_c_char_strict(opencc.normalize_compat_extended(input_str))
 }
 
-// === Public FFI: DeToFu ===
+// === Public FFI: DeTofu ===
 
-/// Applies the built-in DeToFu display-compatibility fallback.
+/// Applies the built-in DeTofu display-compatibility fallback.
 ///
 /// `level` uses the stable C ABI values `0..=7`, corresponding to ExtB
 /// through ExtI respectively. The selected level is inclusive: the selected
@@ -277,7 +277,7 @@ pub extern "C" fn opencc_jieba_detofu(
     let level = match detofu_level_from_ffi(level) {
         Some(level) => level,
         None => {
-            set_c_api_last_error(format!("Invalid DeToFu level: {level}"));
+            set_c_api_last_error(format!("Invalid DeTofu level: {level}"));
             return ptr::null_mut();
         }
     };
@@ -1734,7 +1734,7 @@ mod detofu_capi_tests {
         assert!(result.is_null());
         assert_eq!(
             read_owned_string(opencc_jieba_last_error()),
-            "Invalid DeToFu level: 99"
+            "Invalid DeTofu level: 99"
         );
     }
 

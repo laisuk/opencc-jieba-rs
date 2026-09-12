@@ -212,7 +212,7 @@ public:
         return transformString(input, opencc_jieba_normalize_compat_extended);
     }
 
-    // Applies the built-in DeToFu display-compatibility fallback.
+    // Applies the built-in DeTofu display-compatibility fallback.
     [[nodiscard]] std::string detofu(
         const std::string_view input,
         const opencc_jieba_detofu_level_t level = OPENCC_JIEBA_DETOFU_EXT_B

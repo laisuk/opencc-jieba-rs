@@ -1,2 +1,2 @@
-pub mod converter;
-pub use converter::{OfficeConverter, OfficeTextConverter};
+mod converter;
+pub(crate) use converter::{OfficeConverter};

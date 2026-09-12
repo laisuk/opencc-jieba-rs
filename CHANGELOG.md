@@ -11,11 +11,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Added `OpenCC::detofu` with configurable CJK extension fallback levels from Extension B through Extension I.
-- Added C API support for compatibility normalization and DeToFu with `opencc_jieba_normalize_compat`,
+- Added C API support for compatibility normalization and DeTofu with `opencc_jieba_normalize_compat`,
   `opencc_jieba_normalize_compat_extended`, and `opencc_jieba_detofu`.
 - Added C API constructors for in-memory Jieba user dictionaries, custom conversion dictionaries, and combined
   user/custom dictionary initialization.
-- Expanded the C++ RAII helper with custom dictionary construction, compatibility normalization, DeToFu, tagging,
+- Expanded the C++ RAII helper with custom dictionary construction, compatibility normalization, DeTofu, tagging,
   weighted keyword extraction, and native error handling.
 
 ---
