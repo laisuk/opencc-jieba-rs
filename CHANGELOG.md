@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   user/custom dictionary initialization.
 - Expanded the C++ RAII helper with custom dictionary construction, compatibility normalization, DeTofu, tagging,
   weighted keyword extraction, and native error handling.
+- Update dictionary data.
 
 ---
 
