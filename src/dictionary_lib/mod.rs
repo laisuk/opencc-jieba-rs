@@ -17,8 +17,6 @@ pub use crate::dictionary_lib::dict_slots::{
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use zstd::stream::read::Decoder;
-#[cfg(feature = "dictionary-build")]
-use zstd::Encoder;
 
 pub(crate) const SCHEMA_VERSION: u16 = 3;
 
@@ -476,14 +474,16 @@ impl Dictionary {
     }
 
     /// Saves this dictionary as compressed JSON using Zstandard.
+    ///
+    /// The dictionary is first serialized to compact JSON and then compressed in
+    /// one shot so the Zstandard frame records its uncompressed content size.
     #[cfg(feature = "dictionary-build")]
     pub(crate) fn save_json_compressed(&self, path: impl AsRef<Path>) -> io::Result<()> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-        let mut encoder = Encoder::new(writer, 19)?;
-        serde_json::to_writer(&mut encoder, self)?;
-        encoder.finish()?;
-        Ok(())
+        let json = serde_json::to_vec(self).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        let compressed = zstd::bulk::compress(&json, 19)?;
+
+        std::fs::write(path, compressed)
     }
 
     /// Saves this dictionary as compact or pretty-printed JSON.
