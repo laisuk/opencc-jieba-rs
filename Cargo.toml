@@ -46,7 +46,7 @@ zstd = "0.14"
 # Exact direct dependency pins to preserve behavior and Rust 2021/MSRV compatibility.
 # Older toolchains may require a locked dependency graph; see MSRV-1.75.0-GUIDE.md.
 rayon = "=1.10"
-rayon-core = "=1.12"
+rayon-core = "=1.12.1"
 rustc-hash = "=2.1.1"
 
 # Keep include-flate at 0.3.0 for Edition 2021 / MSRV compatibility.
