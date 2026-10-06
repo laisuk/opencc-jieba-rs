@@ -24,35 +24,35 @@ from crates.io.
 
 ## Step 1: Inspect dependency tree
 
-Check the dependency versions that can affect Rust 1.75.0 compatibility:
+Check whether the older `libflate` dependency graph still resolves
+`core2`:
 
 ``` bash
 cargo tree -i core2
-cargo tree -i rayon-core
 ```
 
 `core2` only matters when an older `libflate` dependency graph resolves
 it.
 
-For Rayon, this project pins `rayon = 1.10.0`. The known working
-transitive `rayon-core` version for the Rust 1.75.0 build is `1.12.1`.
+Rayon does not require a user-side workaround. This project directly
+pins both `rayon = 1.10.0` and `rayon-core = 1.12.1` to preserve the
+Rust 1.75.0 MSRV. Cargo therefore resolves the known-compatible Rayon
+versions automatically when using this library.
 
 ------------------------------------------------------------------------
 
 ## Step 2: Pin compatible versions (recommended)
 
 For an older or constrained dependency graph, pin the known working
-versions as needed:
+`include-flate` / `libflate` versions as needed:
 
 ``` bash
 cargo update -p include-flate --precise 0.3.0
 cargo update -p libflate --precise 2.1.0
-cargo update -p rayon-core --precise 1.12.1
 ```
 
-The `rayon-core` command prevents a fresh dependency resolution from
-selecting a newer `rayon-core` release if its MSRV is no longer
-compatible with Rust 1.75.0.
+No manual Rayon pin is required: `rayon` and `rayon-core` are already
+pinned directly by `opencc-jieba-rs`.
 
 Then build with:
 
@@ -77,12 +77,9 @@ core2 = { git = "https://github.com/bbqsrc/core2", rev = "545e84bcb0f235b12e2135
 
 - The `core2` workaround is only needed for older toolchains or
   dependency graphs that still resolve `core2`.
-- `rayon = 1.10.0` is pinned directly by this project;
-  `rayon-core = 1.12.1` is the known working transitive version for
-  the Rust 1.75.0 build.
-- The project keeps an optional commented `rayon-core = "=1.12.1"`
-  direct pin in `Cargo.toml`. It only needs to be enabled if Cargo can
-  no longer resolve a Rust-1.75-compatible `rayon-core` transitively.
+- `rayon = 1.10.0` and `rayon-core = 1.12.1` are both pinned directly
+  by this project to keep the Rayon dependency graph compatible with
+  Rust 1.75.0. Users do not need to pin either crate manually.
 - Modern fresh dependency resolutions usually do not need the `core2`
   workaround.
 - Applications (not libraries) should commit `Cargo.lock`.
