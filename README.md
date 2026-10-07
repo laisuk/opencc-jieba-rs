@@ -405,6 +405,14 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 > The runtime uses .zst files generated with zstd.  
 > These are included in the crate, but the .txt source files are not.
 
+Runtime loading uses a private, vendored pure Rust decoder derived from ruzstd 0.9.0 for both embedded dictionaries
+and custom packs. Default builds do not require native `zstd` / `zstd-sys` or a C compiler for Zstandard.
+The optional `dictionary-build` feature enables native `zstd` for pack compression only.
+
+The loader reads one Zstandard frame and ignores trailing input. Frames without a frame content size are supported;
+a declared size up to 64 MiB is only an allocation hint. Windows larger than 100 MiB, nonzero compression dictionary
+IDs, and leading skippable frames are rejected. Checksum bytes are consumed but their values are not verified.
+
 ### Generate and load a custom conversion dictionary
 
 Power users can edit the OpenCC source files under `dicts/` and generate a runtime conversion pack with the workspace
@@ -444,7 +452,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The loader validates Zstd data, JSON structure, and the dictionary schema version before replacing the active conversion
+The loader decodes the Zstd frame and validates JSON structure and the dictionary schema version before replacing the active conversion
 mappings.
 
 Schema 3 uses the upstream-aligned JP/HK slots:

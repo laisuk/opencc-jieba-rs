@@ -4,6 +4,10 @@
 //! enabled. It is intended for build tools that generate runtime dictionary
 //! packs from the repository's plaintext `./dicts` source directory.
 //!
+//! This feature enables the native `zstd` dependency for compression. Runtime
+//! loading uses a private vendored pure Rust decoder derived from ruzstd and
+//! does not require this feature.
+//!
 //! The runtime dictionary representation, individual maps, metadata, and
 //! logical slot storage remain private implementation details.
 //!
@@ -58,7 +62,10 @@ pub fn write_json_pretty(path: impl AsRef<Path>) -> io::Result<()> {
 ///
 /// Dictionary data is loaded from the `./dicts` directory, serialized as
 /// compact JSON with deterministic dictionary-map key ordering, and compressed
-/// using Zstandard.
+/// using native Zstandard compression at level 19. The single output frame
+/// records its uncompressed content size and can be loaded by
+/// [`OpenCC::try_new_with_dictionary_zstd`](crate::OpenCC::try_new_with_dictionary_zstd)
+/// without enabling `dictionary-build`.
 ///
 /// # Errors
 ///
@@ -111,7 +118,11 @@ where
 ///
 /// The base dictionary is first loaded from `./dicts`. The supplied
 /// [`CustomDictFileSpec`] values are then applied in order before the resulting
-/// dictionary is serialized as compact JSON and compressed using Zstandard.
+/// dictionary is serialized as compact JSON and compressed using native
+/// Zstandard at level 19. The single output frame records its uncompressed
+/// content size and can be loaded by
+/// [`OpenCC::load_dictionary_zstd`](crate::OpenCC::load_dictionary_zstd)
+/// without enabling `dictionary-build`.
 ///
 /// `Append` specs preserve existing mappings in the target slot while adding
 /// or replacing mappings from the custom files. `Override` specs clear the

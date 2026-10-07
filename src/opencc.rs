@@ -3,19 +3,20 @@ use crate::dictionary_lib::{
 };
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
+use crate::zstd::decompress;
 use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
 use jieba_rs::{Jieba, Keyword};
 use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
 use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::Cursor;
-use std::io::{BufRead, BufReader, Read};
 use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
-use zstd::stream::read::Decoder;
 
 const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
@@ -184,7 +185,8 @@ type DictRounds<'a> = &'a [DictRefs<'a>];
 /// ```
 #[derive(Debug)]
 pub enum OpenccError {
-    /// Failed to create or read the zstd decoder for the embedded Jieba dictionary.
+    /// Failed to decode the embedded Jieba dictionary with the vendored
+    /// pure Rust Zstandard decoder. The payload contains the decoder's message.
     ZstdDecode(String),
 
     /// Failed to initialize the embedded Jieba tokenizer.
@@ -193,7 +195,9 @@ pub enum OpenccError {
     /// Failed to open or read a custom OpenCC conversion dictionary pack.
     DictionaryIo(io::Error),
 
-    /// Failed to decompress a custom OpenCC conversion dictionary pack.
+    /// Failed to decompress a custom OpenCC conversion dictionary pack with
+    /// the vendored pure Rust Zstandard decoder. The payload contains the
+    /// decoder's message; JSON errors use [`OpenccError::DictionaryParse`].
     DictionaryDecode(String),
 
     /// Failed to deserialize a custom OpenCC conversion dictionary pack.
@@ -398,10 +402,14 @@ impl OpenCC {
     ///
     /// Loads the default compressed dictionary for Simplified-Traditional conversion,
     /// initializes the Jieba tokenizer, and prepares the dictionary engine.
+    /// Both embedded resources use the vendored pure Rust Zstandard decoder;
+    /// the `dictionary-build` feature is not required.
     ///
     /// # Panics
     ///
-    /// Panics if the internal Jieba dictionary fails to load.
+    /// Panics if an embedded dictionary cannot be decoded, the embedded
+    /// conversion dictionary uses an unsupported schema, or Jieba initialization
+    /// fails.
     ///
     /// # Example
     /// ```
@@ -419,6 +427,10 @@ impl OpenCC {
     /// Packs produced by the workspace `dict-generate` tool are accepted. This
     /// changes the OpenCC character and phrase mappings only; the bundled Jieba
     /// tokenizer dictionary remains in use.
+    ///
+    /// Decoding uses the vendored pure Rust Zstandard decoder and requires no
+    /// Cargo feature. Frames without a frame content size are also supported.
+    /// See [`OpenCC::load_dictionary_zstd`] for frame handling and limits.
     ///
     /// A Jieba user dictionary can be added afterward with
     /// [`OpenCC::load_user_dict`]:
@@ -446,6 +458,16 @@ impl OpenCC {
     /// Replaces this instance's OpenCC conversion mappings from a custom
     /// Zstd-compressed dictionary pack.
     ///
+    /// Decoding uses the vendored pure Rust decoder derived from ruzstd 0.9.0,
+    /// without requiring `dictionary-build` or the native `zstd` dependency.
+    /// The first Zstandard frame must contain a JSON conversion pack. Trailing
+    /// input is ignored; a leading skippable frame is rejected. Frames with or
+    /// without a frame content size are accepted. A declared size up to 64 MiB
+    /// is only a preallocation hint, not an output limit. Decoding rejects
+    /// windows larger than 100 MiB and nonzero Zstandard dictionary IDs (external
+    /// compression dictionaries are unsupported). Checksum bytes are consumed
+    /// but their values are not verified.
+    ///
     /// This method composes with [`OpenCC::try_new_with_user_dict_path`] and
     /// [`OpenCC::new_with_user_dict`]. The existing dictionary remains unchanged
     /// if loading or validation fails.
@@ -463,7 +485,11 @@ impl OpenCC {
     /// # Errors
     ///
     /// Returns an error if the file cannot be read, the Zstd or JSON data is
-    /// invalid, or the pack uses a newer unsupported schema.
+    /// invalid or unsupported by the decoder, or the pack uses a newer
+    /// unsupported schema. These failures are reported as
+    /// [`OpenccError::DictionaryIo`], [`OpenccError::DictionaryDecode`],
+    /// [`OpenccError::DictionaryParse`], or
+    /// [`OpenccError::UnsupportedDictionarySchema`], respectively.
     pub fn load_dictionary_zstd<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OpenccError> {
         let dictionary = Self::read_dictionary_zstd(path)?;
         self.dictionary = dictionary;
@@ -843,14 +869,13 @@ impl OpenCC {
     }
 
     fn try_new_with_dictionary(dictionary: Dictionary) -> Result<Self, OpenccError> {
-        let cursor = Cursor::new(DICT_HANS_HANT_ZSTD);
+        let data =
+            decompress(DICT_HANS_HANT_ZSTD).map_err(|e| OpenccError::ZstdDecode(e.to_string()))?;
 
-        let decoder = Decoder::new(cursor).map_err(|e| OpenccError::ZstdDecode(e.to_string()))?;
-
-        let mut buf = BufReader::new(decoder);
+        let mut cursor = Cursor::new(data);
 
         let jieba =
-            Jieba::with_dict(&mut buf).map_err(|e| OpenccError::JiebaInit(e.to_string()))?;
+            Jieba::with_dict(&mut cursor).map_err(|e| OpenccError::JiebaInit(e.to_string()))?;
 
         Ok(OpenCC {
             jieba: Arc::new(jieba),
@@ -859,15 +884,12 @@ impl OpenCC {
     }
 
     fn read_dictionary_zstd<P: AsRef<Path>>(path: P) -> Result<Dictionary, OpenccError> {
-        let file = File::open(path).map_err(OpenccError::DictionaryIo)?;
-        let mut decoder =
-            Decoder::new(file).map_err(|error| OpenccError::DictionaryDecode(error.to_string()))?;
-        let mut json = String::new();
-        decoder
-            .read_to_string(&mut json)
+        let compressed = std::fs::read(path).map_err(OpenccError::DictionaryIo)?;
+
+        let json = decompress(&compressed)
             .map_err(|error| OpenccError::DictionaryDecode(error.to_string()))?;
 
-        let dictionary: Dictionary = serde_json::from_str(&json)
+        let dictionary: Dictionary = serde_json::from_slice(&json)
             .map_err(|error| OpenccError::DictionaryParse(error.to_string()))?;
 
         if dictionary.schema_version > dictionary_lib::SCHEMA_VERSION {
@@ -3136,7 +3158,7 @@ impl OpenCC {
 
     /// Converts non-BMP CJK extension characters to display-safe fallbacks.
     ///
-    /// This is a convenience wrapper around [`detofu::detofu`]. It is intended
+    /// This is a convenience wrapper around the internal DeTofu implementation. It is intended
     /// for environments with incomplete rare-character font coverage, such as
     /// some systems, browsers, e-book readers, document viewers, or mobile
     /// platforms where non-BMP CJK extension characters may render as tofu boxes
@@ -3284,7 +3306,7 @@ impl OpenCC {
         input: &str,
         level: DetofuLevel,
         path: P,
-    ) -> std::io::Result<String> {
+    ) -> io::Result<String> {
         let map = DetofuMap::builtin(level).with_custom_file(path)?;
         Ok(map.detofu(input))
     }

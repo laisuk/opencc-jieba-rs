@@ -14,9 +14,8 @@ pub(crate) use crate::dictionary_lib::dict_map::DictMap;
 pub use crate::dictionary_lib::dict_slots::{
     CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot,
 };
+use crate::zstd::decompress;
 use serde::{Deserialize, Serialize};
-use std::io::{Cursor, Read};
-use zstd::stream::read::Decoder;
 
 pub(crate) const SCHEMA_VERSION: u16 = 3;
 
@@ -179,46 +178,35 @@ impl Dictionary {
     /// Loads the built-in dictionary from an embedded, Zstd-compressed JSON file.
     ///
     /// This constructor reads `dictionary.json.zst` bundled at compile time via
-    /// [`include_bytes!`], decompresses it using Zstd, and deserializes it into
-    /// a [`Dictionary`] structure.
+    /// [`include_bytes!`], decompresses it using the vendored Zstd decoder, and
+    /// deserializes it into a [`Dictionary`] structure.
     ///
     /// # Behavior
     ///
-    /// - The dictionary is loaded **entirely in memory** from a baked-in byte slice.
+    /// - The dictionary is loaded entirely in memory from a baked-in byte slice.
     /// - This method is intended for applications that ship with a fixed dictionary
     ///   set and do not require external configuration.
-    /// - If deserialization fails due to missing fields or a schema mismatch,
-    ///   a default, empty [`Dictionary`] is returned and a diagnostic message is
-    ///   printed to stderr.
-    ///
-    /// After loading, the method also performs a schema compatibility check and
-    /// panics if the embedded data uses an unsupported `schema_version`.
+    /// - If deserialization fails, a default, empty [`Dictionary`] is returned and
+    ///   a diagnostic message is printed to stderr.
+    /// - After loading, the dictionary schema version is checked for compatibility.
     ///
     /// # Panics
     ///
-    /// This function will panic in the following situations:
+    /// This function will panic if:
     ///
-    /// - If the Zstd decoder cannot be created.
-    /// - If decompression of `dictionary.json.zst` fails.
-    /// - If the loaded dictionary's `schema_version` does not match the crate's
-    ///   expected [`SCHEMA_VERSION`].
-    ///
+    /// - Decompression of `dictionary.json.zst` fails.
+    /// - The loaded dictionary uses a `schema_version` newer than [`SCHEMA_VERSION`].
     pub(crate) fn new() -> Self {
         const DICTIONARY_JSON_ZSTD: &[u8] = include_bytes!("dicts/dictionary.json.zst");
 
-        let cursor = Cursor::new(DICTIONARY_JSON_ZSTD);
-        let mut decoder = Decoder::new(cursor).expect("Failed to create zstd decoder");
-        let mut json_data = String::new();
-        decoder
-            .read_to_string(&mut json_data)
-            .expect("Failed to decompress dictionary.json");
+        let json_data =
+            decompress(DICTIONARY_JSON_ZSTD).expect("Failed to decompress dictionary.json.zst");
 
-        let dict: Dictionary = serde_json::from_str(&json_data).unwrap_or_else(|e| {
+        let dict: Dictionary = serde_json::from_slice(&json_data).unwrap_or_else(|e| {
             eprintln!("Error: Failed to deserialize dictionary JSON: {e}");
             Dictionary::default()
         });
 
-        // Optional sanity check
         assert!(
             dict.schema_version <= SCHEMA_VERSION,
             "Unsupported future dictionary schema_version"

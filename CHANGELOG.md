@@ -20,6 +20,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Update dictionary data.
 - Update Unicode Compatibility mapping table.
 
+### Changed
+
+- Replaced runtime native `zstd` / `zstd-sys` decoding with a private vendored pure Rust decoder derived from
+  ruzstd 0.9.0 for embedded OpenCC and Jieba dictionaries and custom conversion packs. Native `zstd` is now optional
+  and enabled only by `dictionary-build` for compression; runtime loading requires no Cargo feature.
+- Retained support for frames without a frame content size. Declared sizes up to 64 MiB serve only as allocation
+  hints; decoding retains the required backreference history and enforces a 100 MiB window limit.
+- Documented runtime decoding, custom-pack frame handling and errors, and the compression feature split in rustdoc
+  and the README. Public API signatures and dictionary schemas are unchanged.
+
 ---
 
 ## [0.8.0] - 2026-08-26

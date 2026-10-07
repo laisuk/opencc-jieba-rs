@@ -30,18 +30,12 @@ include = [
     "/LICENSE"
 ]
 
-[features]
-default = []
-# Enables dictionary-pack generation operations without exposing the runtime
-# dictionary representation or its logical slots.
-dictionary-build = []
-
 [dependencies]
 jieba-rs = { version = "=0.7.4", features = ["tfidf", "textrank"] }
 regex = "1.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-zstd = "0.14"
+zstd = { version = "0.14.0", optional = true }
 
 # Exact direct dependency pins to preserve behavior and Rust 2021/MSRV compatibility.
 # Older toolchains may require a locked dependency graph; see MSRV-1.75.0-GUIDE.md.
@@ -53,6 +47,12 @@ rustc-hash = "=2.1.1"
 # Do not pin libflate directly; include-flate depends on libflate ^2.0,
 # allowing modern toolchains to resolve newer libflate versions that avoid yanked core2.
 include-flate = "=0.3.0"
+
+[features]
+default = []
+# Enables dictionary-pack generation operations without exposing the runtime
+# dictionary representation or its logical slots.
+dictionary-build = ["dep:zstd"]
 
 [profile.release]
 opt-level = 3              # Maximize speed (better suited for C API performance)
