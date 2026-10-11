@@ -452,7 +452,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The loader decodes the Zstd frame and validates JSON structure and the dictionary schema version before replacing the active conversion
+The loader decodes the Zstd frame and validates JSON structure and the dictionary schema version before replacing the
+active conversion
 mappings.
 
 Schema 3 uses the upstream-aligned JP/HK slots:
@@ -609,6 +610,50 @@ compose with a converter created from a custom Zstd conversion pack.
 ## User dictionary
 
 `opencc-jieba-rs` supports loading Jieba user dictionaries without directly using the lower-level `jieba-rs` API.
+
+### Add a single word
+
+Use `OpenCC::add_word()` for ordinary single-word additions:
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cc = OpenCC::new();
+    cc.add_word("唐培里侬", Some(3), Some("nz"))?;
+    cc.add_word("自然语言处理", None, Some("n"))?;
+    cc.add_word("星际量子茶壶", None, None)?;
+    Ok(())
+}
+```
+
+The method has the following signature:
+
+```rust,ignore
+pub fn add_word(
+    &mut self,
+    word: &str,
+    freq: Option<usize>,
+    tag: Option<&str>,
+) -> Result<(), OpenccError>
+```
+
+- `word`: A non-empty word or phrase without whitespace.
+- `freq`: `Some(n)` sets an explicit frequency; `None` delegates frequency selection to Jieba.
+- `tag`: An optional part-of-speech (POS) tag, such as `"n"` or `"nz"`; `None` omits the tag.
+  A supplied tag must not contain whitespace or NUL characters. Conflict handling follows `jieba-rs` behavior;
+  a supplied tag does not necessarily overwrite the tag of an existing dictionary word.
+
+An empty word, whitespace in the word, or whitespace or NUL in the tag returns `OpenccError::UserDictParse`.
+Validation occurs before mutation, so invalid arguments leave the tokenizer unchanged.
+
+The method uses `Arc::make_mut()` for safe copy-on-write mutation: when the tokenizer is shared, it is cloned before
+modification, and other owners retain their original dictionary. An unshared tokenizer is modified without cloning.
+This changes the instance's Jieba segmentation dictionary, not OpenCC conversion mappings.
+
+Use `load_user_dict()` for dictionary files, or `load_user_dict_entries()` for multiple in-memory `UserDictEntry` values
+with required frequencies. `add_word()` is convenient for a single word and also supports automatic frequency selection.
+The public `pub jieba: Arc<Jieba>` field remains available for advanced direct Jieba access.
 
 ### Default user dictionary path
 

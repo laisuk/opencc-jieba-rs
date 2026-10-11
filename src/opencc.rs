@@ -389,9 +389,9 @@ pub struct OpenCC {
     /// OpenCC conversion dictionaries are stored separately, so read-only use of
     /// this tokenizer does not modify the active OpenCC conversion mappings.
     ///
-    /// To add Jieba user-dictionary entries, prefer
-    /// [`OpenCC::load_user_dict`], [`OpenCC::load_user_dict_entries`], or the
-    /// corresponding constructors so tokenizer replacement remains transactional.
+    /// For ordinary user-dictionary updates, prefer
+    /// [`OpenCC::add_word`], [`OpenCC::load_user_dict`], or
+    /// [`OpenCC::load_user_dict_entries`].
     pub jieba: Arc<Jieba>,
     /// The conversion dictionary.
     dictionary: Dictionary,
@@ -828,6 +828,122 @@ impl OpenCC {
 
         self.jieba = Arc::new(new_jieba);
 
+        Ok(())
+    }
+
+    /// Adds or updates a word in this instance's Jieba segmentation dictionary.
+    ///
+    /// This is a convenient high-level alternative to accessing the public
+    /// [`OpenCC::jieba`] tokenizer directly. It supports an optional frequency
+    /// and an optional part-of-speech (POS) tag.
+    ///
+    /// The change affects Jieba word segmentation and related operations that
+    /// use this tokenizer. It does not modify the OpenCC Simplified/Traditional
+    /// conversion dictionaries.
+    ///
+    /// # Arguments
+    ///
+    /// - `word`: The word or phrase to register. It must be non-empty and must
+    ///   not contain whitespace.
+    /// - `freq`: Optional word frequency. `Some(n)` explicitly sets the
+    ///   frequency to `n`; `None` lets Jieba determine the frequency using
+    ///   its own default behavior.
+    /// - `tag`: Optional part-of-speech tag, such as `"n"` (noun) or `"nz"`
+    ///   (proper noun). `None` omits the tag. A supplied tag must not contain
+    ///   whitespace or NUL characters.
+    ///
+    /// # Sharing and mutation
+    ///
+    /// The tokenizer is stored in an [`Arc`](std::sync::Arc).
+    /// This method uses [`Arc::make_mut`](std::sync::Arc::make_mut) to obtain
+    /// mutable access, cloning the tokenizer when necessary.
+    ///
+    /// Consequently, an existing shared tokenizer snapshot is not modified.
+    /// Other owners of the previous snapshot continue using their original
+    /// Jieba dictionary, while this `OpenCC` instance uses the updated one.
+    ///
+    /// Repeated calls on an unshared tokenizer can modify it without
+    /// cloning the entire tokenizer each time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpenccError::UserDictParse`] if:
+    ///
+    /// - `word` is empty or contains whitespace.
+    /// - `tag` contains whitespace or a NUL character (`'\0'`).
+    ///
+    /// Validation occurs before mutation. Invalid arguments leave the
+    /// current tokenizer unchanged.
+    ///
+    /// # Examples
+    ///
+    /// Add a word with an explicit frequency and POS tag:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    ///
+    /// cc.add_word("唐培里侬", Some(3), Some("nz"))?;
+    /// cc.add_word("人工智能", Some(100), Some("n"))?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Let Jieba determine the frequency, with or without a POS tag:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    ///
+    /// cc.add_word("自然语言处理", None, Some("n"))?;
+    /// cc.add_word("星际量子茶壶", None, None)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Invalid entries return an error:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let mut cc = OpenCC::new();
+    ///
+    /// assert!(cc.add_word("", None, None).is_err());
+    /// assert!(cc.add_word("hello world", None, None).is_err());
+    /// assert!(cc.add_word("测试", Some(10), Some("bad tag")).is_err());
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`OpenCC::load_user_dict`] — load entries from a Jieba dictionary file.
+    /// - [`OpenCC::load_user_dict_entries`] — load multiple structured entries.
+    /// - [`OpenCC::jieba`] — direct access to the underlying tokenizer for
+    ///   advanced use cases.
+    pub fn add_word(
+        &mut self,
+        word: &str,
+        freq: Option<usize>,
+        tag: Option<&str>,
+    ) -> Result<(), OpenccError> {
+        if word.is_empty() || word.chars().any(char::is_whitespace) {
+            return Err(OpenccError::UserDictParse(
+                "word must not be empty or contain whitespace".into(),
+            ));
+        }
+
+        if tag.is_some_and(|tag| tag.chars().any(char::is_whitespace) || tag.contains('\0')) {
+            return Err(OpenccError::UserDictParse(
+                "tag must not contain whitespace or NUL".into(),
+            ));
+        }
+
+        Arc::make_mut(&mut self.jieba).add_word(word, freq, tag);
         Ok(())
     }
 

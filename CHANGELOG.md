@@ -10,6 +10,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added high-level `OpenCC::add_word()` for single-word Jieba dictionary additions with optional frequency and POS tag
+  support and safe copy-on-write mutation through `Arc::make_mut()`.
 - Added `OpenCC::detofu` with configurable CJK extension fallback levels from Extension B through Extension I.
 - Added C API support for compatibility normalization and DeTofu with `opencc_jieba_normalize_compat`,
   `opencc_jieba_normalize_compat_extended`, and `opencc_jieba_detofu`.

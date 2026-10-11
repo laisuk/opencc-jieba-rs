@@ -4,7 +4,6 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 mod tests {
     use super::*;
     use opencc_jieba_rs::{DetofuLevel, DetofuMap, OpenccError, UserDictEntry};
-    use std::sync::Arc;
 
     #[test]
     fn zho_check_test() {
@@ -312,19 +311,117 @@ mod tests {
     }
 
     #[test]
-    fn test_add_word() {
-        let input = "云计算";
-
+    fn test_add_word_with_frequency_and_tag() {
         let mut opencc = OpenCC::new();
+        opencc
+            .add_word("星际量子茶壶", Some(100_000), Some("nz"))
+            .unwrap();
+        assert_eq!(
+            opencc.jieba_cut("星际量子茶壶", false),
+            vec!["星际量子茶壶"]
+        );
+    }
 
-        let jieba = Arc::get_mut(&mut opencc.jieba).expect("Jieba instance is shared");
+    #[test]
+    fn test_add_word_without_optional_arguments() {
+        let mut opencc = OpenCC::new();
+        opencc.add_word("星际量子茶壶", None, None).unwrap();
+        assert_eq!(
+            opencc.jieba_cut("星际量子茶壶", false),
+            vec!["星际量子茶壶"]
+        );
+    }
 
-        jieba.add_word("云计算", Some(3), Some("n"));
+    #[test]
+    fn test_add_word_with_tag_and_automatic_frequency() {
+        let mut opencc = OpenCC::new();
+        opencc.add_word("星际量子茶壶", None, Some("nz")).unwrap();
+        assert_eq!(
+            opencc.jieba_cut("星际量子茶壶", false),
+            vec!["星际量子茶壶"]
+        );
+    }
 
-        let result = jieba.cut(input, false);
-        println!("{:?}", result);
+    #[test]
+    fn test_add_word_rejects_invalid_words() {
+        let mut opencc = OpenCC::new();
+        for word in ["", "hello world", "hello\tworld", "hello\nworld", "  "] {
+            assert!(
+                matches!(
+                    opencc.add_word(word, Some(100), Some("nz")),
+                    Err(OpenccError::UserDictParse(_))
+                ),
+                "expected invalid word to be rejected: {word:?}"
+            );
+        }
+    }
 
-        assert!(result.contains(&"云计算"));
+    #[test]
+    fn test_add_word_rejects_invalid_tags() {
+        let mut opencc = OpenCC::new();
+        for tag in ["bad tag", "bad\ttag", "bad\ntag", "bad\0tag"] {
+            assert!(
+                matches!(
+                    opencc.add_word("星际量子茶壶", Some(100), Some(tag)),
+                    Err(OpenccError::UserDictParse(_))
+                ),
+                "expected invalid tag to be rejected: {tag:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_add_word_failed_validation_does_not_mutate_tokenizer() {
+        let mut opencc = OpenCC::new();
+        let before = opencc.jieba.clone();
+
+        assert!(matches!(
+            opencc.add_word("invalid word", Some(100), Some("nz")),
+            Err(OpenccError::UserDictParse(_))
+        ));
+        assert!(matches!(
+            opencc.add_word("星际量子茶壶", Some(100), Some("bad tag")),
+            Err(OpenccError::UserDictParse(_))
+        ));
+        assert!(std::sync::Arc::ptr_eq(&before, &opencc.jieba));
+    }
+
+    #[test]
+    fn test_add_word_shared_tokenizer_uses_copy_on_write() {
+        let mut opencc = OpenCC::new();
+        let original = opencc.jieba.clone();
+        let original_count = original.cut("星际量子茶壶", false).len();
+
+        opencc
+            .add_word("星际量子茶壶", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert!(!std::sync::Arc::ptr_eq(&original, &opencc.jieba));
+        assert_eq!(
+            opencc.jieba_cut("星际量子茶壶", false),
+            vec!["星际量子茶壶"]
+        );
+        assert_eq!(original.cut("星际量子茶壶", false).len(), original_count);
+    }
+
+    #[test]
+    fn test_add_word_multiple_calls_compose() {
+        let mut opencc = OpenCC::new();
+        opencc
+            .add_word("星际量子茶壶", Some(100_000), Some("nz"))
+            .unwrap();
+        opencc
+            .add_word("银河草莓引擎", Some(100_000), None)
+            .unwrap();
+
+        assert_eq!(
+            opencc.jieba_cut("星际量子茶壶", false),
+            vec!["星际量子茶壶"]
+        );
+        assert_eq!(
+            opencc.jieba_cut("银河草莓引擎", false),
+            vec!["银河草莓引擎"]
+        );
     }
 
     #[test]
