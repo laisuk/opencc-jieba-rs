@@ -1,6 +1,6 @@
 # opencc-jieba-rs
 
-High-performance Rust-based Chinese text converter using Jieba segmentation and OpenCC dictionaries.
+High-performance Rust-based Chinese text converter integrating Jieba segmentation with OpenCC dictionaries.
 
 [![GitHub release](https://img.shields.io/github/v/release/laisuk/opencc-jieba-rs?style=flat-square)](https://github.com/laisuk/opencc-jieba-rs/releases)
 [![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)](https://crates.io/crates/opencc-jieba-rs)
@@ -11,9 +11,9 @@ High-performance Rust-based Chinese text converter using Jieba segmentation and 
 [![Build and Release](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml/badge.svg)](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml)
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust_build_test.yml/badge.svg)
 
-A Rust-based Chinese text converter powered by **OpenCC lexicons**, using **Jieba** for word segmentation to improve
-phrase-level accuracy. This project aims to provide high-performance and accurate **Simplified ↔ Traditional Chinese**
-(zh-Hans ↔ zh-Hant) conversion.
+A Rust-based Chinese text converter that integrates **Jieba word segmentation** with **OpenCC lexicons** for
+phrase-aware conversion. It provides high-performance **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant)
+conversion, with support for both segmentation and conversion dictionaries.
 
 ## Features
 
