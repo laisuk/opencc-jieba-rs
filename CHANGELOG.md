@@ -13,24 +13,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Added high-level `OpenCC::add_word()` for single-word Jieba dictionary additions with optional frequency and POS tag
   support and safe copy-on-write mutation through `Arc::make_mut()`.
 - Added `OpenCC::detofu` with configurable CJK extension fallback levels from Extension B through Extension I.
+- Added reusable `DetofuMap`, custom fallback files and pairs, and appending `detofu_into` APIs for buffer reuse.
+- CLI: Added `--detofu` to `convert` and `office`, applying `Extension B–I` fallbacks after conversion.
 - Added C API support for compatibility normalization and DeTofu with `opencc_jieba_normalize_compat`,
   `opencc_jieba_normalize_compat_extended`, and `opencc_jieba_detofu`.
 - Added C API constructors for in-memory Jieba user dictionaries, custom conversion dictionaries, and combined
   user/custom dictionary initialization.
 - Expanded the C++ RAII helper with custom dictionary construction, compatibility normalization, DeTofu, tagging,
   weighted keyword extraction, and native error handling.
-- Update dictionary data.
-- Update Unicode Compatibility mapping table.
 
 ### Changed
 
+- Updated conversion dictionary data and the curated Unicode compatibility mapping table.
 - Replaced runtime native `zstd` / `zstd-sys` decoding with a private vendored pure Rust decoder derived from
   ruzstd 0.9.0 for embedded OpenCC and Jieba dictionaries and custom conversion packs. Native `zstd` is now optional
   and enabled only by `dictionary-build` for compression; runtime loading requires no Cargo feature.
 - Retained support for frames without a frame content size. Declared sizes up to 64 MiB serve only as allocation
   hints; decoding retains the required backreference history and enforces a 100 MiB window limit.
 - Documented runtime decoding, custom-pack frame handling and errors, and the compression feature split in rustdoc
-  and the README. Public API signatures and dictionary schemas are unchanged.
+  and the README. Existing public API signatures and dictionary schemas are unchanged.
+- Expanded crate-level usage examples for typed configurations, single-word Jieba additions, and DeTofu.
+  docs.rs builds include the optional `dictionary_build` module; runtime users do not need to enable that feature.
 
 ---
 
@@ -319,8 +322,4 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 
 - N/A
-
----
-
-## [Unreleased]
 

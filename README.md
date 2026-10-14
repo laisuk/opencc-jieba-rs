@@ -34,6 +34,9 @@ conversion, with support for both segmentation and conversion dictionaries.
 
 ## Installation
 
+For the Rust library, see [Library Usage](#library-usage). To build the CLI tools from the repository
+(with a current stable Rust toolchain):
+
 ```bash
 git clone https://github.com/laisuk/opencc-jieba-rs
 cd opencc-jieba-rs
@@ -107,8 +110,11 @@ Options:
   -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
   -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
   -f, --format <ext>                  Force office document format <ext>: docx, xlsx, pptx, odt, ods, odp, epub
+  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
+  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
+      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
   -k, --keep-font                     Preserve original font styles
-      --convert-filename              Convert the output filename using the selected OpenCC configuration
+  -F, --convert-filename              Convert the output filename using the selected OpenCC configuration
   -h, --help                          Print help
 ```
 
@@ -126,6 +132,9 @@ opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat
 
 # Normalize CJK Compatibility Ideographs and curated Unicode compatibility forms
 opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat-extended
+
+# Apply rare-character display fallbacks after conversion
+opencc-jieba convert -i input.txt -o output.txt --config t2s --detofu
 
 # Convert with a Jieba user dictionary and a custom OpenCC conversion dictionary
 opencc-jieba convert -i input.txt -o output.txt --config hk2sp \
@@ -183,7 +192,8 @@ opencc-jieba segment --mode tag --delim " " --separator ":"
 
 ### Lexicons
 
-By default, it uses OpenCC's built-in lexicon paths.
+The library and conversion CLI use embedded OpenCC conversion dictionaries and a combined Hans/Hant Jieba dictionary.
+No external dictionary files are needed for ordinary conversion or segmentation.
 
 ---
 
@@ -209,7 +219,10 @@ use opencc_jieba_rs::{OpenCC, OpenccConfig};
 fn main() {
     let opencc = OpenCC::new();
 
-    assert_eq!(opencc.convert("这是一个测试", "s2t", false), "這是一個測試");
+    assert_eq!(
+        opencc.convert_with_config("这是一个测试", OpenccConfig::S2t, false),
+        "這是一個測試"
+    );
 
     // Direct one-pass Hong Kong phrase APIs.
     assert_eq!(opencc.t2hkp("鼠標", false), "滑鼠");
@@ -222,6 +235,26 @@ fn main() {
     );
 }
 ```
+
+For configuration names supplied by users, parse with `OpenccConfig::try_from(name)` and handle the error before calling
+`convert_with_config`. The convenience `convert` method returns `"Invalid config: <config>"` as output text for an
+invalid configuration; it does not return a `Result`.
+
+Segmentation and keyword extraction can also be used independently:
+
+```rust
+use opencc_jieba_rs::{OpenCC, POS_KEYWORDS};
+
+fn main() {
+    let cc = OpenCC::new();
+    let words = cc.jieba_cut("自然语言处理", true);
+    let search_words = cc.jieba_cut_for_search("自然语言处理", true);
+    let tagged = cc.jieba_tag("自然语言处理", true);
+    let keywords = cc.keyword_weight_tfidf_pos("自然语言处理与机器学习", 5, Some(POS_KEYWORDS));
+}
+```
+
+Run the repository's broader API example with `cargo run --example use_opencc_jieba_tests`.
 
 > 📦 Crate: [opencc-jieba-rs on crates.io](https://crates.io/crates/opencc-jieba-rs)  
 > 📄 Docs: [docs.rs/opencc-jieba-rs](https://docs.rs/opencc-jieba-rs/)
@@ -319,6 +352,21 @@ NFD, NFKC, or NFKD implementation. Unmapped characters are preserved.
 DeTofu is an optional post-conversion display-compatibility pass for rare CJK extension characters that may render as
 tofu boxes on some systems, fonts, browsers, document viewers, mobile devices, or e-book readers.
 
+```rust
+use opencc_jieba_rs::{DetofuLevel, OpenCC};
+
+fn main() {
+    let cc = OpenCC::new();
+    let converted = cc.t2s("驂騑", false);
+    assert_eq!(converted, "骖𬴂");
+    assert_eq!(cc.detofu(&converted, DetofuLevel::ExtB), "骖騑");
+}
+```
+
+`ExtB` selects all supported `Extension B–I` mappings; later levels preserve mappings from earlier extension blocks.
+Unmapped characters remain unchanged. DeTofu does not detect font support, and its fallback forms can differ from the
+converted script. Keep the original text when fidelity matters. The CLI `--detofu` flag uses `ExtB`.
+
 This is an advanced compatibility feature rather than common OpenCC conversion usage. See the
 [DeTofu User Guide](DETOFU_USER_GUIDE.md) for Rust APIs, threshold behavior, custom fallback pairs, and custom fallback
 files.
@@ -398,7 +446,7 @@ compression scenarios at zlib-level and better compression ratios.
 
 ```
 zstd -19 src/dictionary_lib/dicts/dictionary.json -o src/dictionary_lib/dicts/dictionary.json.zst
-zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_hans_hant.txt.zst
+zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dicts/dict_hans_hant.txt.zst
 ```
 
 > These .txt files are used for development only.  
@@ -408,6 +456,16 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dict_
 Runtime loading uses a private, vendored pure Rust decoder derived from ruzstd 0.9.0 for both embedded dictionaries
 and custom packs. Default builds do not require native `zstd` / `zstd-sys` or a C compiler for Zstandard.
 The optional `dictionary-build` feature enables native `zstd` for pack compression only.
+
+For pack-generation APIs in a Rust build tool, enable the feature explicitly:
+
+```toml
+opencc-jieba-rs = { version = "0.8.1", features = ["dictionary-build"] }
+```
+
+`dictionary_build` reads plaintext sources from `./dicts` in the working directory. Those source dictionaries are not
+included in the published crate; obtain them from the repository. The workspace `dict-generate` tool enables the feature
+automatically.
 
 The loader reads one Zstandard frame and ignores trailing input. Frames without a frame content size are supported;
 a declared size up to 64 MiB is only an allocation hint. Windows larger than 100 MiB, nonzero compression dictionary
@@ -530,7 +588,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     cc.load_custom_dict_files(&[CustomDictFileSpec {
         slot: DictSlot::STPhrases,
-        files: vec!["dicts/my_phrases.txt".into()],
+        files: vec!["dicts/my_phrases.txt"],
         mode: CustomDictMode::Append,
     }])?;
 

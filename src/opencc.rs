@@ -2155,7 +2155,7 @@ impl OpenCC {
     /// A `String` containing the converted Taiwan Traditional Chinese output.
     ///
     /// # Example
-    /// ```ignore
+    /// ```rust
     /// let opencc = opencc_jieba_rs::OpenCC::new();
     /// let out = opencc.t2tw("繁體字", false);
     /// ```

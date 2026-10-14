@@ -16,6 +16,7 @@
 //! - Keyword extraction using TF-IDF or TextRank
 //! - Optional punctuation conversion (e.g., 「」 ↔ “”)
 //! - Optional Unicode compatibility normalization through [`OpenCC`]
+//! - Optional rare-character display fallbacks with [`OpenCC::detofu`] and [`DetofuMap`]
 //!
 //! ## Example
 //!
@@ -33,12 +34,6 @@
 //! - Cross-regional Chinese content adaptation
 //! - Automatic subtitle or document localization
 //!
-//! ## Crate Status
-//!
-//! - 🚀 Fast and parallelized
-//! - 🧪 Battle-tested on multi-million character corpora
-//!
-//! ---
 //! # Conversion Overview (OpenCC + Jieba)
 //!
 //! `opencc_jieba_rs::OpenCC` provides a set of high-level helpers that mirror
@@ -62,6 +57,22 @@
 //! ```
 //!
 //! ## Core Simplified ↔ Traditional
+//!
+//! Prefer [`OpenCC::convert_with_config`] when the configuration is known in code.
+//! For external configuration strings, validate with [`OpenccConfig::try_from`]
+//! before converting. [`OpenCC::convert`] returns `"Invalid config: <config>"`
+//! as output text for an invalid name rather than returning a `Result`.
+//!
+//! ```rust
+//! use opencc_jieba_rs::{OpenCC, OpenccConfig};
+//!
+//! # fn main() -> Result<(), &'static str> {
+//! let config = OpenccConfig::try_from("s2t").map_err(|_| "unsupported configuration")?;
+//! let cc = OpenCC::new();
+//! assert_eq!(cc.convert_with_config("汉字", config, false), "漢字");
+//! # Ok(())
+//! # }
+//! ```
 //!
 //! [`OpenCC::s2t`] and [`OpenCC::t2s`] use phrase and character dictionaries
 //! with internal Jieba segmentation. For configuration-driven conversion, use
@@ -123,6 +134,22 @@
 //! honor the same option for every configuration.
 //!
 //! ## User Dictionaries
+//!
+//! To add a single word, use [`OpenCC::add_word`]. `None` for the frequency
+//! asks Jieba to select one automatically. These updates affect segmentation;
+//! conversion mappings are managed separately with [`OpenCC::load_custom_dicts`]
+//! or [`OpenCC::load_custom_dict_files`].
+//!
+//! ```rust
+//! use opencc_jieba_rs::OpenCC;
+//!
+//! # fn main() -> Result<(), opencc_jieba_rs::OpenccError> {
+//! let mut cc = OpenCC::new();
+//! cc.add_word("星际量子茶壶", Some(100_000), Some("n"))?;
+//! assert_eq!(cc.jieba_cut("星际量子茶壶", false), vec!["星际量子茶壶"]);
+//! # Ok(())
+//! # }
+//! ```
 //!
 //! Jieba user dictionaries can be loaded during construction or added later to
 //! an existing [`OpenCC`] instance. Entries use the format:
@@ -216,6 +243,29 @@
 //! assert_eq!(normalized, "天龍八部書裡的聽眾");
 //! assert_eq!(simplified, "天龙八部书里的听众");
 //! ```
+//!
+//! ## Rare-character display fallback (DeTofu)
+//!
+//! Apply [`OpenCC::detofu`] after conversion when the target font has limited
+//! rare-character coverage. Only mapped characters at the selected extension
+//! threshold or later are replaced; unmapped characters remain unchanged.
+//! This pass does not detect font support and can replace a character with a
+//! different written form, so keep the original text when fidelity matters.
+//!
+//! ```rust
+//! use opencc_jieba_rs::{DetofuLevel, OpenCC};
+//!
+//! let cc = OpenCC::new();
+//! let converted = cc.t2s("驂騑", false);
+//! assert_eq!(converted, "骖𬴂");
+//! assert_eq!(cc.detofu(&converted, DetofuLevel::ExtB), "骖騑");
+//! ```
+//!
+//! [`DetofuLevel::ExtB`] selects all supported Extension B–I mappings;
+//! [`DetofuLevel::ExtC`] preserves Extension B mappings. For custom fallbacks,
+//! use [`OpenCC::detofu_with_custom_pairs`] or build a reusable [`DetofuMap`].
+//! [`OpenCC::detofu_into`] and [`DetofuMap::detofu_into`] append to an output
+//! buffer; clear it first when reusing it for an independent result.
 //!
 //! ## When to Use What?
 //!
