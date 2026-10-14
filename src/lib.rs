@@ -250,6 +250,7 @@ mod detofu;
 #[cfg(feature = "dictionary-build")]
 pub mod dictionary_build;
 mod unicode_compat;
+#[allow(clippy::upper_case_acronyms)]
 mod zstd;
 
 pub use dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};

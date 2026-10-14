@@ -592,7 +592,7 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
                     out.push_str(delimiter);
                 }
                 out.push_str(&w);
-                out.push_str(&separator);
+                out.push_str(separator);
                 out.push_str(&t);
             }
 

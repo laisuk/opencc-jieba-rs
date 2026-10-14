@@ -563,13 +563,11 @@ impl OfficeConverter {
     fn mask_font(xml: &mut String, format: &str, font_map: &mut HashMap<String, String>) {
         FONT_PATTERNS.with(|patterns| {
             if let Some(re) = patterns.get_pattern(format) {
-                let mut counter = 0;
                 let mut result_str = String::with_capacity(xml.len() + xml.len() / 10);
                 let mut last_end = 0;
 
-                for caps in re.captures_iter(xml) {
-                    let marker = format!("__F_O_N_T_{}__", counter);
-                    counter += 1;
+                for (counter, caps) in re.captures_iter(xml).enumerate() {
+                    let marker = format!("__F_O_N_T_{}_", counter);
                     font_map.insert(marker.clone(), caps[2].to_string());
 
                     let mat = caps.get(0).unwrap();
@@ -580,8 +578,10 @@ impl OfficeConverter {
                     if caps.len() > 3 {
                         result_str.push_str(&caps[3]);
                     }
+
                     last_end = mat.end();
                 }
+
                 result_str.push_str(&xml[last_end..]);
                 *xml = result_str;
             }
@@ -617,6 +617,8 @@ fn remove_existing_file(path: &Path) -> io::Result<()> {
     if let Ok(meta) = fs::metadata(path) {
         let mut perms = meta.permissions();
         if perms.readonly() {
+            // Windows only: clears the read-only attribute, not NTFS ACLs.
+            #[allow(clippy::permissions_set_readonly_false)]
             perms.set_readonly(false);
             fs::set_permissions(path, perms)?;
         }

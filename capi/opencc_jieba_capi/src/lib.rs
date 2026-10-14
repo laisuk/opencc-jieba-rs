@@ -1,3 +1,12 @@
+//! C ABI for OpenCC-Jieba.
+//!
+//! Pointer-taking exports are unsafe for Rust callers: NULL checks cannot
+//! validate pointer provenance, lifetimes, array bounds, or allocation ownership.
+//! See each function's safety contract. Rust's `unsafe` qualifier does not change
+//! C symbol names, calling conventions, parameter types, or struct layouts.
+
+#![deny(clippy::missing_safety_doc, clippy::not_unsafe_ptr_arg_deref)]
+
 use opencc_jieba_rs::{
     CustomDictMode, CustomDictSpec, DetofuLevel, DictSlot, KeywordMethod, OpenCC, UserDictEntry,
 };
@@ -90,6 +99,22 @@ pub extern "C" fn opencc_jieba_new() -> *mut OpenCC {
     )
 }
 
+/// Creates an instance with copied Jieba user dictionary entries.
+///
+/// # Safety
+/// If `entry_count > 0`, non-NULL `entries` must reference an aligned,
+/// initialized, readable array of at least `entry_count` entries in one
+/// allocation, with total byte size at most `isize::MAX`. Zero count ignores
+/// `entries`; NULL with nonzero count is rejected. Each non-NULL `word` and
+/// `tag` must satisfy the string pointer requirements below; NULL `tag` is optional.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// All arrays and strings must remain valid and unchanged during the call.
+/// The constructor copies the data before returning. A non-NULL result must
+/// be destroyed exactly once with [`opencc_jieba_delete`].
 #[no_mangle]
 pub unsafe extern "C" fn opencc_jieba_new_user_dict(
     entries: *const OpenccJiebaUserDictEntry,
@@ -98,6 +123,24 @@ pub unsafe extern "C" fn opencc_jieba_new_user_dict(
     finish_constructor(build_opencc_jieba(entries, entry_count, ptr::null(), 0))
 }
 
+/// Creates an instance with copied custom conversion dictionaries.
+///
+/// # Safety
+/// If `spec_count > 0`, non-NULL `specs` must reference an aligned,
+/// initialized, readable array of at least `spec_count` specifications in one
+/// allocation. Each non-NULL `pairs` with nonzero `pair_count` must likewise
+/// reference at least `pair_count` initialized pairs. Array byte sizes must
+/// not exceed `isize::MAX`. Zero counts ignore array pointers; NULL arrays
+/// with nonzero counts are rejected. Each non-NULL `source` and `target` must
+/// satisfy the string pointer requirements below.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// All arrays and strings must remain valid and unchanged during the call.
+/// The constructor copies the data before returning. A non-NULL result must
+/// be destroyed exactly once with [`opencc_jieba_delete`].
 #[no_mangle]
 pub unsafe extern "C" fn opencc_jieba_new_custom(
     specs: *const OpenccJiebaCustomDictSpec,
@@ -106,6 +149,29 @@ pub unsafe extern "C" fn opencc_jieba_new_custom(
     finish_constructor(build_opencc_jieba(ptr::null(), 0, specs, spec_count))
 }
 
+/// Creates an instance with copied user entries and conversion dictionaries.
+///
+/// # Safety
+/// If `entry_count > 0`, non-NULL `entries` must reference an aligned,
+/// initialized, readable array of at least `entry_count` entries in one
+/// allocation, with total byte size at most `isize::MAX`. Zero count ignores
+/// `entries`; NULL with nonzero count is rejected. Each non-NULL `word` and
+/// `tag` must satisfy the string pointer requirements below; NULL `tag` is optional.
+/// If `spec_count > 0`, non-NULL `specs` must reference an aligned,
+/// initialized, readable array of at least `spec_count` specifications in one
+/// allocation. Each non-NULL `pairs` with nonzero `pair_count` must likewise
+/// reference at least `pair_count` initialized pairs. Array byte sizes must
+/// not exceed `isize::MAX`. Zero counts ignore array pointers; NULL arrays
+/// with nonzero counts are rejected. Each non-NULL `source` and `target` must
+/// satisfy the string pointer requirements below.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// All arrays and strings must remain valid and unchanged during the call.
+/// The constructor copies the data before returning. A non-NULL result must
+/// be destroyed exactly once with [`opencc_jieba_delete`].
 #[no_mangle]
 pub unsafe extern "C" fn opencc_jieba_new_user_dict_custom(
     entries: *const OpenccJiebaUserDictEntry,
@@ -116,8 +182,15 @@ pub unsafe extern "C" fn opencc_jieba_new_user_dict_custom(
     finish_constructor(build_opencc_jieba(entries, entry_count, specs, spec_count))
 }
 
+/// Destroys an instance returned by an OpenCC-Jieba constructor.
+///
+/// # Safety
+/// `instance` must be NULL or the original, still-live pointer returned by
+/// an `opencc_jieba_new*` constructor, not previously freed. This call takes
+/// ownership and destroys it exactly once. No references or other accesses
+/// to the instance may be active during or after this call.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_delete(instance: *mut OpenCC) {
+pub unsafe extern "C" fn opencc_jieba_delete(instance: *mut OpenCC) {
     if instance.is_null() {
         return;
     }
@@ -128,15 +201,34 @@ pub extern "C" fn opencc_jieba_delete(instance: *mut OpenCC) {
 }
 
 #[deprecated(note = "Use `opencc_jieba_delete` instead")]
+/// Legacy alias for [`opencc_jieba_delete`].
+///
+/// # Safety
+/// `instance` must be NULL or the original, still-live pointer returned by
+/// an `opencc_jieba_new*` constructor, not previously freed. This call takes
+/// ownership and destroys it exactly once. No references or other accesses
+/// to the instance may be active during or after this call.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
+pub unsafe extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
     opencc_jieba_delete(instance);
 }
 
 // === Public FFI: conversion ===
 
+/// Converts a UTF-8 string using the named configuration.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_convert(
+pub unsafe extern "C" fn opencc_jieba_convert(
     instance: *const OpenCC,
     input: *const c_char,
     config: *const c_char,
@@ -158,8 +250,21 @@ pub extern "C" fn opencc_jieba_convert(
     str_to_raw_c_char_strict(opencc.convert(input_str, config_str, punctuation))
 }
 
+/// Classifies Chinese text; returns -1 for NULL arguments or invalid UTF-8.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_zho_check(instance: *const OpenCC, input: *const c_char) -> i32 {
+pub unsafe extern "C" fn opencc_jieba_zho_check(
+    instance: *const OpenCC,
+    input: *const c_char,
+) -> i32 {
     let opencc = match borrow_opencc(instance) {
         Some(opencc) => opencc,
         None => return -1,
@@ -185,27 +290,27 @@ pub extern "C" fn opencc_jieba_zho_check(instance: *const OpenCC, input: *const 
 ///
 /// Returns NULL and records a thread-local C API error when `instance` or
 /// `input` is NULL or `input` is not valid UTF-8.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_normalize_compat(
+pub unsafe extern "C" fn opencc_jieba_normalize_compat(
     instance: *const OpenCC,
     input: *const c_char,
 ) -> *mut c_char {
-    if instance.is_null() || input.is_null() {
-        set_c_api_last_error("Invalid argument: instance/input is NULL");
-        return ptr::null_mut();
+    unsafe {
+        transform_utf8_ffi(instance, input, |opencc, input_str| {
+            Ok(opencc.normalize_compat(input_str))
+        })
     }
-
-    let opencc = unsafe { &*instance };
-    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
-        Ok(input_str) => input_str,
-        Err(_) => {
-            set_c_api_last_error("Invalid UTF-8 input");
-            return ptr::null_mut();
-        }
-    };
-
-    clear_c_api_last_error();
-    str_to_raw_c_char_strict(opencc.normalize_compat(input_str))
 }
 
 /// Applies the full built-in compatibility normalization pre-pass.
@@ -219,27 +324,27 @@ pub extern "C" fn opencc_jieba_normalize_compat(
 ///
 /// Returns NULL and records a thread-local C API error when `instance` or
 /// `input` is NULL or `input` is not valid UTF-8.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_normalize_compat_extended(
+pub unsafe extern "C" fn opencc_jieba_normalize_compat_extended(
     instance: *const OpenCC,
     input: *const c_char,
 ) -> *mut c_char {
-    if instance.is_null() || input.is_null() {
-        set_c_api_last_error("Invalid argument: instance/input is NULL");
-        return ptr::null_mut();
+    unsafe {
+        transform_utf8_ffi(instance, input, |opencc, input_str| {
+            Ok(opencc.normalize_compat_extended(input_str))
+        })
     }
-
-    let opencc = unsafe { &*instance };
-    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
-        Ok(input_str) => input_str,
-        Err(_) => {
-            set_c_api_last_error("Invalid UTF-8 input");
-            return ptr::null_mut();
-        }
-    };
-
-    clear_c_api_last_error();
-    str_to_raw_c_char_strict(opencc.normalize_compat_extended(input_str))
 }
 
 // === Public FFI: DeTofu ===
@@ -254,42 +359,48 @@ pub extern "C" fn opencc_jieba_normalize_compat_extended(
 ///
 /// Returns NULL and records a thread-local C API error when `instance` or
 /// `input` is NULL, `input` is not valid UTF-8, or `level` is not recognized.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_detofu(
+pub unsafe extern "C" fn opencc_jieba_detofu(
     instance: *const OpenCC,
     input: *const c_char,
     level: u32,
 ) -> *mut c_char {
-    if instance.is_null() || input.is_null() {
-        set_c_api_last_error("Invalid argument: instance/input is NULL");
-        return ptr::null_mut();
+    unsafe {
+        transform_utf8_ffi(instance, input, |opencc, input_str| {
+            let level = detofu_level_from_ffi(level)
+                .ok_or_else(|| format!("Invalid DeTofu level: {level}"))?;
+            Ok(opencc.detofu(input_str, level))
+        })
     }
-
-    let opencc = unsafe { &*instance };
-    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
-        Ok(input_str) => input_str,
-        Err(_) => {
-            set_c_api_last_error("Invalid UTF-8 input");
-            return ptr::null_mut();
-        }
-    };
-
-    let level = match detofu_level_from_ffi(level) {
-        Some(level) => level,
-        None => {
-            set_c_api_last_error(format!("Invalid DeTofu level: {level}"));
-            return ptr::null_mut();
-        }
-    };
-
-    clear_c_api_last_error();
-    str_to_raw_c_char_strict(opencc.detofu(input_str, level))
 }
 
 // === Public FFI: segmentation and tagging ===
 
+/// Segments a UTF-8 string into a NULL-terminated token array.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, NULL-terminated, and must
+/// be released exactly once with [`opencc_jieba_free_string_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_cut(
+pub unsafe extern "C" fn opencc_jieba_cut(
     instance: *const OpenCC,
     input: *const c_char,
     hmm: bool,
@@ -306,8 +417,20 @@ pub extern "C" fn opencc_jieba_cut(
     vec_to_cstr_ptr(opencc.jieba_cut(input_str, hmm))
 }
 
+/// Segments text for search into a NULL-terminated token array.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, NULL-terminated, and must
+/// be released exactly once with [`opencc_jieba_free_string_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_cut_for_search(
+pub unsafe extern "C" fn opencc_jieba_cut_for_search(
     instance: *const OpenCC,
     input: *const c_char,
     hmm: bool,
@@ -324,8 +447,20 @@ pub extern "C" fn opencc_jieba_cut_for_search(
     vec_to_cstr_ptr(opencc.jieba_cut_for_search(input_str, hmm))
 }
 
+/// Segments text in full mode into a NULL-terminated token array.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, NULL-terminated, and must
+/// be released exactly once with [`opencc_jieba_free_string_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_cut_all(
+pub unsafe extern "C" fn opencc_jieba_cut_all(
     instance: *const OpenCC,
     input: *const c_char,
 ) -> *mut *mut c_char {
@@ -341,8 +476,20 @@ pub extern "C" fn opencc_jieba_cut_all(
     vec_to_cstr_ptr(opencc.jieba_cut_all(input_str))
 }
 
+/// Segments text and joins the tokens with the supplied delimiter.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_cut_and_join(
+pub unsafe extern "C" fn opencc_jieba_cut_and_join(
     instance: *const OpenCC,
     input: *const c_char,
     hmm: bool,
@@ -364,8 +511,21 @@ pub extern "C" fn opencc_jieba_cut_and_join(
     str_to_raw_c_char_strict(opencc.jieba_cut(input_str, hmm).join(delimiter_str))
 }
 
+/// Returns tokens and their part-of-speech tags.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, terminated by an entry
+/// with both pointers NULL, and must be released exactly once with
+/// [`opencc_jieba_free_tag_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_tag(
+pub unsafe extern "C" fn opencc_jieba_tag(
     instance: *const OpenCC,
     input: *const c_char,
     hmm: bool,
@@ -384,8 +544,22 @@ pub extern "C" fn opencc_jieba_tag(
 
 // === Public FFI: string utilities ===
 
+/// Joins a NULL-terminated array of UTF-8 strings.
+///
+/// # Safety
+/// Non-NULL `strings` must reference an aligned, initialized, readable
+/// array of string pointers terminated by a NULL pointer, all within one
+/// allocation of at most `isize::MAX` bytes. The array must remain valid and
+/// unchanged throughout the call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_join_str(
+pub unsafe extern "C" fn opencc_jieba_join_str(
     strings: *const *const c_char,
     delimiter: *const c_char,
 ) -> *mut c_char {
@@ -406,8 +580,20 @@ pub extern "C" fn opencc_jieba_join_str(
 
 // === Public FFI: keyword extraction ===
 
+/// Extracts keywords into a NULL-terminated string array.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, NULL-terminated, and must
+/// be released exactly once with [`opencc_jieba_free_string_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keywords(
+pub unsafe extern "C" fn opencc_jieba_keywords(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
@@ -430,8 +616,20 @@ pub extern "C" fn opencc_jieba_keywords(
     vec_to_cstr_ptr(keywords)
 }
 
+/// Extracts keywords with an optional whitespace-separated POS filter.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned array is caller-owned, NULL-terminated, and must
+/// be released exactly once with [`opencc_jieba_free_string_array`].
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keywords_pos(
+pub unsafe extern "C" fn opencc_jieba_keywords_pos(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
@@ -458,8 +656,24 @@ pub extern "C" fn opencc_jieba_keywords_pos(
     vec_to_cstr_ptr(keywords)
 }
 
+/// Extracts keywords and weights into counted arrays.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// Non-NULL `out_len`, `out_keywords`, and `out_weights` must be aligned and
+/// exclusively writable for one value of their respective types. These
+/// output regions must not overlap each other, the instance, or borrowed
+/// string memory. NULL output pointers are rejected. On success, the returned
+/// arrays and strings are caller-owned and must be freed together exactly
+/// once with [`opencc_jieba_free_keywords_and_weights`] using the returned length.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keywords_and_weights(
+pub unsafe extern "C" fn opencc_jieba_keywords_and_weights(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
@@ -493,8 +707,24 @@ pub extern "C" fn opencc_jieba_keywords_and_weights(
     )
 }
 
+/// Extracts keywords and weights with an optional POS filter.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// Non-NULL `out_len`, `out_keywords`, and `out_weights` must be aligned and
+/// exclusively writable for one value of their respective types. These
+/// output regions must not overlap each other, the instance, or borrowed
+/// string memory. NULL output pointers are rejected. On success, the returned
+/// arrays and strings are caller-owned and must be freed together exactly
+/// once with [`opencc_jieba_free_keywords_and_weights`] using the returned length.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_keywords_and_weights_pos(
+pub unsafe extern "C" fn opencc_jieba_keywords_and_weights_pos(
     instance: *const OpenCC,
     input: *const c_char,
     top_k: usize,
@@ -546,8 +776,18 @@ pub extern "C" fn opencc_jieba_clear_last_error() {
 
 // === Public FFI: memory management ===
 
+/// Frees counted keyword and weight arrays returned by this API.
+///
+/// # Safety
+/// Each non-NULL pointer must be the original, still-live corresponding
+/// allocation returned by `opencc_jieba_keywords_and_weights*`. `len` must
+/// equal the length returned with those allocations; the keyword elements
+/// and strings must be unchanged and not previously freed. NULL pointers
+/// are ignored. Each supplied allocation and contained string is consumed
+/// exactly once. No references or other accesses may be active during or
+/// after this call.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_keywords_and_weights(
+pub unsafe extern "C" fn opencc_jieba_free_keywords_and_weights(
     keywords: *mut *mut c_char,
     weights: *mut f64,
     len: usize,
@@ -569,8 +809,16 @@ pub extern "C" fn opencc_jieba_free_keywords_and_weights(
     }
 }
 
+/// Frees an owned string returned by this API; NULL is a no-op.
+///
+/// # Safety
+/// `ptr` must be NULL or an original, still-live string allocation returned
+/// by this C API, not previously freed. It must not be a borrowed version
+/// string or a caller allocation. The allocation and its terminating NUL
+/// position must be unchanged; no references or accesses may remain active
+/// during or after this call. Ownership is consumed exactly once.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn opencc_jieba_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
@@ -580,8 +828,16 @@ pub extern "C" fn opencc_jieba_free_string(ptr: *mut c_char) {
     }
 }
 
+/// Frees an owned NULL-terminated string array and its strings.
+///
+/// # Safety
+/// `array` must be NULL or the original, still-live array returned by a
+/// segmentation or keyword extraction function in this API. Its elements
+/// and terminating NULL sentinel must be unchanged and not previously freed.
+/// The array and every contained string are consumed exactly once. No
+/// references or other accesses may be active during or after this call.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
+pub unsafe extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
     if array.is_null() {
         return;
     }
@@ -602,8 +858,16 @@ pub extern "C" fn opencc_jieba_free_string_array(array: *mut *mut c_char) {
     }
 }
 
+/// Frees an owned tag array and its word and tag strings.
+///
+/// # Safety
+/// `array` must be NULL or the original, still-live array returned by
+/// [`opencc_jieba_tag`]. Its elements and terminal entry (both pointers NULL)
+/// must be unchanged and not previously freed. The array and every contained
+/// string are consumed exactly once. No references or other accesses may
+/// be active during or after this call.
 #[no_mangle]
-pub extern "C" fn opencc_jieba_free_tag_array(array: *mut OpenccJiebaTag) {
+pub unsafe extern "C" fn opencc_jieba_free_tag_array(array: *mut OpenccJiebaTag) {
     if array.is_null() {
         return;
     }
@@ -631,6 +895,46 @@ pub extern "C" fn opencc_jieba_free_tag_array(array: *mut OpenccJiebaTag) {
 }
 
 // === Internal helpers ===
+
+/// Validates borrowed transformation inputs and manages the C API error state.
+///
+/// # Safety
+/// Non-NULL `instance` must point to a live, aligned `OpenCC`, immutable for
+/// this call. Non-NULL `input` must point to a readable NUL-terminated string
+/// in one allocation, unchanged and valid for this call.
+unsafe fn transform_utf8_ffi<F>(
+    instance: *const OpenCC,
+    input: *const c_char,
+    transform: F,
+) -> *mut c_char
+where
+    F: FnOnce(&OpenCC, &str) -> Result<String, String>,
+{
+    if instance.is_null() || input.is_null() {
+        set_c_api_last_error("Invalid argument: instance/input is NULL");
+        return ptr::null_mut();
+    }
+
+    let opencc = unsafe { &*instance };
+    let input_str = match unsafe { CStr::from_ptr(input) }.to_str() {
+        Ok(input_str) => input_str,
+        Err(_) => {
+            set_c_api_last_error("Invalid UTF-8 input");
+            return ptr::null_mut();
+        }
+    };
+
+    match transform(opencc, input_str) {
+        Ok(output) => {
+            clear_c_api_last_error();
+            str_to_raw_c_char_strict(output)
+        }
+        Err(message) => {
+            set_c_api_last_error(message);
+            ptr::null_mut()
+        }
+    }
+}
 
 #[inline]
 fn detofu_level_from_ffi(level: u32) -> Option<DetofuLevel> {
@@ -862,7 +1166,10 @@ fn dict_slot_from_ffi(slot: u32) -> Option<DictSlot> {
     }
 }
 
-fn borrow_opencc<'a>(instance: *const OpenCC) -> Option<&'a OpenCC> {
+/// # Safety
+/// Non-NULL `instance` must point to a live, aligned `OpenCC`, immutable
+/// for the returned borrow lifetime.
+unsafe fn borrow_opencc<'a>(instance: *const OpenCC) -> Option<&'a OpenCC> {
     if instance.is_null() {
         None
     } else {
@@ -870,7 +1177,10 @@ fn borrow_opencc<'a>(instance: *const OpenCC) -> Option<&'a OpenCC> {
     }
 }
 
-fn cstr_to_str<'a>(ptr: *const c_char) -> Option<&'a str> {
+/// # Safety
+/// Non-NULL `ptr` must point to a readable NUL-terminated string in one
+/// allocation, unchanged and valid for the returned borrow lifetime.
+unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Option<&'a str> {
     if ptr.is_null() {
         return None;
     }
@@ -878,7 +1188,10 @@ fn cstr_to_str<'a>(ptr: *const c_char) -> Option<&'a str> {
     unsafe { CStr::from_ptr(ptr).to_str().ok() }
 }
 
-fn join_cstr_array(strings: *const *const c_char, delimiter: &str) -> Option<String> {
+/// # Safety
+/// `strings` must point to a readable, aligned NULL-terminated pointer
+/// array whose non-NULL strings satisfy `cstr_to_str` for this call.
+unsafe fn join_cstr_array(strings: *const *const c_char, delimiter: &str) -> Option<String> {
     let mut result = String::new();
     let mut index = 0usize;
 
@@ -997,12 +1310,16 @@ fn vec_pair_to_tag_ptr<TWord: AsRef<str>, TTag: AsRef<str>>(
 
 // ------ POS ------ //
 #[inline]
-fn parse_keyword_method(method: *const c_char) -> Option<KeywordMethod> {
+/// # Safety
+/// Non-NULL `method` must satisfy `cstr_to_str` for this call.
+unsafe fn parse_keyword_method(method: *const c_char) -> Option<KeywordMethod> {
     KeywordMethod::parse_str(cstr_to_str(method)?)
 }
 
 #[inline]
-fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {
+/// # Safety
+/// Non-NULL `pos` must satisfy `cstr_to_str` for this call.
+unsafe fn parse_allowed_pos(pos: *const c_char) -> Option<Vec<String>> {
     if pos.is_null() {
         return None;
     }
@@ -1047,7 +1364,11 @@ fn keyword_weight_ffi(
     }
 }
 
-fn keyword_weights_ffi_impl(
+#[allow(clippy::too_many_arguments)]
+/// # Safety
+/// Non-NULL output pointers must be aligned and exclusively writable for
+/// one value, with disjoint regions that do not overlap borrowed inputs.
+unsafe fn keyword_weights_ffi_impl(
     opencc: &OpenCC,
     input_str: &str,
     top_k: usize,
@@ -1125,7 +1446,12 @@ fn keyword_weights_ffi_impl(
 }
 
 #[inline]
-fn with_allowed_pos_refs<R>(allowed_pos: *const c_char, f: impl FnOnce(Option<&[&str]>) -> R) -> R {
+/// # Safety
+/// Non-NULL `allowed_pos` must satisfy `cstr_to_str` for this call.
+unsafe fn with_allowed_pos_refs<R>(
+    allowed_pos: *const c_char,
+    f: impl FnOnce(Option<&[&str]>) -> R,
+) -> R {
     let storage = parse_allowed_pos(allowed_pos);
     let refs = storage
         .as_ref()
@@ -1170,7 +1496,7 @@ mod tests {
         let opencc = OpenCC::new();
         let input = raw_cstring("你好，世界，欢迎");
 
-        let result = opencc_jieba_zho_check(&opencc as *const OpenCC, input);
+        let result = unsafe { opencc_jieba_zho_check(&opencc as *const OpenCC, input) };
 
         unsafe {
             reclaim_raw_cstring(input);
@@ -1185,7 +1511,8 @@ mod tests {
         let input = raw_cstring("意大利罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。");
         let config = raw_cstring("s2twp");
 
-        let result_ptr = opencc_jieba_convert(&opencc as *const OpenCC, input, config, true);
+        let result_ptr =
+            unsafe { opencc_jieba_convert(&opencc as *const OpenCC, input, config, true) };
         let result = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
 
         unsafe {
@@ -1208,7 +1535,8 @@ mod tests {
         {
             let input = raw_cstring(input_text);
             let config = raw_cstring(config_name);
-            let result_ptr = opencc_jieba_convert(&opencc as *const OpenCC, input, config, false);
+            let result_ptr =
+                unsafe { opencc_jieba_convert(&opencc as *const OpenCC, input, config, false) };
             assert!(!result_ptr.is_null());
             let result = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
 
@@ -1228,7 +1556,7 @@ mod tests {
             raw_cstring("豫章故郡，洪都新府。星分翼軫，地接衡廬。襟三江而帶五湖，控蠻荊而引甌越。");
         let config = raw_cstring("t2s");
 
-        let result_ptr = opencc_jieba_convert(opencc, input, config, true);
+        let result_ptr = unsafe { opencc_jieba_convert(opencc, input, config, true) };
         let result = unsafe { CString::from_raw(result_ptr).to_string_lossy().into_owned() };
 
         unsafe {
@@ -1240,7 +1568,7 @@ mod tests {
             result,
             "豫章故郡，洪都新府。星分翼轸，地接衡庐。襟三江而带五湖，控蛮荆而引瓯越。"
         );
-        opencc_jieba_delete(opencc);
+        unsafe { opencc_jieba_delete(opencc) };
     }
 
     #[test]
@@ -1248,7 +1576,7 @@ mod tests {
         let opencc = OpenCC::new();
         let input = raw_cstring("你好，世界！");
 
-        let result = opencc_jieba_cut(&opencc as *const OpenCC, input, true);
+        let result = unsafe { opencc_jieba_cut(&opencc as *const OpenCC, input, true) };
         let out = unsafe { cstr_array_to_vec_str(result) };
 
         assert_eq!(out, vec!["你好", "，", "世界", "！"]);
@@ -1265,7 +1593,8 @@ mod tests {
         let input = raw_cstring("你好，世界！");
         let delimiter = raw_cstring("/ ");
 
-        let result = opencc_jieba_cut_and_join(&opencc as *const OpenCC, input, false, delimiter);
+        let result =
+            unsafe { opencc_jieba_cut_and_join(&opencc as *const OpenCC, input, false, delimiter) };
         let result_str = unsafe { CStr::from_ptr(result).to_str().unwrap() };
 
         assert_eq!(result_str, "你好/ ，/ 世界/ ！");
@@ -1281,16 +1610,16 @@ mod tests {
     fn test_opencc_jieba_join_str() {
         let c1 = CString::new("Hello").unwrap();
         let c2 = CString::new("World").unwrap();
-        let strings = vec![c1.as_ptr(), c2.as_ptr(), ptr::null()];
+        let strings = [c1.as_ptr(), c2.as_ptr(), ptr::null()];
         let delimiter = CString::new(" ").unwrap();
 
-        let result = opencc_jieba_join_str(strings.as_ptr(), delimiter.as_ptr());
+        let result = unsafe { opencc_jieba_join_str(strings.as_ptr(), delimiter.as_ptr()) };
         assert!(!result.is_null());
 
         let result_string = unsafe { CStr::from_ptr(result).to_string_lossy().into_owned() };
         assert_eq!(result_string, "Hello World");
 
-        opencc_jieba_free_string(result);
+        unsafe { opencc_jieba_free_string(result) };
     }
 
     #[test]
@@ -1301,7 +1630,7 @@ mod tests {
             .into_raw();
         let method = raw_cstring("textrank");
 
-        let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method);
+        let result = unsafe { opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method) };
         assert!(!result.is_null());
 
         let out = unsafe { cstr_array_to_vec_str(result) };
@@ -1322,7 +1651,7 @@ mod tests {
             .into_raw();
         let method = raw_cstring("tfidf");
 
-        let result = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method);
+        let result = unsafe { opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method) };
         assert!(!result.is_null());
 
         let out = unsafe { cstr_array_to_vec_str(result) };
@@ -1344,8 +1673,9 @@ mod tests {
         let method = raw_cstring("textrank");
         let allowed_pos = raw_cstring("n nr ns nt nz v vn");
 
-        let result =
-            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        let result = unsafe {
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos)
+        };
         assert!(!result.is_null());
 
         let out = unsafe { cstr_array_to_vec_str(result) };
@@ -1368,8 +1698,9 @@ mod tests {
         let method = raw_cstring("tfidf");
         let allowed_pos = raw_cstring("n nr ns nt nz v vn");
 
-        let result =
-            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        let result = unsafe {
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos)
+        };
         assert!(!result.is_null());
 
         let out = unsafe { cstr_array_to_vec_str(result) };
@@ -1392,8 +1723,9 @@ mod tests {
         let method = raw_cstring("textrank");
         let allowed_pos = raw_cstring("");
 
-        let result =
-            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos);
+        let result = unsafe {
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method, allowed_pos)
+        };
         assert!(!result.is_null());
 
         let out = unsafe { cstr_array_to_vec_str(result) };
@@ -1417,13 +1749,15 @@ mod tests {
         let method_pos = raw_cstring("textrank");
         let allowed_pos = raw_cstring("n nr ns nt nz v vn");
 
-        let result_all = opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_all);
+        let result_all =
+            unsafe { opencc_jieba_keywords(&opencc as *const OpenCC, input, 10, method_all) };
         assert!(!result_all.is_null());
         let out_all = unsafe { cstr_array_to_vec_str(result_all) };
         assert!(!out_all.is_empty());
 
-        let result_pos =
-            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method_pos, allowed_pos);
+        let result_pos = unsafe {
+            opencc_jieba_keywords_pos(&opencc as *const OpenCC, input, 10, method_pos, allowed_pos)
+        };
         assert!(!result_pos.is_null());
         let out_pos = unsafe { cstr_array_to_vec_str(result_pos) };
         assert!(!out_pos.is_empty());
@@ -1447,15 +1781,17 @@ mod tests {
         let mut keywords: *mut *mut c_char = ptr::null_mut();
         let mut weights: *mut f64 = ptr::null_mut();
 
-        let result = opencc_jieba_keywords_and_weights(
-            &opencc as *const OpenCC,
-            input.as_ptr(),
-            5,
-            method.as_ptr(),
-            &mut keyword_count,
-            &mut keywords,
-            &mut weights,
-        );
+        let result = unsafe {
+            opencc_jieba_keywords_and_weights(
+                &opencc as *const OpenCC,
+                input.as_ptr(),
+                5,
+                method.as_ptr(),
+                &mut keyword_count,
+                &mut keywords,
+                &mut weights,
+            )
+        };
 
         assert_eq!(result, 0);
         assert!(keyword_count > 0);
@@ -1466,7 +1802,7 @@ mod tests {
         assert_eq!(keyword_vec.len(), keyword_count);
         assert!(weight_vec.iter().all(|w| *w >= 0.0));
 
-        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+        unsafe { opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count) };
     }
 
     #[test]
@@ -1480,16 +1816,18 @@ mod tests {
         let mut keywords: *mut *mut c_char = ptr::null_mut();
         let mut weights: *mut f64 = ptr::null_mut();
 
-        let result = opencc_jieba_keywords_and_weights_pos(
-            &opencc as *const OpenCC,
-            input.as_ptr(),
-            5,
-            method.as_ptr(),
-            allowed_pos.as_ptr(),
-            &mut keyword_count,
-            &mut keywords,
-            &mut weights,
-        );
+        let result = unsafe {
+            opencc_jieba_keywords_and_weights_pos(
+                &opencc as *const OpenCC,
+                input.as_ptr(),
+                5,
+                method.as_ptr(),
+                allowed_pos.as_ptr(),
+                &mut keyword_count,
+                &mut keywords,
+                &mut weights,
+            )
+        };
 
         assert_eq!(result, 0);
         assert!(keyword_count > 0);
@@ -1500,7 +1838,7 @@ mod tests {
         assert_eq!(keyword_vec.len(), keyword_count);
         assert!(weight_vec.iter().all(|w| *w >= 0.0));
 
-        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+        unsafe { opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count) };
     }
 
     #[test]
@@ -1514,16 +1852,18 @@ mod tests {
         let mut keywords: *mut *mut c_char = ptr::null_mut();
         let mut weights: *mut f64 = ptr::null_mut();
 
-        let result = opencc_jieba_keywords_and_weights_pos(
-            &opencc as *const OpenCC,
-            input.as_ptr(),
-            5,
-            method.as_ptr(),
-            allowed_pos.as_ptr(),
-            &mut keyword_count,
-            &mut keywords,
-            &mut weights,
-        );
+        let result = unsafe {
+            opencc_jieba_keywords_and_weights_pos(
+                &opencc as *const OpenCC,
+                input.as_ptr(),
+                5,
+                method.as_ptr(),
+                allowed_pos.as_ptr(),
+                &mut keyword_count,
+                &mut keywords,
+                &mut weights,
+            )
+        };
 
         assert_eq!(result, 0);
         assert!(keyword_count > 0);
@@ -1534,7 +1874,7 @@ mod tests {
         assert_eq!(keyword_vec.len(), keyword_count);
         assert!(weight_vec.iter().all(|w| *w >= 0.0));
 
-        opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count);
+        unsafe { opencc_jieba_free_keywords_and_weights(keywords, weights, keyword_count) };
     }
 
     fn collect_keywords_and_weights(
@@ -1582,7 +1922,7 @@ mod tests {
         assert!(!instance.is_null());
 
         let input = CString::new("我喜歡Rust程序語言").unwrap();
-        let array = opencc_jieba_tag(instance, input.as_ptr(), true);
+        let array = unsafe { opencc_jieba_tag(instance, input.as_ptr(), true) };
         assert!(!array.is_null());
 
         let mut result = Vec::<(String, String)>::new();
@@ -1607,8 +1947,8 @@ mod tests {
         assert!(result.iter().any(|(word, _)| word == "Rust"));
         assert!(result.iter().all(|(_, tag)| !tag.is_empty()));
 
-        opencc_jieba_free_tag_array(array);
-        opencc_jieba_delete(instance);
+        unsafe { opencc_jieba_free_tag_array(array) };
+        unsafe { opencc_jieba_delete(instance) };
     }
 }
 
@@ -1619,7 +1959,7 @@ mod compatibility_normalization_capi_tests {
     fn read_owned_string(ptr: *mut c_char) -> String {
         assert!(!ptr.is_null());
         let value = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
-        opencc_jieba_free_string(ptr);
+        unsafe { opencc_jieba_free_string(ptr) };
         value
     }
 
@@ -1628,7 +1968,7 @@ mod compatibility_normalization_capi_tests {
         let opencc = OpenCC::new();
         let input = CString::new("天龍八部書").unwrap();
 
-        let result = opencc_jieba_normalize_compat(&opencc, input.as_ptr());
+        let result = unsafe { opencc_jieba_normalize_compat(&opencc, input.as_ptr()) };
 
         assert_eq!(read_owned_string(result), "天龍八部書");
     }
@@ -1638,7 +1978,8 @@ mod compatibility_normalization_capi_tests {
         let opencc = OpenCC::new();
         let input = CString::new("天龍八部書裡的聼眾‧聼聼竒羙⽟䂖甁噐⾳").unwrap();
 
-        let normalized_ptr = opencc_jieba_normalize_compat_extended(&opencc, input.as_ptr());
+        let normalized_ptr =
+            unsafe { opencc_jieba_normalize_compat_extended(&opencc, input.as_ptr()) };
         assert!(!normalized_ptr.is_null());
 
         let normalized = unsafe { CStr::from_ptr(normalized_ptr) }
@@ -1649,8 +1990,9 @@ mod compatibility_normalization_capi_tests {
 
         let normalized_input = CString::new(normalized).unwrap();
         let config = CString::new("t2s").unwrap();
-        let simplified_ptr =
-            opencc_jieba_convert(&opencc, normalized_input.as_ptr(), config.as_ptr(), false);
+        let simplified_ptr = unsafe {
+            opencc_jieba_convert(&opencc, normalized_input.as_ptr(), config.as_ptr(), false)
+        };
         assert!(!simplified_ptr.is_null());
 
         assert_eq!(
@@ -1658,7 +2000,7 @@ mod compatibility_normalization_capi_tests {
             "天龙八部书里的听众·听听奇美玉石瓶器音"
         );
 
-        opencc_jieba_free_string(normalized_ptr);
+        unsafe { opencc_jieba_free_string(normalized_ptr) };
     }
 
     #[test]
@@ -1666,7 +2008,7 @@ mod compatibility_normalization_capi_tests {
         opencc_jieba_clear_last_error();
         let input = CString::new("天龍八部").unwrap();
 
-        let result = opencc_jieba_normalize_compat(ptr::null(), input.as_ptr());
+        let result = unsafe { opencc_jieba_normalize_compat(ptr::null(), input.as_ptr()) };
 
         assert!(result.is_null());
         assert_eq!(
@@ -1681,7 +2023,8 @@ mod compatibility_normalization_capi_tests {
         let opencc = OpenCC::new();
         let input = [0xff_u8, 0];
 
-        let result = opencc_jieba_normalize_compat(&opencc, input.as_ptr() as *const c_char);
+        let result =
+            unsafe { opencc_jieba_normalize_compat(&opencc, input.as_ptr() as *const c_char) };
 
         assert!(result.is_null());
         assert_eq!(
@@ -1698,7 +2041,7 @@ mod detofu_capi_tests {
     fn read_owned_string(ptr: *mut c_char) -> String {
         assert!(!ptr.is_null());
         let value = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap().to_owned();
-        opencc_jieba_free_string(ptr);
+        unsafe { opencc_jieba_free_string(ptr) };
         value
     }
 
@@ -1707,7 +2050,7 @@ mod detofu_capi_tests {
         let opencc = OpenCC::new();
         let input = CString::new("骖𬴂").unwrap();
 
-        let result = opencc_jieba_detofu(&opencc, input.as_ptr(), 0);
+        let result = unsafe { opencc_jieba_detofu(&opencc, input.as_ptr(), 0) };
 
         assert_eq!(read_owned_string(result), "骖騑");
     }
@@ -1718,7 +2061,7 @@ mod detofu_capi_tests {
         let input = CString::new("普通中文").unwrap();
 
         for level in 0..=7 {
-            let result = opencc_jieba_detofu(&opencc, input.as_ptr(), level);
+            let result = unsafe { opencc_jieba_detofu(&opencc, input.as_ptr(), level) };
             assert_eq!(read_owned_string(result), "普通中文");
         }
     }
@@ -1729,7 +2072,7 @@ mod detofu_capi_tests {
         let opencc = OpenCC::new();
         let input = CString::new("骖𬴂").unwrap();
 
-        let result = opencc_jieba_detofu(&opencc, input.as_ptr(), 99);
+        let result = unsafe { opencc_jieba_detofu(&opencc, input.as_ptr(), 99) };
 
         assert!(result.is_null());
         assert_eq!(
@@ -1744,14 +2087,17 @@ mod detofu_capi_tests {
         let opencc = OpenCC::new();
         let valid = CString::new("骖𬴂").unwrap();
 
-        assert!(opencc_jieba_detofu(ptr::null(), valid.as_ptr(), 0).is_null());
+        assert!(unsafe { opencc_jieba_detofu(ptr::null(), valid.as_ptr(), 0) }.is_null());
         assert_eq!(
             read_owned_string(opencc_jieba_last_error()),
             "Invalid argument: instance/input is NULL"
         );
 
         let invalid = [0xff_u8, 0];
-        assert!(opencc_jieba_detofu(&opencc, invalid.as_ptr() as *const c_char, 0,).is_null());
+        assert!(
+            unsafe { opencc_jieba_detofu(&opencc, invalid.as_ptr() as *const c_char, 0,) }
+                .is_null()
+        );
         assert_eq!(
             read_owned_string(opencc_jieba_last_error()),
             "Invalid UTF-8 input"
@@ -1767,14 +2113,14 @@ mod constructor_tests {
     fn user_dict_constructor_accepts_null_zero() {
         let instance = unsafe { opencc_jieba_new_user_dict(ptr::null(), 0) };
         assert!(!instance.is_null());
-        opencc_jieba_delete(instance);
+        unsafe { opencc_jieba_delete(instance) };
     }
 
     #[test]
     fn custom_constructor_accepts_null_zero() {
         let instance = unsafe { opencc_jieba_new_custom(ptr::null(), 0) };
         assert!(!instance.is_null());
-        opencc_jieba_delete(instance);
+        unsafe { opencc_jieba_delete(instance) };
     }
 
     #[test]
@@ -1804,15 +2150,16 @@ mod constructor_tests {
 
         let input = CString::new("帕兰蒂尔").unwrap();
         let config = CString::new("s2t").unwrap();
-        let output = opencc_jieba_convert(instance, input.as_ptr(), config.as_ptr(), false);
+        let output =
+            unsafe { opencc_jieba_convert(instance, input.as_ptr(), config.as_ptr(), false) };
 
         assert!(!output.is_null());
         unsafe {
             assert_eq!(CStr::from_ptr(output).to_str().unwrap(), "柏蘭蒂爾");
         }
 
-        opencc_jieba_free_string(output);
-        opencc_jieba_delete(instance);
+        unsafe { opencc_jieba_free_string(output) };
+        unsafe { opencc_jieba_delete(instance) };
     }
 
     #[test]
@@ -1830,6 +2177,6 @@ mod constructor_tests {
             );
         }
 
-        opencc_jieba_free_string(error);
+        unsafe { opencc_jieba_free_string(error) };
     }
 }
