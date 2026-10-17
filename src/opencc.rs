@@ -3489,240 +3489,6 @@ impl Default for OpenCC {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    fn dict(entries: &[(&str, &str)]) -> DictMap {
-        let mut map = DictMap::default();
-        for (from, to) in entries {
-            map.insert_with_len(
-                (*from).to_string(),
-                (*to).to_string(),
-                from.chars().count() as u16,
-            );
-        }
-        map
-    }
-
-    fn opencc_with_dictionary(dictionary: Dictionary, words: &[&str]) -> OpenCC {
-        let mut jieba = Jieba::new();
-        for word in words {
-            jieba.add_word(word, Some(100_000), Some("n"));
-        }
-
-        OpenCC {
-            jieba: Arc::new(jieba),
-            dictionary,
-        }
-    }
-
-    #[test]
-    fn tw_forward_variants_apply_phrases_before_characters() {
-        let mut dictionary = Dictionary::default();
-        dictionary.tw_variants_phrases = dict(&[("純喫茶", "純喫茶")]);
-        dictionary.tw_variants = dict(&[("喫", "吃")]);
-        let opencc = opencc_with_dictionary(dictionary, &["純喫茶"]);
-
-        assert_eq!(opencc.t2tw("純喫茶", false), "純喫茶");
-        assert_eq!(opencc.t2tw("喫", false), "吃");
-    }
-
-    #[test]
-    fn s2twp_combines_taiwan_dictionaries_in_second_round() {
-        let mut dictionary = Dictionary::default();
-        dictionary.tw_phrases = dict(&[("甲", "乙")]);
-        dictionary.tw_variants_phrases = dict(&[("甲", "丁")]);
-        dictionary.tw_variants = dict(&[("乙", "丙")]);
-        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
-
-        // Taiwan phrases have first priority within round 2, and their output
-        // is not fed through a separate Taiwan-variant round afterward.
-        assert_eq!(opencc.s2twp("甲", false), "乙");
-    }
-
-    #[test]
-    fn t2twp_uses_one_pass_with_dictionary_precedence() {
-        let mut dictionary = Dictionary::default();
-        dictionary.tw_phrases = dict(&[("甲", "乙")]);
-        dictionary.tw_variants_phrases = dict(&[("甲", "丁")]);
-        dictionary.tw_variants = dict(&[("乙", "丙")]);
-        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
-
-        assert_eq!(opencc.t2twp("甲", false), "乙");
-    }
-
-    #[test]
-    fn tw2tp_uses_one_pass_with_dictionary_precedence() {
-        let mut dictionary = Dictionary::default();
-        dictionary.tw_variants_rev = dict(&[("甲", "乙")]);
-        dictionary.tw_variants_rev_phrases = dict(&[("甲", "丁")]);
-        dictionary.tw_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
-        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
-
-        assert_eq!(opencc.tw2tp("甲", false), "乙");
-    }
-
-    #[test]
-    fn hk_forward_variants_apply_phrases_before_characters() {
-        let mut dictionary = Dictionary::default();
-        dictionary.hk_variants_phrases = dict(&[("無線新聞", "無綫新聞")]);
-        dictionary.hk_variants = dict(&[("線", "綫")]);
-        let opencc = opencc_with_dictionary(dictionary, &["無線新聞"]);
-
-        assert_eq!(opencc.t2hk("無線新聞", false), "無綫新聞");
-        assert_eq!(opencc.t2hk("線", false), "綫");
-    }
-
-    #[test]
-    fn t2hkp_uses_one_pass_with_dictionary_precedence() {
-        let mut dictionary = Dictionary::default();
-        dictionary.hk_phrases = dict(&[("甲", "乙")]);
-        dictionary.hk_variants_phrases = dict(&[("甲", "丁")]);
-        dictionary.hk_variants = dict(&[("乙", "丙")]);
-        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
-
-        assert_eq!(opencc.t2hkp("甲", false), "乙");
-    }
-
-    #[test]
-    fn hk2tp_uses_one_pass_with_dictionary_precedence() {
-        let mut dictionary = Dictionary::default();
-        dictionary.hk_variants_rev_phrases = dict(&[("甲", "乙")]);
-        dictionary.hk_variants_rev = dict(&[("甲", "丁")]);
-        dictionary.hk_phrases_rev = dict(&[("甲", "戊"), ("乙", "丙")]);
-        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
-
-        assert_eq!(opencc.hk2tp("甲", false), "乙");
-    }
-
-    #[test]
-    fn older_dictionary_json_defaults_new_forward_variant_phrase_slots() {
-        let json = r#"{
-            "schema_version": 2,
-            "st_characters": {},
-            "st_phrases": {},
-            "ts_characters": {},
-            "ts_phrases": {},
-            "tw_phrases": {},
-            "tw_phrases_rev": {},
-            "tw_variants": {},
-            "tw_variants_rev": {},
-            "tw_variants_rev_phrases": {},
-            "hk_variants": {},
-            "hk_variants_rev": {},
-            "hk_variants_rev_phrases": {},
-            "jps_characters": {},
-            "jps_phrases": {},
-            "jp_variants": {},
-            "jp_variants_rev": {}
-        }"#;
-
-        let dictionary: Dictionary = serde_json::from_str(json).unwrap();
-
-        assert_eq!(dictionary.schema_version, 2);
-        assert!(dictionary.tw_variants_phrases.is_empty());
-        assert!(dictionary.hk_variants_phrases.is_empty());
-    }
-
-    #[test]
-    fn schema_3_japanese_chains_use_shinjitai_slots() {
-        let mut dictionary = Dictionary::default();
-        dictionary.schema_version = 3;
-        dictionary.jps_characters_rev = dict(&[("舊", "旧")]);
-        dictionary.jps_characters = dict(&[("旧", "舊")]);
-        dictionary.legacy_jp_variants = dict(&[("舊", "LEGACY")]);
-        dictionary.legacy_jp_variants_rev = dict(&[("旧", "LEGACY")]);
-        let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
-
-        assert_eq!(opencc.t2jp("舊", false), "旧");
-        assert_eq!(opencc.jp2t("旧", false), "舊");
-    }
-
-    #[test]
-    fn schema_2_japanese_chains_keep_legacy_fallbacks() {
-        let mut dictionary = Dictionary::default();
-        dictionary.schema_version = 2;
-        dictionary.legacy_jp_variants = dict(&[("舊", "旧")]);
-        dictionary.legacy_jp_variants_rev = dict(&[("旧", "舊")]);
-        let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
-
-        assert_eq!(opencc.t2jp("舊", false), "旧");
-        assert_eq!(opencc.jp2t("旧", false), "舊");
-    }
-
-    #[test]
-    fn schema_3_serialization_uses_only_new_jp_hk_slots() {
-        let mut dictionary = Dictionary::default();
-        dictionary.schema_version = 3;
-        let json = serde_json::to_string(&dictionary).unwrap();
-
-        assert!(json.contains("\"hk_phrases\""));
-        assert!(json.contains("\"hk_phrases_rev\""));
-        assert!(json.contains("\"jps_characters_rev\""));
-        assert!(!json.contains("\"jp_variants\""));
-        assert!(!json.contains("\"jp_variants_rev\""));
-    }
-
-    #[test]
-    fn bundled_dictionary_new_loads() {
-        let dictionary = Dictionary::new();
-        let json = serde_json::to_string(&dictionary).unwrap();
-
-        assert_eq!(dictionary.schema_version, 3);
-        assert!(!dictionary.st_characters.is_empty());
-        assert!(!dictionary.hk_phrases.is_empty());
-        assert!(!dictionary.hk_phrases_rev.is_empty());
-        assert!(!dictionary.jps_characters_rev.is_empty());
-        assert!(!json.contains("\"jp_variants\""));
-        assert!(!json.contains("\"jp_variants_rev\""));
-    }
-
-    #[test]
-    fn custom_dictionary_zstd_composes_with_jieba_user_dictionary() {
-        let dictionary_path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/dictionary_lib/dicts/dictionary.json.zst"
-        );
-        let user_dictionary_path = std::env::temp_dir().join(format!(
-            "opencc-jieba-rs-user-dict-{}.txt",
-            std::process::id()
-        ));
-        fs::write(&user_dictionary_path, "火星詞 100000 n\n").unwrap();
-
-        let mut custom_first = OpenCC::try_new_with_dictionary_zstd(dictionary_path).unwrap();
-        custom_first.load_user_dict(&user_dictionary_path).unwrap();
-        assert_eq!(custom_first.s2t("汉字", false), "漢字");
-        assert_eq!(custom_first.jieba_cut("火星詞", false), vec!["火星詞"]);
-
-        let mut jieba_first = OpenCC::try_new_with_user_dict_path(&user_dictionary_path).unwrap();
-        jieba_first.load_dictionary_zstd(dictionary_path).unwrap();
-        assert_eq!(jieba_first.s2t("汉字", false), "漢字");
-        assert_eq!(jieba_first.jieba_cut("火星詞", false), vec!["火星詞"]);
-
-        fs::remove_file(user_dictionary_path).unwrap();
-    }
-
-    #[test]
-    fn failed_custom_dictionary_load_preserves_current_dictionary() {
-        let invalid_path = std::env::temp_dir().join(format!(
-            "opencc-jieba-rs-invalid-dict-{}.zst",
-            std::process::id()
-        ));
-        fs::write(&invalid_path, b"not a zstd dictionary").unwrap();
-
-        let mut opencc = OpenCC::new();
-        let before = opencc.s2t("汉字", false);
-        let result = opencc.load_dictionary_zstd(&invalid_path);
-
-        assert!(matches!(result, Err(OpenccError::DictionaryDecode(_))));
-        assert_eq!(opencc.s2t("汉字", false), before);
-
-        fs::remove_file(invalid_path).unwrap();
-    }
-}
-
 /// Returns the maximum valid UTF-8 byte length for a string slice, ensuring no partial characters.
 ///
 /// This function is useful when you need to truncate a string to a maximum byte count
@@ -3846,4 +3612,258 @@ fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccErro
     }
 
     Ok(validated)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn dict(entries: &[(&str, &str)]) -> DictMap {
+        let mut map = DictMap::default();
+        for (from, to) in entries {
+            map.insert_with_len(
+                (*from).to_string(),
+                (*to).to_string(),
+                from.chars().count() as u16,
+            );
+        }
+        map
+    }
+
+    fn opencc_with_dictionary(dictionary: Dictionary, words: &[&str]) -> OpenCC {
+        let mut jieba = Jieba::new();
+        for word in words {
+            jieba.add_word(word, Some(100_000), Some("n"));
+        }
+
+        OpenCC {
+            jieba: Arc::new(jieba),
+            dictionary,
+        }
+    }
+
+    #[test]
+    fn tw_forward_variants_apply_phrases_before_characters() {
+        let dictionary = Dictionary {
+            tw_variants_phrases: dict(&[("純喫茶", "純喫茶")]),
+            tw_variants: dict(&[("喫", "吃")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["純喫茶"]);
+
+        assert_eq!(opencc.t2tw("純喫茶", false), "純喫茶");
+        assert_eq!(opencc.t2tw("喫", false), "吃");
+    }
+
+    #[test]
+    fn s2twp_combines_taiwan_dictionaries_in_second_round() {
+        let dictionary = Dictionary {
+            tw_phrases: dict(&[("甲", "乙")]),
+            tw_variants_phrases: dict(&[("甲", "丁")]),
+            tw_variants: dict(&[("乙", "丙")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        // Taiwan phrases have first priority within round 2, and their output
+        // is not fed through a separate Taiwan-variant round afterward.
+        assert_eq!(opencc.s2twp("甲", false), "乙");
+    }
+
+    #[test]
+    fn t2twp_uses_one_pass_with_dictionary_precedence() {
+        let dictionary = Dictionary {
+            tw_phrases: dict(&[("甲", "乙")]),
+            tw_variants_phrases: dict(&[("甲", "丁")]),
+            tw_variants: dict(&[("乙", "丙")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.t2twp("甲", false), "乙");
+    }
+
+    #[test]
+    fn tw2tp_uses_one_pass_with_dictionary_precedence() {
+        let dictionary = Dictionary {
+            tw_variants_rev: dict(&[("甲", "乙")]),
+            tw_variants_rev_phrases: dict(&[("甲", "丁")]),
+            tw_phrases_rev: dict(&[("甲", "戊"), ("乙", "丙")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.tw2tp("甲", false), "乙");
+    }
+
+    #[test]
+    fn hk_forward_variants_apply_phrases_before_characters() {
+        let dictionary = Dictionary {
+            hk_variants_phrases: dict(&[("無線新聞", "無綫新聞")]),
+            hk_variants: dict(&[("線", "綫")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["無線新聞"]);
+
+        assert_eq!(opencc.t2hk("無線新聞", false), "無綫新聞");
+        assert_eq!(opencc.t2hk("線", false), "綫");
+    }
+
+    #[test]
+    fn t2hkp_uses_one_pass_with_dictionary_precedence() {
+        let dictionary = Dictionary {
+            hk_phrases: dict(&[("甲", "乙")]),
+            hk_variants_phrases: dict(&[("甲", "丁")]),
+            hk_variants: dict(&[("乙", "丙")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.t2hkp("甲", false), "乙");
+    }
+
+    #[test]
+    fn hk2tp_uses_one_pass_with_dictionary_precedence() {
+        let dictionary = Dictionary {
+            hk_variants_rev_phrases: dict(&[("甲", "乙")]),
+            hk_variants_rev: dict(&[("甲", "丁")]),
+            hk_phrases_rev: dict(&[("甲", "戊"), ("乙", "丙")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["甲", "乙"]);
+
+        assert_eq!(opencc.hk2tp("甲", false), "乙");
+    }
+
+    #[test]
+    fn older_dictionary_json_defaults_new_forward_variant_phrase_slots() {
+        let json = r#"{
+            "schema_version": 2,
+            "st_characters": {},
+            "st_phrases": {},
+            "ts_characters": {},
+            "ts_phrases": {},
+            "tw_phrases": {},
+            "tw_phrases_rev": {},
+            "tw_variants": {},
+            "tw_variants_rev": {},
+            "tw_variants_rev_phrases": {},
+            "hk_variants": {},
+            "hk_variants_rev": {},
+            "hk_variants_rev_phrases": {},
+            "jps_characters": {},
+            "jps_phrases": {},
+            "jp_variants": {},
+            "jp_variants_rev": {}
+        }"#;
+
+        let dictionary: Dictionary = serde_json::from_str(json).unwrap();
+
+        assert_eq!(dictionary.schema_version, 2);
+        assert!(dictionary.tw_variants_phrases.is_empty());
+        assert!(dictionary.hk_variants_phrases.is_empty());
+    }
+
+    #[test]
+    fn schema_3_japanese_chains_use_shinjitai_slots() {
+        let dictionary = Dictionary {
+            schema_version: 3,
+            jps_characters_rev: dict(&[("舊", "旧")]),
+            jps_characters: dict(&[("旧", "舊")]),
+            legacy_jp_variants: dict(&[("舊", "LEGACY")]),
+            legacy_jp_variants_rev: dict(&[("旧", "LEGACY")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
+
+        assert_eq!(opencc.t2jp("舊", false), "旧");
+        assert_eq!(opencc.jp2t("旧", false), "舊");
+    }
+
+    #[test]
+    fn schema_2_japanese_chains_keep_legacy_fallbacks() {
+        let dictionary = Dictionary {
+            schema_version: 2,
+            legacy_jp_variants: dict(&[("舊", "旧")]),
+            legacy_jp_variants_rev: dict(&[("旧", "舊")]),
+            ..Default::default()
+        };
+        let opencc = opencc_with_dictionary(dictionary, &["舊", "旧"]);
+
+        assert_eq!(opencc.t2jp("舊", false), "旧");
+        assert_eq!(opencc.jp2t("旧", false), "舊");
+    }
+
+    #[test]
+    fn schema_3_serialization_uses_only_new_jp_hk_slots() {
+        let dictionary = Dictionary {
+            schema_version: 3,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&dictionary).unwrap();
+
+        assert!(json.contains("\"hk_phrases\""));
+        assert!(json.contains("\"hk_phrases_rev\""));
+        assert!(json.contains("\"jps_characters_rev\""));
+        assert!(!json.contains("\"jp_variants\""));
+        assert!(!json.contains("\"jp_variants_rev\""));
+    }
+
+    #[test]
+    fn bundled_dictionary_new_loads() {
+        let dictionary = Dictionary::new();
+        let json = serde_json::to_string(&dictionary).unwrap();
+
+        assert_eq!(dictionary.schema_version, 3);
+        assert!(!dictionary.st_characters.is_empty());
+        assert!(!dictionary.hk_phrases.is_empty());
+        assert!(!dictionary.hk_phrases_rev.is_empty());
+        assert!(!dictionary.jps_characters_rev.is_empty());
+        assert!(!json.contains("\"jp_variants\""));
+        assert!(!json.contains("\"jp_variants_rev\""));
+    }
+
+    #[test]
+    fn custom_dictionary_zstd_composes_with_jieba_user_dictionary() {
+        let dictionary_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/dictionary_lib/dicts/dictionary.json.zst"
+        );
+        let user_dictionary_path = std::env::temp_dir().join(format!(
+            "opencc-jieba-rs-user-dict-{}.txt",
+            std::process::id()
+        ));
+        fs::write(&user_dictionary_path, "火星詞 100000 n\n").unwrap();
+
+        let mut custom_first = OpenCC::try_new_with_dictionary_zstd(dictionary_path).unwrap();
+        custom_first.load_user_dict(&user_dictionary_path).unwrap();
+        assert_eq!(custom_first.s2t("汉字", false), "漢字");
+        assert_eq!(custom_first.jieba_cut("火星詞", false), vec!["火星詞"]);
+
+        let mut jieba_first = OpenCC::try_new_with_user_dict_path(&user_dictionary_path).unwrap();
+        jieba_first.load_dictionary_zstd(dictionary_path).unwrap();
+        assert_eq!(jieba_first.s2t("汉字", false), "漢字");
+        assert_eq!(jieba_first.jieba_cut("火星詞", false), vec!["火星詞"]);
+
+        fs::remove_file(user_dictionary_path).unwrap();
+    }
+
+    #[test]
+    fn failed_custom_dictionary_load_preserves_current_dictionary() {
+        let invalid_path = std::env::temp_dir().join(format!(
+            "opencc-jieba-rs-invalid-dict-{}.zst",
+            std::process::id()
+        ));
+        fs::write(&invalid_path, b"not a zstd dictionary").unwrap();
+
+        let mut opencc = OpenCC::new();
+        let before = opencc.s2t("汉字", false);
+        let result = opencc.load_dictionary_zstd(&invalid_path);
+
+        assert!(matches!(result, Err(OpenccError::DictionaryDecode(_))));
+        assert_eq!(opencc.s2t("汉字", false), before);
+
+        fs::remove_file(invalid_path).unwrap();
+    }
 }
