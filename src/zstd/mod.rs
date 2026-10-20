@@ -57,9 +57,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decompress_embedded_matches_original_and_has_valid_fcs() {
+    fn decompress_embedded_has_valid_dictionary_and_fcs() {
         let compressed = include_bytes!("../dictionary_lib/dicts/dictionary.json.zst");
-        let expected = include_bytes!("../dictionary_lib/dicts/dictionary.json");
 
         let mut decoder = FrameDecoder::new();
         decoder
@@ -70,15 +69,14 @@ mod tests {
 
         let decoded = decompress(compressed).expect("zstd decompression failed");
 
-        // The embedded Zstd artifact contains compact JSON, while the source
-        // dictionary JSON is pretty-printed. Compare their parsed JSON values.
+        // Only compressed runtime assets ship in the crate. Validate the
+        // decoded schema and representative mappings without source JSON.
+        let _: crate::dictionary_lib::Dictionary =
+            serde_json::from_slice(&decoded).expect("decompressed dictionary schema is invalid");
         let decoded_json: serde_json::Value =
             serde_json::from_slice(&decoded).expect("decompressed JSON is invalid");
-
-        let expected_json: serde_json::Value =
-            serde_json::from_slice(expected).expect("source dictionary JSON is invalid");
-
-        assert_eq!(decoded_json, expected_json);
+        assert_eq!(decoded_json["st_characters"]["map"]["汉"], "漢");
+        assert_eq!(decoded_json["ts_characters"]["map"]["漢"], "汉");
 
         // The FCS describes the actual decompressed (compact JSON) payload.
         assert_eq!(
@@ -91,7 +89,10 @@ mod tests {
     #[cfg(feature = "dictionary-build")]
     #[test]
     fn decompress_with_fcs_matches_original() {
-        let expected = include_bytes!("../dictionary_lib/dicts/dictionary.json");
+        // A self-contained payload keeps this roundtrip test runnable from
+        // the published crate, which excludes the plaintext source JSON.
+        let expected = "{\"汉字\":\"漢字\",\"message\":\"Zstandard roundtrip\"}".repeat(4096);
+        let expected = expected.as_bytes();
 
         // One-shot compression declares the uncompressed frame content size.
         let compressed = zstd::bulk::compress(expected, 3).expect("zstd compression failed");
@@ -106,6 +107,15 @@ mod tests {
         let decoded = decompress(&compressed).expect("zstd decompression failed");
 
         assert_eq!(decoded.as_slice(), expected);
+    }
+
+    #[cfg(feature = "dictionary-build")]
+    #[test]
+    fn decompress_embedded_matches_native_decoder() {
+        let compressed = include_bytes!("../dictionary_lib/dicts/dictionary.json.zst");
+        let expected =
+            ::zstd::stream::decode_all(compressed.as_slice()).expect("native decompression failed");
+        assert_eq!(decompress(compressed).unwrap(), expected);
     }
 }
 

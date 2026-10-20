@@ -560,17 +560,13 @@ mod tests {
     }
 
     #[test]
-    fn custom_build_dictionary_rejects_malformed_line() {
+    fn custom_build_dictionary_parser_rejects_malformed_line() {
         let path = temp_dict_path("malformed");
         fs::write(&path, "帕兰蒂尔\t柏蘭蒂爾\nmalformed-without-tab\n").unwrap();
 
-        let specs = [CustomDictFileSpec {
-            slot: DictSlot::STPhrases,
-            files: vec![path.clone()],
-            mode: CustomDictMode::Append,
-        }];
-
-        let result = Dictionary::from_dicts_with_custom_files(&specs);
+        // Exercise custom-input validation without loading base plaintext
+        // dictionaries, which are not shipped in the published crate.
+        let result = Dictionary::load_custom_dictionary_from_path(&path);
 
         let _ = fs::remove_file(&path);
 

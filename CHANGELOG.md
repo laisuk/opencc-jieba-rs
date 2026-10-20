@@ -41,6 +41,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Made vendored Zstandard decoder tests self-contained for published crate sources, which include compressed runtime
+  dictionaries but exclude the plaintext dictionary JSON.
 - Feature-gated dictionary-pack builders now return an I/O error when base source dictionaries cannot be read,
   matching their documented `io::Result` contract instead of panicking.
 
