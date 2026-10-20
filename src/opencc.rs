@@ -2444,6 +2444,7 @@ impl OpenCC {
     ///
     /// * `input` - UTF-8 Traditional Chinese text.
     /// * `punctuation` - Whether to normalize punctuation to the target Chinese writing style.
+    ///
     /// Note that this is **not a Japanese translation**—only character forms are
     /// converted.
     ///

@@ -231,11 +231,10 @@ impl Dictionary {
     /// - To use this function, clone the repository from GitHub and ensure the `dicts/` folder is present.
     ///
     /// # Errors
-    /// Panics if any file is missing or fails to load.
-    /// Returns the default [`Dictionary`] instance only if `.unwrap()` is replaced by fallible handling.
+    /// Returns an I/O error if any source file is missing or fails to load.
     ///
     #[cfg(feature = "dictionary-build")]
-    pub(crate) fn from_dicts() -> Self {
+    pub(crate) fn from_dicts() -> io::Result<Self> {
         let load = Self::load_dictionary_from_path;
 
         let files = [
@@ -282,12 +281,12 @@ impl Dictionary {
         jps_phrases,
         ]: [DictMap; 19] = files
             .into_iter()
-            .map(|f| load(f).unwrap())
-            .collect::<Vec<_>>()
+            .map(load)
+            .collect::<io::Result<Vec<_>>>()?
             .try_into()
             .unwrap();
 
-        Dictionary {
+        Ok(Dictionary {
             schema_version: SCHEMA_VERSION,
             st_characters,
             st_phrases,
@@ -310,7 +309,7 @@ impl Dictionary {
             jps_phrases,
             legacy_jp_variants: DictMap::default(),
             legacy_jp_variants_rev: DictMap::default(),
-        }
+        })
     }
 
     /// Returns a mutable reference to the conversion dictionary for a custom slot.
@@ -495,7 +494,7 @@ impl Dictionary {
     where
         P: AsRef<Path>,
     {
-        let mut dictionary = Self::from_dicts();
+        let mut dictionary = Self::from_dicts()?;
 
         for spec in specs {
             let dict = dictionary.custom_slot_mut(spec.slot);

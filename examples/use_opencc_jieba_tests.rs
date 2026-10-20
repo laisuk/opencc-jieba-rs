@@ -28,6 +28,7 @@ fn main() {
     println!("== Test 2: string config compatibility API ==");
 
     let by_name = opencc.convert(input, "s2twp", true);
+    assert_eq!(by_name, traditional);
 
     println!("Converted: {}", by_name);
     println!(
@@ -39,8 +40,10 @@ fn main() {
         }
     );
 
-    // Invalid string configs remain self-protected and report the error text.
+    // Validate external names with OpenccConfig::try_from before converting.
+    // The compatibility API returns invalid-config errors as output text.
     let invalid = opencc.convert(input, "what_is_this", false);
+    assert_eq!(invalid, "Invalid config: what_is_this");
     println!("Invalid config returned: {}", invalid);
 
     // ---------------------------------------------------------------------
@@ -104,6 +107,8 @@ fn main() {
     let custom_traditional = custom_opencc.convert_with_config(source, OpenccConfig::S2t, false);
     let custom_simplified =
         custom_opencc.convert_with_config(&custom_traditional, OpenccConfig::T2s, false);
+    assert_eq!(custom_traditional, "柏蘭蒂爾是一家軟體公司。");
+    assert_eq!(custom_simplified, source);
 
     println!("Source:      {}", source);
     println!("S2T custom:  {}", custom_traditional);
@@ -125,6 +130,7 @@ fn main() {
 
     let compat_source = "天龍八部書";
     let compat_normalized = opencc.normalize_compat(compat_source);
+    assert_eq!(compat_normalized, "天龍八部書");
 
     println!("Source:       {}", compat_source);
     println!("Norm compat:  {}", compat_normalized);
@@ -150,6 +156,7 @@ fn main() {
 
     let norm_ok = normalized == "天龍八部書裡的聽眾·聽聽奇美玉石瓶器音";
     let t2s_ok = simplified == "天龙八部书里的听众·听听奇美玉石瓶器音";
+    assert!(norm_ok && t2s_ok);
 
     println!("Source:         {}", extended_source);
     println!("Norm extended:  {}", normalized);
@@ -167,6 +174,7 @@ fn main() {
 
     let detofu_source = "骖𬴂";
     let detofued = opencc.detofu(detofu_source, DetofuLevel::ExtB);
+    assert_eq!(detofued, "骖騑");
 
     println!("Source:      {}", detofu_source);
     println!("DeTofu:      {}", detofued);

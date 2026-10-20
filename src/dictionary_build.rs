@@ -54,7 +54,7 @@ use std::path::Path;
 ///
 /// v0.8.0
 pub fn write_json_pretty(path: impl AsRef<Path>) -> io::Result<()> {
-    Dictionary::from_dicts().save_json(path, true)
+    Dictionary::from_dicts()?.save_json(path, true)
 }
 
 /// Generates a Zstandard-compressed JSON dictionary pack from the base
@@ -76,7 +76,7 @@ pub fn write_json_pretty(path: impl AsRef<Path>) -> io::Result<()> {
 ///
 /// v0.8.0
 pub fn write_zstd(path: impl AsRef<Path>) -> io::Result<()> {
-    Dictionary::from_dicts().save_json_compressed(path)
+    Dictionary::from_dicts()?.save_json_compressed(path)
 }
 
 /// Generates a pretty-printed JSON dictionary pack with custom conversion

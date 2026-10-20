@@ -34,8 +34,8 @@ conversion, with support for both segmentation and conversion dictionaries.
 
 ## Installation
 
-For the Rust library, see [Library Usage](#library-usage). To build the CLI tools from the repository
-(with a current stable Rust toolchain):
+For the Rust library, see [Library Usage](#library-usage). To build the CLI tools from the repository (with a current
+stable Rust toolchain):
 
 ```bash
 git clone https://github.com/laisuk/opencc-jieba-rs
@@ -239,6 +239,18 @@ fn main() {
 For configuration names supplied by users, parse with `OpenccConfig::try_from(name)` and handle the error before calling
 `convert_with_config`. The convenience `convert` method returns `"Invalid config: <config>"` as output text for an
 invalid configuration; it does not return a `Result`.
+
+Names are ASCII case-insensitive bare identifiers such as `s2t` or `T2HKP`. Whitespace and `.json` suffixes are not
+accepted. `OpenccConfig::ALL` lists all 20 configurations grouped by conversion family; use `to_ffi()` for numeric
+FFI values rather than an array index.
+
+Construct `OpenCC` once and reuse it across inputs. It implements `Send + Sync`, so an immutable converter can be shared
+between threads using `std::sync::Arc`. Dictionary updates require `&mut OpenCC`; Jieba updates use copy-on-write if
+the public `jieba` tokenizer is shared. Conversion mappings and Jieba segmentation dictionaries are independent.
+
+The `punctuation` flag controls the punctuation pass. Unicode compatibility normalization and DeTofu are separate,
+opt-in steps: normalize before conversion and apply DeTofu afterward when needed. Conversion is many-to-one in some
+directions, so converting back does not guarantee recovery of the original text.
 
 Segmentation and keyword extraction can also be used independently:
 

@@ -48,6 +48,10 @@
 //!
 //! ## Quick Start
 //!
+//! Construct a converter once and reuse it for multiple inputs. [`OpenCC`] is
+//! `Send + Sync`, so an immutable instance can also be shared between threads
+//! with [`std::sync::Arc`]. Dictionary updates require exclusive `&mut` access.
+//!
 //! ```rust
 //! let opencc = opencc_jieba_rs::OpenCC::new();
 //!
@@ -132,6 +136,8 @@
 //! When enabled, they normalize punctuation to the target Chinese writing style
 //! after text conversion. [`OpenCC::convert`] and [`OpenCC::convert_with_config`]
 //! honor the same option for every configuration.
+//! With `false`, punctuation is preserved by the punctuation pass; custom
+//! conversion mappings can still replace punctuation explicitly.
 //!
 //! ## User Dictionaries
 //!

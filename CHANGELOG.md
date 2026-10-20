@@ -34,6 +34,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   and the README. Existing public API signatures and dictionary schemas are unchanged.
 - Expanded crate-level usage examples for typed configurations, single-word Jieba additions, and DeTofu.
   docs.rs builds include the optional `dictionary_build` module; runtime users do not need to enable that feature.
+- Clarified configuration parsing and grouped iteration order versus numeric FFI values, converter reuse and thread
+  sharing, and the normalization/conversion/DeTofu pipeline in the public documentation.
+- Made the runnable API example fail on incorrect results and added public API contract coverage for all 20
+  configuration names, numeric FFI values, and typed/string/direct conversion dispatch.
+
+### Fixed
+
+- Feature-gated dictionary-pack builders now return an I/O error when base source dictionaries cannot be read,
+  matching their documented `io::Result` contract instead of panicking.
 
 ---
 

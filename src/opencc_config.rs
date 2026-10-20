@@ -137,8 +137,9 @@ impl OpenccConfig {
     /// - Case-insensitive parsing via [`OpenccConfig::parse`]
     /// - Validation helpers such as [`OpenccConfig::is_valid_config`]
     ///
-    /// The contents of this array are stable and reflect the same ordering
-    /// defined by the enum and its `#[repr(u32)]` FFI mapping.
+    /// Entries are grouped by conversion family, not sorted by numeric FFI
+    /// value. Use [`OpenccConfig::to_ffi`] rather than an array index when
+    /// passing a configuration to foreign code.
     ///
     /// # Since
     /// v0.7.3
@@ -309,7 +310,8 @@ impl OpenccConfig {
     ///
     /// The input string is matched against the canonical OpenCC configuration
     /// identifiers (e.g. `"s2t"`, `"t2s"`, `"s2tw"`). Matching is
-    /// **case-insensitive**.
+    /// **ASCII case-insensitive**. Names must be bare identifiers: whitespace
+    /// is not trimmed and a `.json` suffix is not accepted.
     ///
     /// If the input does not correspond to a supported configuration,
     /// `None` is returned.
@@ -343,8 +345,8 @@ impl OpenccConfig {
     /// - UI / config file validation
     /// - Preflight checks before calling conversion APIs
     ///
-    /// The check is case-insensitive and does **not** allocate on success paths
-    /// beyond the internal normalization already used by `TryFrom<&str>`.
+    /// The check is ASCII case-insensitive and does not allocate. Whitespace
+    /// and `.json` suffixes are not accepted, just as with [`OpenccConfig::parse`].
     ///
     /// # Examples
     ///
