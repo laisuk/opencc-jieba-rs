@@ -146,7 +146,7 @@ uint32_t opencc_jieba_abi_number(void);
  * The returned pointer is a UTF-8, null-terminated string valid for the
  * lifetime of the program. It must not be freed.
  *
- * Example: `"0.7.4-beta1"`
+ * Includes the C API build revision, for example `"0.8.1.1"`.
  *
  * @return Version string pointer.
  */
@@ -202,6 +202,34 @@ void opencc_jieba_delete(void *instance);
  * @param instance Instance previously returned by any `opencc_jieba_new*()` constructor.
  */
 void opencc_jieba_free(void *instance);
+
+/**
+ * @brief Adds or updates one Jieba word on an existing instance (since 0.8.1.1).
+ *
+ * @param instance Live, mutable instance returned by any `opencc_jieba_new*()`.
+ * @param word Required UTF-8, NUL-terminated word; empty or whitespace-containing
+ *             words are rejected.
+ * @param has_freq False selects automatic frequency (Rust None); true selects
+ *                 the exact frequency (Rust Some(freq)), including zero.
+ * @param freq Frequency used only when has_freq is true.
+ * @param tag Optional UTF-8, NUL-terminated POS tag. NULL selects Rust None;
+ *            any non-NULL tag selects Some(tag). Whitespace is rejected.
+ *
+ * Strings remain caller-owned and need only remain valid during the call.
+ * Callers must synchronize concurrent access to the same instance. Mutation
+ * must not race with conversion, segmentation, or any other instance access.
+ *
+ * @return true on success, clearing stale thread-local C API errors; false on
+ *         NULL instance/word, invalid UTF-8, or Rust validation failure, recording
+ *         details for `opencc_jieba_last_error()` on the calling thread.
+ */
+bool opencc_jieba_add_word(
+    void *instance,
+    const char *word,
+    bool has_freq,
+    size_t freq,
+    const char *tag
+);
 
 /* =========================================================================
  * Conversion

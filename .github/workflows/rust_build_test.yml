@@ -13,6 +13,22 @@ permissions:
   contents: read
 
 jobs:
+  native-capi:
+    name: C and C++17 API regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo +stable build -p opencc_jieba_capi --locked
+      - name: Compile and run against canonical headers
+        env:
+          LD_LIBRARY_PATH: target/debug
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -I capi/include capi/tests/add_word.c -L target/debug -lopencc_jieba_capi -o target/debug/add_word_c
+          c++ -std=c++17 -Wall -Wextra -Werror -I capi/include capi/tests/add_word.cpp -L target/debug -lopencc_jieba_capi -o target/debug/add_word_cpp
+          target/debug/add_word_c
+          target/debug/add_word_cpp
+
   msrv:
     name: Rust 1.75 tests
     runs-on: ubuntu-latest

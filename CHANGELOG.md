@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [C API 0.8.1.1] - 2026-10-23
+
+### Added
+
+- Added `opencc_jieba_add_word(instance, word, has_freq, freq, tag)` and C++17
+  `OpenccJiebaHelper::addWord()` for dynamic Jieba updates on an existing instance,
+  supporting automatic or explicit frequency (including zero) and optional POS tags.
+- Added regression coverage for validation, segmentation, repeated updates, and
+  thread-local errors. Callers must synchronize mutation with all instance access.
+
+### Changed
+
+- C API version strings include the build revision on all platforms (`0.8.1.1`).
+  Cargo retains version `0.8.1` with C API metadata revision `1`; the core Rust
+  version and C ABI number `1` are unchanged.
+
 ## [0.8.1] - 2026-10-21
 
 ### Added

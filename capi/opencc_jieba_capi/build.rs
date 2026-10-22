@@ -1,6 +1,5 @@
 // build.rs
 
-#[cfg(target_os = "windows")]
 fn read_capi_revision() -> u16 {
     use std::{env, fs, path::Path};
     use toml::Value;
@@ -38,10 +37,15 @@ fn pack_win_ver(major: u16, minor: u16, patch: u16, revision: u16) -> u64 {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    let revision = read_capi_revision();
+    println!(
+        "cargo:rustc-env=OPENCC_JIEBA_CAPI_VERSION={}.{}",
+        std::env::var("CARGO_PKG_VERSION").unwrap(),
+        revision
+    );
     #[cfg(target_os = "windows")]
     {
-        println!("cargo:rerun-if-changed=Cargo.toml");
-
         use std::env;
         use winres::{VersionInfo, WindowsResource};
 
@@ -57,7 +61,6 @@ fn main() {
             .unwrap()
             .parse()
             .unwrap();
-        let revision: u16 = read_capi_revision();
 
         let packed_u64 = pack_win_ver(major, minor, patch, revision);
 

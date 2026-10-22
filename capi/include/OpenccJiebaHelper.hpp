@@ -3,6 +3,7 @@
 #include "opencc_jieba_capi.h"
 
 #include <stdexcept>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -135,6 +136,28 @@ public:
     }
 
     ~OpenccJiebaHelper() noexcept { cleanup(); }
+
+    /**
+     * Adds or updates a word using the managed native instance (C++17).
+     * Omitted frequency is automatic; an explicit zero remains zero.
+     * Omitted tag is NULL; an explicitly empty tag remains present.
+     * Inputs must be UTF-8 without embedded NUL bytes.
+     * Returns false on native failure; inspect lastError() on the same thread.
+     * Callers must synchronize access: mutation must not race with conversion,
+     * segmentation, or any other access to this instance.
+     */
+    [[nodiscard]] bool addWord(
+        const std::string_view word,
+        const std::optional<std::size_t> freq = std::nullopt,
+        const std::optional<std::string_view> tag = std::nullopt
+    ) {
+        const std::string wordOwned(word);
+        const std::string tagOwned(tag.value_or(std::string_view{}));
+        return opencc_jieba_add_word(
+            instance_, wordOwned.c_str(), freq.has_value(), freq.value_or(0),
+            tag ? tagOwned.c_str() : nullptr
+        );
+    }
 
     // ---------------------------
     // Stateful conversion config
