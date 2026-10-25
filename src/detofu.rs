@@ -14,7 +14,7 @@
 //! A customizable [`DetofuMap`] stores only application-specific overrides, so
 //! creating one does not clone the built-in table.
 
-use rustc_hash::FxHashMap;
+use crate::rustc_hash::FxHashMap;
 use std::path::Path;
 use std::sync::OnceLock;
 

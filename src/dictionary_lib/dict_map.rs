@@ -1,4 +1,4 @@
-use rustc_hash::{FxHashMap, FxHashSet};
+use crate::rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 /// Represents a single OpenCC-style dictionary table with

@@ -2282,7 +2282,7 @@ mod add_word_tests {
                 CStr::from_ptr(opencc_jieba_version_string())
                     .to_str()
                     .unwrap(),
-                "0.8.1.1"
+                env!("OPENCC_JIEBA_CAPI_VERSION")
             );
             assert_eq!(opencc_jieba_abi_number(), 1);
             opencc_jieba_delete(instance);

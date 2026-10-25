@@ -9,7 +9,7 @@ members = [
 
 [package]
 name = "opencc-jieba-rs"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 authors = ["Laisuk Lai <laisuk@yahoo.com>"]
 description = "High-performance Chinese text conversion and segmentation using Jieba and OpenCC-style dictionaries."
@@ -32,6 +32,9 @@ include = [
     "dicts/LICENSE",
     "src/zstd/NOTICE.md",
     "src/zstd/LICENSE-RUZSTD",
+    "src/rustc_hash/LICENSE-MIT",
+    "src/rustc_hash/LICENSE-APACHE",
+    "src/rustc_hash/VENDOR_NOTES.md",
     "MSRV-1.75.0-GUIDE.md",
     "/LICENSE"
 ]
@@ -50,7 +53,6 @@ zstd = { version = "0.14", optional = true }
 # Older toolchains may require a locked dependency graph; see MSRV-1.75.0-GUIDE.md.
 rayon = "=1.10"
 rayon-core = "=1.12.1"
-rustc-hash = "=2.1.1"
 
 # Keep include-flate at 0.3.0 for Edition 2021 / MSRV compatibility.
 # Do not pin libflate directly; include-flate depends on libflate ^2.0,

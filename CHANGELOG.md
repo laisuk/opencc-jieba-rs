@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.2] - Unreleased
+
+### Changed
+
+- Replaced the external `rustc-hash` dependency with a private vendored module adapted from rustc-hash 2.1.3,
+  ported from `opencc-fmmseg` with Rust 1.75 compatibility. Internal maps and sets use the vendored Fx hasher;
+  public APIs and serialized dictionary schemas are unchanged. Bundled upstream licenses and vendoring notes.
+
+---
+
 ## [C API 0.8.1.1] - 2026-10-23
 
 ### Added

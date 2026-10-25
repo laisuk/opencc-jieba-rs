@@ -58,7 +58,22 @@ provided separately by the optional `zstd` dependency when the `dictionary-build
 
 ---
 
-## 4) How to Report Attribution Issues
+## 4) rustc-hash — Vendored Fx Hasher
+
+**Component:** Private hashing module adapted from rustc-hash 2.1.3, ported from opencc-fmmseg.
+
+**Upstream:** [rustc-hash](https://github.com/rust-lang/rustc-hash)
+
+**License:** MIT OR Apache-2.0
+
+**Files in this distribution:** `src/rustc_hash/`
+
+**License and adaptation notes:** `src/rustc_hash/LICENSE-MIT`, `src/rustc_hash/LICENSE-APACHE`,
+and `src/rustc_hash/VENDOR_NOTES.md`.
+
+---
+
+## 5) How to Report Attribution Issues
 
 If you believe any attribution or license terms are missing or incorrect, please open an issue with details so we can
 correct it promptly.

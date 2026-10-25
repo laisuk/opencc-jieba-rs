@@ -1,11 +1,11 @@
 [package]
 name = "opencc_jieba_capi"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 
 [package.metadata.capi]
 # Fourth component of the C API release version: 0.8.1.1.
-revision = 1
+revision = 0
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
