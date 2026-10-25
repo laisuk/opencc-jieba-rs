@@ -2,6 +2,7 @@
 
 #include "opencc_jieba_capi.h"
 
+#include <memory>
 #include <stdexcept>
 #include <optional>
 #include <string>
@@ -88,21 +89,24 @@ public:
     //
     // Throws std::runtime_error if native construction fails.
     OpenccJiebaHelper()
-        : instance_(createDefault()) {}
+        : instance_(createDefault()) {
+    }
 
     /**
      * Creates an OpenCC-Jieba instance with custom Jieba user-dictionary
      * entries and the built-in OpenCC conversion dictionaries.
      */
     explicit OpenccJiebaHelper(const std::vector<UserDictEntry> &entries)
-        : instance_(createWithUserDict(entries)) {}
+        : instance_(createWithUserDict(entries)) {
+    }
 
     /**
      * Creates an OpenCC-Jieba instance with the built-in Jieba dictionary and
      * custom OpenCC conversion dictionaries.
      */
     explicit OpenccJiebaHelper(const std::vector<CustomDictSpec> &specs)
-        : instance_(createWithCustomDicts(specs)) {}
+        : instance_(createWithCustomDicts(specs)) {
+    }
 
     /**
      * Creates an OpenCC-Jieba instance with both custom Jieba segmentation
@@ -115,15 +119,18 @@ public:
         const std::vector<UserDictEntry> &entries,
         const std::vector<CustomDictSpec> &specs
     )
-        : instance_(createWithUserDictAndCustom(entries, specs)) {}
+        : instance_(createWithUserDictAndCustom(entries, specs)) {
+    }
 
     OpenccJiebaHelper(const OpenccJiebaHelper &) = delete;
+
     OpenccJiebaHelper &operator=(const OpenccJiebaHelper &) = delete;
 
     OpenccJiebaHelper(OpenccJiebaHelper &&other) noexcept
         : instance_(std::exchange(other.instance_, nullptr)),
           config_(std::move(other.config_)),
-          punctuationEnabled_(other.punctuationEnabled_) {}
+          punctuationEnabled_(other.punctuationEnabled_) {
+    }
 
     OpenccJiebaHelper &operator=(OpenccJiebaHelper &&other) noexcept {
         if (this != &other) {
@@ -149,8 +156,8 @@ public:
     [[nodiscard]] bool addWord(
         const std::string_view word,
         const std::optional<std::size_t> freq = std::nullopt,
-        const std::optional<std::string_view> tag = std::nullopt
-    ) {
+        const std::optional<std::string_view> &tag = std::nullopt
+    ) const {
         const std::string wordOwned(word);
         const std::string tagOwned(tag.value_or(std::string_view{}));
         return opencc_jieba_add_word(
@@ -205,6 +212,23 @@ public:
         return convertByName(input, config, punctuation);
     }
 
+    // Input must be NUL-terminated UTF-8 and remain alive for the entire call.
+    // No intermediate input string is allocated or copied.
+    // Null and empty input return an empty result without calling the C API.
+    [[nodiscard]] std::string convert_cstr(const char *input) const {
+        return convert_cstr(input, config_, punctuationEnabled_);
+    }
+
+    // Converts with an explicit config without changing the stored state.
+    [[nodiscard]] std::string convert_cstr(
+        const char *input,
+        const std::string_view config,
+        const bool punctuation = false
+    ) const {
+        if (!input || *input == '\0') return {};
+        return convertByNameCstr(input, config, punctuation);
+    }
+
     // Checks whether input appears Simplified or Traditional Chinese.
     //
     // Returns:
@@ -243,12 +267,7 @@ public:
         if (input.empty()) return {};
 
         const std::string in(input);
-        char *output = opencc_jieba_detofu(instance_, in.c_str(), level);
-        if (!output) return takeLastErrorText();
-
-        std::string result(output);
-        opencc_jieba_free_string(output);
-        return result;
+        return takeNativeString(opencc_jieba_detofu(instance_, in.c_str(), level));
     }
 
     // ---------------------------
@@ -297,14 +316,8 @@ public:
         const std::string in(input);
         const std::string delim(delimiter);
 
-        char *output =
-            opencc_jieba_cut_and_join(instance_, in.c_str(), hmm, delim.c_str());
-
-        if (!output) return takeLastErrorText();
-
-        std::string result(output);
-        opencc_jieba_free_string(output);
-        return result;
+        return takeNativeString(
+            opencc_jieba_cut_and_join(instance_, in.c_str(), hmm, delim.c_str()));
     }
 
     [[nodiscard]] std::vector<Tag> tag(
@@ -331,8 +344,7 @@ public:
 
             opencc_jieba_free_tag_array(array);
             return result;
-        }
-        catch (...) {
+        } catch (...) {
             opencc_jieba_free_tag_array(array);
             throw;
         }
@@ -353,7 +365,7 @@ public:
         const std::string methodOwned(method);
 
         char **result =
-            opencc_jieba_keywords(instance_, in.c_str(), topK, methodOwned.c_str());
+                opencc_jieba_keywords(instance_, in.c_str(), topK, methodOwned.c_str());
 
         return extractStringArray(result);
     }
@@ -416,12 +428,9 @@ public:
     //
     // Call on the same thread immediately after a failed C API call.
     [[nodiscard]] static std::string lastError() {
-        char *err = opencc_jieba_last_error();
-        if (!err) return {};
-
-        std::string result(err);
-        opencc_jieba_free_string(err);
-        return result;
+        const std::unique_ptr<char, decltype(&opencc_jieba_free_string)> err(
+            opencc_jieba_last_error(), opencc_jieba_free_string);
+        return err ? std::string(err.get()) : std::string{};
     }
 
     static void clearLastError() noexcept {
@@ -476,11 +485,11 @@ private:
         std::vector<OpenccJiebaUserDictEntry> ffiEntries;
         ffiEntries.reserve(entries.size());
 
-        for (const UserDictEntry &entry : entries) {
+        for (const auto &[word, freq, tag]: entries) {
             ffiEntries.push_back({
-                entry.word.c_str(),
-                entry.freq,
-                entry.tag.empty() ? nullptr : entry.tag.c_str(),
+                word.c_str(),
+                freq,
+                tag.empty() ? nullptr : tag.c_str(),
             });
         }
 
@@ -501,19 +510,19 @@ private:
         );
     }
 
-    [[nodiscard]] static std::vector<std::vector<OpenccJiebaCustomPair>>
+    [[nodiscard]] static std::vector<std::vector<OpenccJiebaCustomPair> >
     buildCustomPairArrays(const std::vector<CustomDictSpec> &specs) {
-        std::vector<std::vector<OpenccJiebaCustomPair>> ffiPairArrays;
+        std::vector<std::vector<OpenccJiebaCustomPair> > ffiPairArrays;
         ffiPairArrays.reserve(specs.size());
 
-        for (const CustomDictSpec &spec : specs) {
+        for (const CustomDictSpec &spec: specs) {
             std::vector<OpenccJiebaCustomPair> ffiPairs;
             ffiPairs.reserve(spec.pairs.size());
 
-            for (const CustomPair &pair : spec.pairs) {
+            for (const auto &[source, target]: spec.pairs) {
                 ffiPairs.push_back({
-                    pair.source.c_str(),
-                    pair.target.c_str(),
+                    source.c_str(),
+                    target.c_str(),
                 });
             }
 
@@ -526,7 +535,7 @@ private:
     [[nodiscard]] static std::vector<OpenccJiebaCustomDictSpec>
     buildCustomSpecFfi(
         const std::vector<CustomDictSpec> &specs,
-        const std::vector<std::vector<OpenccJiebaCustomPair>> &ffiPairArrays
+        const std::vector<std::vector<OpenccJiebaCustomPair> > &ffiPairArrays
     ) {
         std::vector<OpenccJiebaCustomDictSpec> ffiSpecs;
         ffiSpecs.reserve(specs.size());
@@ -579,22 +588,31 @@ private:
         );
     }
 
+    // Always release native strings, including when the owning copy throws.
+    [[nodiscard]] static std::string takeNativeString(char *raw) {
+        const std::unique_ptr<char, decltype(&opencc_jieba_free_string)> output(
+            raw, opencc_jieba_free_string);
+        if (!output) return takeLastErrorText();
+        return {output.get()};
+    }
+
     [[nodiscard]] std::string convertByName(
         const std::string_view input,
         const std::string_view config,
         const bool punctuation
     ) const {
         const std::string in(input);
+        return convertByNameCstr(in.c_str(), config, punctuation);
+    }
+
+    [[nodiscard]] std::string convertByNameCstr(
+        const char *input,
+        const std::string_view config,
+        const bool punctuation
+    ) const {
         const std::string cfg(config);
-
-        char *output =
-            opencc_jieba_convert(instance_, in.c_str(), cfg.c_str(), punctuation);
-
-        if (!output) return takeLastErrorText();
-
-        std::string result(output);
-        opencc_jieba_free_string(output);
-        return result;
+        return takeNativeString(
+            opencc_jieba_convert(instance_, input, cfg.c_str(), punctuation));
     }
 
     [[nodiscard]] std::string transformString(
@@ -602,13 +620,7 @@ private:
         const StringTransformFn fn
     ) const {
         const std::string in(input);
-        char *output = fn(instance_, in.c_str());
-
-        if (!output) return takeLastErrorText();
-
-        std::string result(output);
-        opencc_jieba_free_string(output);
-        return result;
+        return takeNativeString(fn(instance_, in.c_str()));
     }
 
     [[nodiscard]] static std::vector<std::string>
@@ -624,8 +636,7 @@ private:
 
             opencc_jieba_free_string_array(array);
             return result;
-        }
-        catch (...) {
+        } catch (...) {
             opencc_jieba_free_string_array(array);
             throw;
         }
@@ -648,25 +659,25 @@ private:
         double *weights = nullptr;
 
         const int32_t code = posOwned.empty()
-            ? opencc_jieba_keywords_and_weights(
-                instance_,
-                in.c_str(),
-                topK,
-                methodOwned.c_str(),
-                &len,
-                &keywords,
-                &weights
-            )
-            : opencc_jieba_keywords_and_weights_pos(
-                instance_,
-                in.c_str(),
-                topK,
-                methodOwned.c_str(),
-                posOwned.c_str(),
-                &len,
-                &keywords,
-                &weights
-            );
+                                 ? opencc_jieba_keywords_and_weights(
+                                     instance_,
+                                     in.c_str(),
+                                     topK,
+                                     methodOwned.c_str(),
+                                     &len,
+                                     &keywords,
+                                     &weights
+                                 )
+                                 : opencc_jieba_keywords_and_weights_pos(
+                                     instance_,
+                                     in.c_str(),
+                                     topK,
+                                     methodOwned.c_str(),
+                                     posOwned.c_str(),
+                                     &len,
+                                     &keywords,
+                                     &weights
+                                 );
 
         if (code != 0) {
             std::string error = takeLastErrorText();
@@ -689,8 +700,7 @@ private:
 
             opencc_jieba_free_keywords_and_weights(keywords, weights, len);
             return result;
-        }
-        catch (...) {
+        } catch (...) {
             opencc_jieba_free_keywords_and_weights(keywords, weights, len);
             throw;
         }
