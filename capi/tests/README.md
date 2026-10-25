@@ -12,7 +12,10 @@ LD_LIBRARY_PATH=target/debug target/debug/add_word_cpp
 ```
 
 The C API release version combines Cargo's three-component package version with
-`package.metadata.capi.revision`, currently `0.8.1.1`. Cargo.lock therefore retains
-`0.8.1`. Windows resources and `opencc_jieba_version_string()` report the combined
-version. The release workflow accepts four-component `v*` tags and packages both
-canonical headers; use `v0.8.1.1` for this C API release. ABI number remains `1`.
+`package.metadata.capi.revision` as a fourth component (including revision zero).
+Cargo.lock retains the three-component package version. Windows resources and
+`opencc_jieba_version_string()` report the combined version. The C regression
+checks the four-component numeric format and ABI number `1`, so package version
+and revision updates do not require changing the test. Rust unit tests check the
+exact version against the build metadata. The release workflow accepts
+four-component `v*` tags and packages both canonical headers.
