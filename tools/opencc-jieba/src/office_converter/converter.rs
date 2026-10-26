@@ -22,7 +22,9 @@
 //! ## I/O model
 //!
 //! File conversion streams from the input package to a temporary output file and
-//! atomically replaces the destination after validating the rebuilt ZIP archive.
+//! replaces the destination after validating the rebuilt ZIP archive. Replacement
+//! is atomic on Unix; Windows uses the standard library native replacement without
+//! an atomicity guarantee. Neither platform deletes the destination first.
 //! [`OfficeConverter::convert_bytes`] provides the same semantics for callers that
 //! already own package bytes in memory.
 //!
@@ -601,99 +603,93 @@ impl OfficeConverter {
 
 /* ---------- Helper Functions ---------- */
 
-/// Remove an existing file if present, handling Windows read-only flags.
-fn remove_existing_file(path: &Path) -> io::Result<()> {
-    if !path.exists() {
-        return Ok(());
-    }
-    if path.is_dir() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("output_path is a directory: {:?}", path),
-        ));
-    }
+/// Owns only a file successfully created with `create_new`. Failed creation never
+/// installs a guard, so a collision cannot cause another operation's file removal.
+struct TempOutput {
+    path: PathBuf,
+    committed: bool,
+}
 
-    #[cfg(windows)]
-    if let Ok(meta) = fs::metadata(path) {
-        let mut perms = meta.permissions();
-        if perms.readonly() {
-            // Windows only: clears the read-only attribute, not NTFS ACLs.
-            #[allow(clippy::permissions_set_readonly_false)]
-            perms.set_readonly(false);
-            fs::set_permissions(path, perms)?;
+impl TempOutput {
+    fn create(final_out: &Path) -> io::Result<(Self, File)> {
+        use std::collections::hash_map::RandomState;
+        use std::hash::BuildHasher;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let parent = final_out
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        // RandomState supplies independently seeded names; the counter also separates
+        // calls within a process. Exclusive creation, not randomness, ensures ownership.
+        let random = RandomState::new();
+        for _ in 0..128 {
+            let nonce = random.hash_one((std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            let path = parent.join(format!(".opencc-{nonce:016x}.tmp"));
+            match fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(file) => {
+                    return Ok((
+                        Self {
+                            path,
+                            committed: false,
+                        },
+                        file,
+                    ))
+                }
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(e),
+            }
         }
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "could not allocate a unique output temporary file",
+        ))
     }
 
-    match fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+    fn replace(&mut self, final_out: &Path) -> io::Result<()> {
+        OfficeConverter::validate_zip_file(&self.path)?;
+        // Unix: same-filesystem rename atomically replaces the directory entry,
+        // including read-only files when directory permissions allow it.
+        // Windows: std uses native replacement (MoveFileExW on Rust 1.75).
+        // Read-only destinations and sharing/ACL failures propagate unchanged;
+        // attributes are never cleared. No delete/copy fallback is attempted here.
+        // Windows/filesystem-specific atomicity is not guaranteed. Neither this
+        // rename nor ZIP validation provides power-loss durability (no fsync).
+        fs::rename(&self.path, final_out)?;
+        self.committed = true;
+        Ok(())
     }
 }
 
-/// Write to a temp file then atomically replace the final path.
-///
-/// Ensures no partial/corrupted output if interrupted.
-///
-/// On failure, the temp file is removed best-effort so stale
-/// `*.tmp.<ext>` files do not accumulate.
+impl Drop for TempOutput {
+    fn drop(&mut self) {
+        if !self.committed {
+            // Best effort: cleanup itself can fail if directory permissions change.
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+/// Finish and close the ZIP before validation and replacement. Declaring the
+/// guard before the writer ensures the file handle closes before cleanup on errors
+/// or unwinding, including on Windows.
 fn replace_with_temp(
     final_out: &Path,
     write_zip: impl FnOnce(&mut ZipWriter<File>) -> io::Result<()>,
 ) -> io::Result<()> {
-    struct TempFileGuard {
-        path: PathBuf,
-        committed: bool,
-    }
-
-    impl TempFileGuard {
-        #[inline]
-        fn new(path: PathBuf) -> Self {
-            Self {
-                path,
-                committed: false,
-            }
-        }
-
-        #[inline]
-        fn commit(&mut self) {
-            self.committed = true;
-        }
-    }
-
-    impl Drop for TempFileGuard {
-        fn drop(&mut self) {
-            if !self.committed {
-                let _ = fs::remove_file(&self.path);
-            }
-        }
-    }
-
-    let ext = final_out
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("zip");
-    let tmp_out = final_out.with_extension(format!("tmp.{}", ext));
-
-    let _ = remove_existing_file(&tmp_out);
-
-    let mut guard = TempFileGuard::new(tmp_out.clone());
-
+    let (mut guard, zip_file) = TempOutput::create(final_out)?;
     {
-        let zip_file = File::create(&tmp_out)?;
         let mut zw = ZipWriter::new(zip_file);
         write_zip(&mut zw)?;
-        zw.finish()?;
+        drop(zw.finish()?);
     }
-
-    OfficeConverter::validate_zip_file(&tmp_out)?;
-
-    remove_existing_file(final_out)?;
-    fs::rename(&tmp_out, final_out)?;
-
-    guard.commit();
-
-    Ok(())
+    guard.replace(final_out)
 }
 
 #[cfg(test)]
@@ -704,6 +700,238 @@ mod tests {
         write::{ExtendedFileOptions, FileOptions},
         CompressionMethod, ZipArchive, ZipWriter,
     };
+
+    struct TestDirectory(PathBuf);
+
+    impl TestDirectory {
+        fn new() -> Self {
+            use std::collections::hash_map::RandomState;
+            use std::hash::BuildHasher;
+            loop {
+                let path = std::env::temp_dir().join(format!(
+                    "opencc-output-test-{:016x}",
+                    RandomState::new().hash_one(std::process::id())
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Self(path),
+                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                    Err(e) => panic!("create test directory: {e}"),
+                }
+            }
+        }
+
+        fn assert_entries(&self, expected: usize) {
+            assert_eq!(fs::read_dir(&self.0).unwrap().count(), expected);
+        }
+    }
+
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn write_test_zip(writer: &mut ZipWriter<File>) -> io::Result<()> {
+        let options: FileOptions<'_, ExtendedFileOptions> = FileOptions::default();
+        writer.start_file("word/document.xml", options)?;
+        writer.write_all(b"converted")
+    }
+
+    #[test]
+    fn path_conversion_creates_and_replaces_destination() {
+        let dir = TestDirectory::new();
+        let input = dir.0.join("input.docx");
+        let output = dir.0.join("output.docx");
+        fs::write(&input, make_zip(&[("word/document.xml", b"original")])).unwrap();
+        let converter = TextConverter::new(|text: &str| text.replace("original", "converted"));
+        for _ in 0..2 {
+            OfficeConverter::convert(
+                input.to_str().unwrap(),
+                output.to_str().unwrap(),
+                "docx",
+                false,
+                &converter,
+            )
+            .unwrap();
+            assert_eq!(
+                read_zip_entry(&fs::read(&output).unwrap(), "word/document.xml"),
+                "converted"
+            );
+            dir.assert_entries(2);
+            fs::write(&output, b"old destination").unwrap();
+        }
+    }
+
+    #[test]
+    fn zip_generation_failure_preserves_destination_and_cleans_temp() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::write(&output, b"original").unwrap();
+        let error = replace_with_temp(&output, |writer| {
+            write_test_zip(writer)?;
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "injected write failure",
+            ))
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("injected write failure"));
+        assert_eq!(fs::read(&output).unwrap(), b"original");
+        dir.assert_entries(1);
+    }
+
+    #[test]
+    fn invalid_temp_zip_preserves_destination_and_cleans_temp() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::write(&output, b"original").unwrap();
+        let temp_path;
+        {
+            let (mut guard, mut file) = TempOutput::create(&output).unwrap();
+            temp_path = guard.path.clone();
+            file.write_all(b"invalid ZIP").unwrap();
+            drop(file);
+            assert!(guard.replace(&output).is_err());
+            assert!(!guard.committed);
+        }
+        assert!(!temp_path.exists());
+        assert_eq!(fs::read(&output).unwrap(), b"original");
+        dir.assert_entries(1);
+    }
+
+    #[test]
+    fn replacement_failure_preserves_destination_and_cleans_temp() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::create_dir(&output).unwrap();
+        fs::write(output.join("original"), b"original").unwrap();
+        assert!(replace_with_temp(&output, write_test_zip).is_err());
+        assert_eq!(fs::read(output.join("original")).unwrap(), b"original");
+        dir.assert_entries(1);
+    }
+
+    #[test]
+    fn concurrent_temp_files_are_exclusive_and_owned() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        // Keep all guards alive until every thread has allocated its file.
+        let barrier = std::sync::Barrier::new(16);
+        let paths = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..16)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let (guard, mut file) = TempOutput::create(&output).unwrap();
+                        let path = guard.path.clone();
+                        assert_eq!(path.parent(), output.parent());
+                        file.write_all(path.to_str().unwrap().as_bytes()).unwrap();
+                        barrier.wait();
+                        assert_eq!(fs::read(&path).unwrap(), path.to_str().unwrap().as_bytes());
+                        drop(file);
+                        drop(guard);
+                        path
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .collect::<std::collections::HashSet<_>>()
+        });
+        assert_eq!(paths.len(), 16);
+        dir.assert_entries(0);
+    }
+
+    #[test]
+    fn generation_panic_cleans_temp_and_preserves_destination() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::write(&output, b"original").unwrap();
+        assert!(std::panic::catch_unwind(|| {
+            let _ = replace_with_temp(&output, |_| panic!("injected panic"));
+        })
+        .is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"original");
+        dir.assert_entries(1);
+    }
+
+    #[test]
+    fn path_conversion_rejects_same_file() {
+        let dir = TestDirectory::new();
+        let input = dir.0.join("input.docx");
+        let original = make_zip(&[("word/document.xml", b"original")]);
+        fs::write(&input, &original).unwrap();
+        let alias = dir.0.join(".").join("input.docx");
+        let converter = TextConverter::new(|text: &str| text.to_owned());
+        for output in [&input, &alias] {
+            let result = OfficeConverter::convert(
+                input.to_str().unwrap(),
+                output.to_str().unwrap(),
+                "docx",
+                false,
+                &converter,
+            );
+            assert!(matches!(result, Err(e) if e.kind() == io::ErrorKind::InvalidInput));
+        }
+        assert_eq!(fs::read(&input).unwrap(), original);
+        dir.assert_entries(1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_readonly_destination_is_preserved() {
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::write(&output, b"original").unwrap();
+        let original_permissions = fs::metadata(&output).unwrap().permissions();
+        let mut permissions = original_permissions.clone();
+        permissions.set_readonly(true);
+        fs::set_permissions(&output, permissions).unwrap();
+        let result = replace_with_temp(&output, write_test_zip);
+        let still_readonly = fs::metadata(&output).unwrap().permissions().readonly();
+        fs::set_permissions(&output, original_permissions).unwrap();
+        assert!(result.is_err());
+        assert!(still_readonly);
+        assert_eq!(fs::read(&output).unwrap(), b"original");
+        dir.assert_entries(1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_sharing_failure_preserves_destination() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        fs::write(&output, b"original").unwrap();
+        let locked = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1)
+            .open(&output)
+            .unwrap();
+        assert!(replace_with_temp(&output, write_test_zip).is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"original");
+        drop(locked);
+        dir.assert_entries(1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_readonly_file_can_be_replaced_without_modifying_old_inode() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = TestDirectory::new();
+        let output = dir.0.join("output.docx");
+        let alias = dir.0.join("old-inode");
+        fs::write(&output, b"original").unwrap();
+        fs::hard_link(&output, &alias).unwrap();
+        fs::set_permissions(&output, fs::Permissions::from_mode(0o444)).unwrap();
+        replace_with_temp(&output, write_test_zip).unwrap();
+        assert_eq!(fs::read(&alias).unwrap(), b"original");
+        assert_eq!(
+            fs::metadata(&alias).unwrap().permissions().mode() & 0o777,
+            0o444
+        );
+        OfficeConverter::validate_zip_file(&output).unwrap();
+        dir.assert_entries(2);
+    }
 
     fn make_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut input_cursor = Cursor::new(Vec::<u8>::new());
