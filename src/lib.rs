@@ -305,6 +305,7 @@ mod compat_ideographs;
 mod detofu;
 #[cfg(feature = "dictionary-build")]
 pub mod dictionary_build;
+pub(crate) mod jieba_rs;
 mod rustc_hash;
 mod unicode_compat;
 #[allow(clippy::upper_case_acronyms)]

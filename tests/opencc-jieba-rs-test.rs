@@ -431,7 +431,12 @@ mod tests {
         let opencc = OpenCC::try_new_with_user_dict_path("tests/dicts/user_dict.txt")
             .unwrap_or_else(|e| panic!("failed to initialize OpenCC with user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|token| token.word)
+            .collect();
 
         println!("{:?}", result);
 
@@ -455,7 +460,12 @@ mod tests {
             .load_user_dict("tests/dicts/user_dict2.txt")
             .unwrap_or_else(|e| panic!("failed to load second user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|token| token.word)
+            .collect();
 
         println!("{:?}", result);
 

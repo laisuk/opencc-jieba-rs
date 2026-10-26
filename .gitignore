@@ -5,3 +5,7 @@
 .venv/
 
 Cargo.toml.orig
+
+# Python bytecode
+__pycache__/
+*.py[cod]

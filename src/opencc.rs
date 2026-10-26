@@ -1,11 +1,11 @@
 use crate::dictionary_lib::{
     CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictMap, Dictionary,
 };
+use crate::jieba_rs::{Jieba, Keyword, Token};
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
 use crate::zstd::decompress;
 use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
-use jieba_rs::{Jieba, Keyword};
 use rayon::prelude::*;
 use regex::Regex;
 use std::borrow::Cow;
@@ -18,7 +18,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
 
-const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
+pub(crate) const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
 /// Master delimiter string containing all punctuation and whitespace treated
 /// as token boundaries by OpenCC-Jieba.
@@ -1228,7 +1228,8 @@ impl OpenCC {
     ) {
         let tokens = self.jieba.cut(chunk, hmm);
 
-        'tok: for phrase in tokens {
+        'tok: for token in tokens {
+            let phrase = token.word;
             if phrase.is_empty() {
                 continue 'tok;
             }
@@ -1504,13 +1505,15 @@ impl OpenCC {
     ///   `split_string_ranges()`.
     fn phrases_cut_impl<F>(&self, input: &str, use_parallel: bool, cutter: F) -> Vec<String>
     where
-        F: for<'a> Fn(&Jieba, &'a str) -> Vec<&'a str> + Sync + Send,
+        F: for<'a> Fn(&Jieba, &'a str) -> Vec<Token<'a>> + Sync + Send,
     {
         let ranges = self.split_string_ranges(input, true);
 
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
-            cutter(&self.jieba, chunk).into_iter().map(str::to_owned)
+            cutter(&self.jieba, chunk)
+                .into_iter()
+                .map(|token| token.word.to_owned())
         };
 
         if use_parallel {
