@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::io::{self, BufRead};
@@ -9,12 +10,17 @@ use super::{Keyword, KeywordExtract, KeywordExtractConfig, KeywordExtractConfigB
 use crate::jieba_rs::FxHashMap as HashMap;
 use crate::jieba_rs::Jieba;
 
-static DEFAULT_IDF: OnceLock<String> = OnceLock::new();
-fn default_idf() -> &'static str {
+// Only built-in data is shared. A custom load detaches through Cow::to_mut;
+// ordinary extraction neither copies the map nor takes a lock after first use.
+static DEFAULT_IDF: OnceLock<IdfData> = OnceLock::new();
+fn default_idf() -> &'static IdfData {
     DEFAULT_IDF.get_or_init(|| {
         let bytes = crate::zstd::decompress(include_bytes!("../data/idf.txt.zst"))
             .expect("failed to decompress bundled IDF");
-        String::from_utf8(bytes).expect("bundled IDF is not UTF-8")
+        let text = String::from_utf8(bytes).expect("bundled IDF is not UTF-8");
+        let mut data = IdfData::default();
+        data.load_str(&text);
+        data
     })
 }
 
@@ -44,9 +50,14 @@ impl PartialOrd for HeapNode<'_> {
 /// Require `tfidf` feature to be enabled
 #[derive(Debug)]
 pub struct TfIdf {
+    data: Cow<'static, IdfData>,
+    config: KeywordExtractConfig,
+}
+
+#[derive(Debug, Clone, Default)]
+struct IdfData {
     idf_dict: HashMap<String, f64>,
     median_idf: f64,
-    config: KeywordExtractConfig,
 }
 
 /// Implementation of JiebaKeywordExtract using a TF-IDF dictionary.
@@ -59,10 +70,10 @@ impl TfIdf {
     ///
     /// New instance with module default stop words and no initial IDF
     /// dictionary. Dictionary should be loaded later with `load_dict()` calls.
+    #[allow(dead_code)] // Retained for custom IDF users of the private implementation.
     pub fn new(opt_dict: Option<&mut impl BufRead>, config: KeywordExtractConfig) -> Self {
         let mut instance = TfIdf {
-            idf_dict: HashMap::default(),
-            median_idf: 0.0,
+            data: Cow::Owned(IdfData::default()),
             config,
         };
         if let Some(dict) = opt_dict {
@@ -72,17 +83,30 @@ impl TfIdf {
     }
 
     /// Merges entries from `dict` into the `idf_dict`.
+    #[allow(dead_code)]
     pub fn load_dict(&mut self, dict: &mut impl BufRead) -> io::Result<()> {
         let mut buf = String::new();
         let mut idfs = Vec::new();
         while dict.read_line(&mut buf)? > 0 {
-            self.load_line(&buf, &mut idfs);
+            self.data.to_mut().load_line(&buf, &mut idfs);
             buf.clear();
         }
-        self.set_median(idfs);
+        self.data.to_mut().set_median(idfs);
         Ok(())
     }
 
+    #[allow(dead_code)]
+    pub fn config(&self) -> &KeywordExtractConfig {
+        &self.config
+    }
+
+    #[allow(dead_code)]
+    pub fn config_mut(&mut self) -> &mut KeywordExtractConfig {
+        &mut self.config
+    }
+}
+
+impl IdfData {
     /// Load a dictionary held in memory, line by line and without copying.
     fn load_str(&mut self, dict: &str) {
         let mut idfs = Vec::with_capacity(bytecount::count(dict.as_bytes(), b'\n') + 1);
@@ -120,16 +144,6 @@ impl TfIdf {
         let (_, median, _) = idfs.select_nth_unstable(mid);
         self.median_idf = median.into_inner();
     }
-
-    #[allow(dead_code)]
-    pub fn config(&self) -> &KeywordExtractConfig {
-        &self.config
-    }
-
-    #[allow(dead_code)]
-    pub fn config_mut(&mut self) -> &mut KeywordExtractConfig {
-        &mut self.config
-    }
 }
 
 /// TF-IDF keywords extraction.
@@ -139,12 +153,10 @@ impl Default for TfIdf {
     /// Creates TfIdf with DEFAULT_STOP_WORDS, the default TfIdf dictionary,
     /// 2 Unicode Scalar Value minimum for keywords, and no hmm in segmentation.
     fn default() -> Self {
-        let mut instance = TfIdf::new(
-            None::<&mut io::Empty>,
-            KeywordExtractConfigBuilder::default().build(),
-        );
-        instance.load_str(default_idf());
-        instance
+        TfIdf {
+            data: Cow::Borrowed(default_idf()),
+            config: KeywordExtractConfigBuilder::default().build(),
+        }
     }
 }
 
@@ -180,8 +192,9 @@ impl KeywordExtract for TfIdf {
         // The `top_k` best so far, the worst of them at the root.
         let mut heap = BinaryHeap::with_capacity(top_k.min(term_freq.len()));
 
+        let data = self.data.as_ref();
         for (k, (tf, _)) in term_freq.iter() {
-            let idf = self.idf_dict.get(*k).unwrap_or(&self.median_idf);
+            let idf = data.idf_dict.get(*k).unwrap_or(&data.median_idf);
 
             let node = HeapNode {
                 tfidf: OrderedFloat(*tf as f64 * idf / total as f64),
@@ -210,3 +223,7 @@ impl KeywordExtract for TfIdf {
         res
     }
 }
+
+#[cfg(test)]
+#[path = "tfidf_tests.rs"]
+mod tests;

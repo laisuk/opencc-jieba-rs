@@ -1,0 +1,10 @@
+case,alloc_calls,requested_bytes,retained_delta_bytes,peak_increment_bytes
+first_default,270282,45027103,25705750,27866806
+second_default,270201,21664546,19503490,21664546
+drop_first,0,0,-19503490,0
+drop_second,0,0,-19503490,0
+resident_after_dropping_defaults,0,0,6202260,0
+sixteen_warm_defaults_drop,4323216,346632736,0,21664546
+customize_default_first_load,3,63,14,63
+customize_default_second_load,3,63,0,49
+drop_customized,0,0,-19503504,0

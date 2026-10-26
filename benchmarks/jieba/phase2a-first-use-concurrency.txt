@@ -1,0 +1,33 @@
+   Compiling opencc-jieba-rs v0.8.2 (D:\codes\Rust\opencc-jieba-rs)
+    Finished test [unoptimized + debuginfo] target(s) in 2.16s
+     Running unittests src\lib.rs (target\debug\deps\opencc_jieba_rs-e093d6f6c020fc8c.exe)
+
+running 1 test
+test jieba_rs::keywords::tfidf::tests::default_initialization_and_repeated_extraction_are_thread_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 96 filtered out; finished in 0.37s
+
+     Running tests\opencc-custom-dict-tests.rs (target\debug\deps\opencc_custom_dict_tests-d7bf25484e04be07.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests\opencc-jieba-rs-test.rs (target\debug\deps\opencc_jieba_rs_test-da1f330c5e46eb01.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.00s
+
+     Running tests\public_api_contracts.rs (target\debug\deps\public_api_contracts-b9ad2621a0556e6f.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests\split_string_ranges_test.rs (target\debug\deps\split_string_ranges_test-2cf675866611afa5.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
