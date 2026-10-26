@@ -280,7 +280,14 @@ fn main() {
         });
     }
 
-    let dict: String = (0..1000).map(|i| format!("维护词条{i} 100 nz\n")).collect();
+    // let dict: String = (0..1000).map(|i| format!("维护词条{i} 100 nz\n")).collect();
+    use std::fmt::Write;
+
+    let mut dict = String::new();
+
+    for i in 0..1000 {
+        writeln!(dict, "维护词条{i} 100 nz").unwrap();
+    }
     let entries: Vec<_> = (0..1000)
         .map(|i| UserDictEntry {
             word: format!("维护词条{i}"),

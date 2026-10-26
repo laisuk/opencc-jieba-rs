@@ -46,6 +46,7 @@ impl core::fmt::Display for Sequence {
 #[derive(Copy, Clone)]
 pub struct CompressionModes(u8);
 /// The compression mode used for symbol compression
+#[allow(clippy::upper_case_acronyms)]
 pub enum ModeType {
     /// A predefined FSE distribution table is used, and no distribution table
     /// will be present.
