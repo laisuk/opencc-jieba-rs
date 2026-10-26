@@ -1069,7 +1069,7 @@ impl Jieba {
     /// Tag `sentence` and hand each tagged word to `emit` in order, for
     /// callers that consume the tags as they come. `emit` runs while the
     /// segmentation scratch is borrowed, so it must not segment.
-    #[cfg_attr(not(any(feature = "tfidf", feature = "textrank")), allow(dead_code))]
+    #[allow(dead_code)]
     pub(crate) fn tag_each<'a>(&'a self, sentence: &'a str, hmm: bool, mut emit: impl FnMut(Tag<'a>)) {
         self.cut_each(sentence, hmm, |token, word_id, block| {
             let word = token.word;
