@@ -54,14 +54,11 @@ zstd = { version = "0.14", optional = true }
 rayon = "=1.10"
 rayon-core = "=1.12.1"
 
-# Keep include-flate at 0.3.0 for Edition 2021 / MSRV compatibility.
-# Do not pin libflate directly; include-flate depends on libflate ^2.0,
-# allowing modern toolchains to resolve newer libflate versions that avoid yanked core2.
-#include-flate = "=0.3.0"
 bytecount = "0.6.9"
 
 [features]
-default = []
+default = ["keywords"]
+keywords = []
 # Enables dictionary-pack generation operations without exposing the runtime
 # dictionary representation or its logical slots.
 dictionary-build = ["dep:zstd"]
@@ -77,3 +74,11 @@ debug = 0                  # No debug info to minimize size
 
 [badges]
 maintenance = { status = "actively-developed" }
+
+[[example]]
+name = "jieba_baseline"
+required-features = ["keywords"]
+
+[[example]]
+name = "tfidf_memory_probe"
+required-features = ["keywords"]

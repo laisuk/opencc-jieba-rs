@@ -204,6 +204,7 @@ mod tests {
         assert_eq!(actual_output, expected_output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank() {
         let input = include_str!("data/OneDay.txt");
@@ -212,6 +213,7 @@ mod tests {
         println!("TextRank: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank_pos() {
         let input = include_str!("data/OneDay.txt");
@@ -229,6 +231,7 @@ mod tests {
         assert!(output.len() <= 10);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank_pos_vs_all() {
         let input = include_str!("data/OneDay.txt");
@@ -249,6 +252,7 @@ mod tests {
         assert_ne!(all, filtered);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_weight_textrank() {
         let input = include_str!("data/OneDay.txt");
@@ -257,6 +261,7 @@ mod tests {
         println!("TextRank: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf() {
         let input = include_str!("data/OneDay.txt");
@@ -265,6 +270,7 @@ mod tests {
         println!("TF-IDF: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf_pos() {
         let input = include_str!("data/OneDay.txt");
@@ -282,6 +288,7 @@ mod tests {
         assert!(output.len() <= 10);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf_pos_vs_all() {
         let input = include_str!("data/OneDay.txt");
@@ -302,6 +309,7 @@ mod tests {
         assert_ne!(all, filtered);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_weight_tfidf() {
         let input = include_str!("data/OneDay.txt");

@@ -1,13 +1,17 @@
 use crate::dictionary_lib::{
     CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictMap, Dictionary,
 };
-use crate::jieba_rs::{Jieba, Keyword, Token};
+#[cfg(feature = "keywords")]
+use crate::jieba_rs::Keyword;
+use crate::jieba_rs::{Jieba, Token};
+#[cfg(feature = "keywords")]
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
 use crate::zstd::decompress;
 use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
 use rayon::prelude::*;
 use regex::Regex;
+#[cfg(feature = "keywords")]
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufRead;
@@ -18,7 +22,8 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
 
-pub(crate) const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
+pub(crate) const DICT_HANS_HANT_ZSTD: &[u8] =
+    include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
 /// Master delimiter string containing all punctuation and whitespace treated
 /// as token boundaries by OpenCC-Jieba.
@@ -2810,7 +2815,11 @@ impl OpenCC {
 
         out
     }
+}
 
+/// Keyword extraction, available with the default-enabled `keywords` feature.
+#[cfg(feature = "keywords")]
+impl OpenCC {
     /// Extracts top keywords using the TextRank algorithm.
     ///
     /// TextRank is a graph-based algorithm that ranks words based on co-occurrence.
@@ -3129,7 +3138,9 @@ impl OpenCC {
     ) -> Vec<Keyword> {
         keyword::keyword_weight_tfidf_internal(&self.jieba, input, top_k, allowed_pos)
     }
+}
 
+impl OpenCC {
     /// Normalizes CJK Compatibility Ideographs with the built-in Unicode table.
     ///
     /// It performs an optional Unicode compatibility normalization pre-pass and
@@ -3534,6 +3545,7 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
 /// Jieba-based ranking. Returning [`Cow`] avoids allocating for the common
 /// case where the input is already single-line.
 #[inline]
+#[cfg(feature = "keywords")]
 pub(crate) fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
     if input.as_bytes().iter().any(|&b| b == b'\n' || b == b'\r') {
         Cow::Owned(input.replace(['\n', '\r'], ""))

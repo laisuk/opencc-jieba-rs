@@ -11,33 +11,34 @@
 //!
 //! then you are good to go. If you are using Rust 2015 you have to ``extern crate jieba_rs`` to your crate root as well.
 //!
-//! ## Enabling Additional Features
+//! ## Cargo features
 //!
-//! * `default-dict` feature enables embedded dictionary, this features is enabled by default
-//! * `tfidf` feature enables TF-IDF keywords extractor
-//! * `textrank` feature enables TextRank keywords extractor
-//!
-//! ```toml
-//! [dependencies]
-//! jieba-rs = { version = "0.7", features = ["tfidf", "textrank"] }
-//! ```
+//! This vendored implementation uses the parent crate's default-enabled
+//! `keywords` feature for both TF-IDF and TextRank. Segmentation and POS tagging
+//! are available independently of that feature.
 
 use std::collections::HashMap;
+#[cfg(feature = "keywords")]
 use std::collections::HashSet;
 use std::fmt;
 use std::io::BufRead;
 
 pub(crate) type FxHashMap<K, V> = HashMap<K, V, crate::rustc_hash::FxBuildHasher>;
+#[cfg(feature = "keywords")]
 pub(crate) type FxHashSet<K> = HashSet<K, crate::rustc_hash::FxBuildHasher>;
 
 pub use crate::jieba_rs::errors::Error;
 pub use crate::jieba_rs::hmm::HmmModel;
+#[cfg(feature = "keywords")]
 pub use crate::jieba_rs::keywords::textrank::TextRank;
+#[cfg(feature = "keywords")]
 pub use crate::jieba_rs::keywords::tfidf::TfIdf;
+#[cfg(feature = "keywords")]
 pub use crate::jieba_rs::keywords::{Keyword, KeywordExtract};
 
 mod errors;
 mod hmm;
+#[cfg(feature = "keywords")]
 mod keywords;
 mod posseg;
 mod sparse_dag;
@@ -134,7 +135,7 @@ fn is_cjk_extension(c: char) -> bool {
 
 /// The main CJK Unified Ideographs block, tested on its own before the
 /// extensions: nearly every character of ordinary text falls in it, and a
-/// single range check is much cheaper than the vectorised nine-range test
+/// single range check is much cheaper than the vectorized nine-range test
 /// the compiler otherwise emits.
 #[inline(always)]
 fn is_cjk_main(c: char) -> bool {
@@ -806,7 +807,7 @@ impl Jieba {
     }
 
     /// Create a Token for a word of `char_count` characters, advancing the
-    /// tracked unicode offset past it.
+    /// tracked Unicode offset past it.
     #[inline]
     fn make_token_incremental<'a>(
         word: &'a str,
@@ -831,7 +832,7 @@ impl Jieba {
 
     /// Segment `sentence` and hand each token to `emit` in order, along with
     /// its dictionary id when the segmentation looked the word up
-    /// (`NO_MATCH` otherwise, which does not mean the word is unknown) and,
+    /// (`NO_MATCH` otherwise, which does not mean the word is unknown) and;
     /// for a token cut from a dictionary block, where it sits in that block.
     fn cut_each<'a>(&self, sentence: &'a str, hmm: bool, mut emit: impl FnMut(Token<'a>, i32, Option<BlockRef<'_>>)) {
         let base = sentence.as_ptr() as usize;

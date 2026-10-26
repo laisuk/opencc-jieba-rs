@@ -194,6 +194,23 @@
 //! `new_with_user_dict()` is a convenience wrapper that loads
 //! `dicts/user_dict.txt`.
 //!
+//! ## Optional keyword extraction
+//!
+//! The `keywords` Cargo feature is enabled by default and provides TF-IDF and
+//! TextRank extraction, including all `OpenCC::keyword_extract_*` and
+//! `OpenCC::keyword_weight_*` methods, `Keyword`, `KeywordMethod`, and `POS_KEYWORDS`.
+//! To omit those APIs and the embedded IDF dictionary, use:
+//!
+//! ```toml
+//! [dependencies]
+//! opencc-jieba-rs = { version = "0.8.2", default-features = false }
+//! ```
+//!
+//! Segmentation, POS tagging (`jieba_tag()`), user dictionaries, OpenCC conversion,
+//! and custom conversion dictionaries remain available. The C API explicitly enables
+//! `keywords` to preserve all existing exported functions. Cargo features are additive;
+//! another dependency enabling `keywords` enables it for the shared library build.
+//!
 //! ## Zstandard decoding and Cargo features
 //!
 //! Embedded OpenCC and Jieba dictionaries and custom conversion packs are
@@ -289,14 +306,15 @@
 //! - [`OpenCC::jieba_cut`] — Jieba segmentation (accurate mode)
 //! - [`OpenCC::jieba_cut_for_search`] — Jieba segmentation optimized for search indexing
 //! - [`OpenCC::jieba_cut_all`] — Jieba full segmentation mode
-//! - [`OpenCC::keyword_extract_textrank`] — keyword extraction using TextRank
-//! - [`OpenCC::keyword_extract_tfidf`] — keyword extraction using TF-IDF
+//! - `OpenCC::keyword_extract_textrank` (requires `keywords`) — keyword extraction using TextRank
+//! - `OpenCC::keyword_extract_tfidf` (requires `keywords`) — keyword extraction using TF-IDF
 //!
 //! These utilities can be used independently of Chinese variant conversion,
 //! or combined with [`OpenCC::convert`] results for downstream NLP tasks such
 //! as indexing, text analysis, and keyword extraction.
 
 mod dictionary_lib;
+#[cfg(feature = "keywords")]
 mod keyword;
 mod opencc;
 mod opencc_config;
@@ -312,11 +330,14 @@ mod unicode_compat;
 mod zstd;
 
 pub use dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};
+#[cfg(feature = "keywords")]
 pub use jieba_rs::Keyword;
+#[cfg(feature = "keywords")]
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 pub use opencc::{find_max_utf8_length, is_delimiter, OpenCC, OpenccError, UserDictEntry};
 pub use opencc_config::OpenccConfig;
 // DeTofu API
 pub use crate::detofu::{DetofuLevel, DetofuMap};
 // Kept at the crate root for the internal keyword module's existing call path.
+#[cfg(feature = "keywords")]
 pub(crate) use opencc::strip_newlines_cow;
