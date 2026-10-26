@@ -1258,9 +1258,7 @@ impl OpenCC {
 
             // Self::convert_by_char(phrase, dictionaries, out);
 
-            let token_len = phrase.chars().count();
-
-            if token_len < 3 {
+            if phrase_len < 3 {
                 Self::convert_by_char(phrase, dictionaries, out);
             } else {
                 Self::convert_by_fallback_fmm(phrase, dictionaries, out);
@@ -2559,14 +2557,18 @@ impl OpenCC {
     /// [`DictMap`]: DictMap
     #[inline]
     fn convert_rounds(&self, input: &str, rounds: DictRounds<'_>, hmm: bool) -> String {
-        if rounds.is_empty() {
-            return input.to_owned();
-        }
+        let mut iter = rounds.iter();
 
-        let mut current = input.to_owned();
-        for round in rounds {
+        let Some(first) = iter.next() else {
+            return input.to_owned();
+        };
+
+        let mut current = self.phrases_cut_convert(input, first, hmm);
+
+        for round in iter {
             current = self.phrases_cut_convert(&current, round, hmm);
         }
+
         current
     }
 
