@@ -1787,16 +1787,18 @@ impl OpenCC {
 
     /// Segments input text using Jieba and joins the result into a single string.
     ///
-    /// Similar to [`OpenCC::jieba_cut`] but returns a space-separated string instead of a vector.
+    /// Equivalent to `jieba_cut(input, hmm).join(delimiter)`, without collecting
+    /// owned strings for every token.
     ///
     /// # Arguments
     ///
-    /// * `text` - The input text to be segmented.
+    /// * `input` - The input text to be segmented.
     /// * `hmm` - Whether to enable HMM for unknown word recognition.
+    /// * `delimiter` - The separator inserted between tokens.
     ///
     /// # Returns
     ///
-    /// A single `String` with segmented words joined by space.
+    /// A single `String` with segmented words joined by `delimiter`.
     ///
     /// # Example
     /// ```
@@ -1805,7 +1807,54 @@ impl OpenCC {
     /// println!("{}", joined); // -> "南京市 长江大桥"
     /// ```
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
-        self.jieba_cut(input, hmm).join(delimiter)
+        let ranges = self.split_string_ranges(input, true);
+        let mut output = String::new();
+        let mut has_tokens = false;
+        if input.len() >= PARALLEL_THRESHOLD {
+            // Indexed collection preserves chunk order. Track token presence
+            // separately: an empty token still needs a boundary separator.
+            let chunks: Vec<_> = ranges
+                .into_par_iter()
+                .map(|range| {
+                    let chunk = &input[range];
+                    let mut joined = String::with_capacity(chunk.len());
+                    let mut has_tokens = false;
+                    for token in self.jieba.cut(chunk, hmm) {
+                        Self::append_joined(&mut joined, &mut has_tokens, token.word, delimiter);
+                    }
+                    (joined, has_tokens)
+                })
+                .collect();
+            let capacity = chunks.iter().map(|(s, _)| s.len()).sum::<usize>()
+                + chunks
+                    .iter()
+                    .filter(|(_, present)| *present)
+                    .count()
+                    .saturating_sub(1)
+                    * delimiter.len();
+            output.reserve(capacity);
+            for (chunk, present) in chunks {
+                if present {
+                    Self::append_joined(&mut output, &mut has_tokens, &chunk, delimiter);
+                }
+            }
+        } else {
+            output.reserve(input.len());
+            for range in ranges {
+                for token in self.jieba.cut(&input[range], hmm) {
+                    Self::append_joined(&mut output, &mut has_tokens, token.word, delimiter);
+                }
+            }
+        }
+        output
+    }
+
+    fn append_joined(output: &mut String, has_tokens: &mut bool, word: &str, delimiter: &str) {
+        if *has_tokens {
+            output.push_str(delimiter);
+        }
+        output.push_str(word);
+        *has_tokens = true;
     }
 
     /// Converts Simplified Chinese to Traditional Chinese.
@@ -3634,6 +3683,21 @@ fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccErro
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn incremental_join_preserves_empty_tokens() {
+        for delimiter in [" ", "/", "|", ""] {
+            for words in [vec![], vec![""], vec!["", ""], vec!["", "南京", "", ""]] {
+                let mut output = String::new();
+                let mut present = false;
+                for word in &words {
+                    OpenCC::append_joined(&mut output, &mut present, word, delimiter);
+                }
+                assert_eq!(output, words.join(delimiter));
+                assert_eq!(present, !words.is_empty());
+            }
+        }
+    }
 
     fn dict(entries: &[(&str, &str)]) -> DictMap {
         let mut map = DictMap::default();
