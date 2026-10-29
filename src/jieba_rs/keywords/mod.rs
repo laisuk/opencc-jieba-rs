@@ -22,11 +22,17 @@ fn default_stop_words() -> &'static BTreeSet<String> {
     })
 }
 
-/// Keyword with weight.
+/// One weighted keyword returned by the `OpenCC::keyword_weight_*` APIs.
+///
+/// Available with the default-enabled `keywords` feature. Weights are specific
+/// to the selected algorithm and input; they are not probabilities.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Keyword {
+    /// Extracted token text.
     pub keyword: String,
+    /// TF-IDF or TextRank score.
     pub weight: f64,
+    /// Part-of-speech tag assigned during extraction.
     pub tag: String,
 }
 

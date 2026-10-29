@@ -163,13 +163,7 @@ impl CompatIdeographs {
     /// This returns a new string and leaves ordinary Chinese text unchanged.
     ///
     pub(crate) fn normalize(&self, input: &str) -> String {
-        let mut output = String::with_capacity(input.len());
-
-        for ch in input.chars() {
-            output.push(self.normalize_char(ch));
-        }
-
-        output
+        crate::opencc::map_chars_cow(input, |ch| self.normalize_char(ch)).into_owned()
     }
 }
 

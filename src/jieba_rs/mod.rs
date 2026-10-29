@@ -1,21 +1,9 @@
-//! The Jieba Chinese Word Segmentation Implemented in Rust
+//! Private Jieba implementation maintained as part of opencc-jieba-rs.
 //!
-//! ## Installation
-//!
-//! Add it to your `Cargo.toml`:
-//!
-//! ```toml
-//! [dependencies]
-//! jieba-rs = "0.9"
-//! ```
-//!
-//! then you are good to go. If you are using Rust 2015 you have to ``extern crate jieba_rs`` to your crate root as well.
-//!
-//! ## Cargo features
-//!
-//! This vendored implementation uses the parent crate's default-enabled
-//! `keywords` feature for both TF-IDF and TextRank. Segmentation and POS tagging
-//! are available independently of that feature.
+//! Use the parent crate's `OpenCC` wrappers. This module is not an external
+//! jieba-rs replacement; see VENDOR_NOTES.md for integration and provenance.
+//! The parent `keywords` feature enables TF-IDF and TextRank. Segmentation
+//! and POS tagging are available without it.
 
 use std::collections::HashMap;
 #[cfg(feature = "keywords")]
@@ -44,7 +32,7 @@ mod posseg;
 mod sparse_dag;
 mod trie;
 
-// No embedded default Jieba dictionary: parent OpenCC loads its own dictionary.
+// Jieba::new and OpenCC share the parent's embedded Hans/Hant dictionary.
 
 use sparse_dag::{NO_MATCH, StaticSparseDAG};
 use trie::CharTrie;

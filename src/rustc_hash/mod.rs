@@ -1,5 +1,5 @@
 //! Internal vendored Fx hashing implementation, adapted from rustc-hash 2.1.3.
-//! Original project: https://github.com/rust-lang/rustc-hash
+//! Original project: <https://github.com/rust-lang/rustc-hash>
 //! License: MIT OR Apache-2.0. See bundled license files.
 //! This module targets Rust 1.75 and uses std; upstream optional rand/nightly features are omitted.
 

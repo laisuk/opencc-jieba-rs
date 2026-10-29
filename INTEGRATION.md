@@ -1,22 +1,21 @@
-# Jieba internal-module vendor bundle (source: jieba-rs 0.11.0)
+# Vendored Jieba integration
 
-Copy `src/jieba_rs/` into your parent `src/` and copy `build.rs` to the **package root** next to Cargo.toml. If you
-already have a build.rs, merge the `generate_hmm_data()` function and rerun directive into it; do not overwrite your
-Windows resource tasks.
+The integration is already part of this repository; no source-copying setup is needed.
+The local import is commit `21d67d4`. Its exact upstream revision remains unverified;
+the original scaffold's claimed jieba-rs 0.11.0 version is not authenticated.
 
-Parent integration checklist:
+- `src/lib.rs` keeps `jieba_rs` private to the crate; `OpenCC` is the high-level API.
+- `OpenCC::jieba` exposes a local tokenizer instance. It is not type-compatible with
+  the external `jieba_rs::Jieba`; low-level segmentation returns token records.
+- `Jieba::new()` and `Default` load the embedded combined Hans/Hant dictionary;
+  `Jieba::empty()` creates an empty tokenizer.
+- The root build script generates HMM tables from `src/jieba_rs/hmm.model`.
+- POS and IDF assets decode lazily through the private pure Rust Zstandard decoder.
+- The default-enabled `keywords` feature gates TF-IDF and TextRank. POS tagging
+  and segmentation remain available without it.
+- Native `zstd` is optional and used for dictionary-pack compression through
+  `dictionary-build`; runtime decoding needs no native Zstandard dependency.
 
-1. Declare `mod jieba_rs;` (or `pub mod jieba_rs;`) in parent `src/lib.rs`. Change `use jieba_rs::...` in parent code to
-   `use crate::jieba_rs::...`.
-2. Confirm vendored hash module path `crate::rustc_hash::FxBuildHasher` matches your project; adjust imports if needed.
-3. Keep `bytecount` in parent Cargo.toml; remove `jieba-rs`, `include-flate`, `ordered-float`, and `jieba-macros` *only
-   if nothing else uses them*.
-4. The parent `crate::zstd::decompress(&[u8]) -> Result<Vec<u8>, _>` must exist (as shown in your opencc.rs).
-5. This version always includes TF-IDF and TextRank and uses lazy zstd decode for IDF and POS model. No bundled
-   `dict.txt`; `Jieba::new()` is empty. `OpenCC::with_dict` path is unaffected.
-6. Run `cargo +1.75.0 check`, `cargo +1.75.0 test`, `cargo clippy`, plus segmentation/POS/keyword regressions. This
-   bundle is not integration-tested against your parent repo, which was not provided.
-7. Upstream doc examples and test fixtures may need adjustments after moving to an internal module.
-
-Upstream Jieba source LICENSE is included for attribution. This is a best-effort migration scaffold, not a verified
-drop-in replacement.
+See [maintenance and provenance notes](src/jieba_rs/VENDOR_NOTES.md),
+[Jieba license](JIEBA-LICENSE), and [third-party notices](THIRD_PARTY_NOTICES.md).
+The README lists the feature matrix, migration guidance, and release integrity checks.

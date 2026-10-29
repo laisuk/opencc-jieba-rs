@@ -40,10 +40,13 @@ To add this crate to your project:
 cargo add opencc-jieba-rs
 ```
 
-Or add the following line to your `Cargo.toml`:
+The examples below target the upcoming v0.9.0 release. Until it is published,
+`cargo add` installs the latest published version; use a local checkout to try v0.9.0.
+
+After release, add the following line to your `Cargo.toml`:
 
 ```toml
-opencc-jieba-rs = "0.8.1"
+opencc-jieba-rs = "0.9.0"
 ```
 
 Use `opencc-jieba-rs` as a library:
@@ -101,6 +104,10 @@ fn main() {
 }
 ```
 
+For joined segmentation, `cc.jieba_cut_and_join(text, hmm, delimiter)` produces the same
+text as `cc.jieba_cut(text, hmm).join(delimiter)` while avoiding an owned string per token.
+Punctuation and whitespace tokens are preserved, including their separators.
+
 Run the repository's broader API example with `cargo run --example use_opencc_jieba_tests`.
 
 > 📦 Crate: [opencc-jieba-rs on crates.io](https://crates.io/crates/opencc-jieba-rs)  
@@ -115,13 +122,33 @@ To omit those APIs and the embedded IDF dictionary, use:
 
 ```toml
 [dependencies]
-opencc-jieba-rs = { version = "0.8.2", default-features = false }
+opencc-jieba-rs = { version = "0.9.0", default-features = false }
 ```
 
 Segmentation, POS tagging (`jieba_tag()`), user dictionaries, OpenCC conversion,
 and custom conversion dictionaries remain available. The C API explicitly enables
 `keywords` to preserve all existing exported functions. Cargo features are additive;
 another dependency enabling `keywords` enables it for the shared library build.
+
+### Cargo features and v0.9 migration
+
+| Feature            | Default | Provides                                                         |
+|--------------------|---------|------------------------------------------------------------------|
+| `keywords`         | Yes     | TF-IDF, TextRank, `Keyword`, `KeywordMethod`, and `POS_KEYWORDS` |
+| `dictionary-build` | No      | Pack-generation utilities and native Zstandard compression       |
+
+Runtime conversion, segmentation, POS tagging, normalization, DeTofu, and loading custom
+packs work with `default-features = false`. docs.rs builds with all features; check the
+feature requirements before copying keyword or pack-generation examples.
+
+v0.9.0 vendors the Jieba implementation inside this crate. Prefer the `OpenCC` wrappers;
+`OpenCC::jieba` now holds a local tokenizer type rather than an external `jieba_rs::Jieba`.
+Code that assigns an external tokenizer to that field or passes it to external Jieba APIs
+needs updating. Low-level `cut*` calls return token records; use `.word` for text, or use
+`OpenCC::jieba_cut*` for `Vec<String>`. Import weighted results as `opencc_jieba_rs::Keyword`,
+not `jieba_rs::Keyword`. The private tokenizer module is not a standalone replacement crate.
+The high-level conversion methods still return owned `String` values; internal borrowed
+fast paths do not change those signatures. The C ABI remains version 1.
 
 ---
 
@@ -272,7 +299,7 @@ int main(int argc, char **argv) {
 
 ### Output
 
-```
+```text
 Text: 意大利邻国法兰西罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。
 Text Code: 2
 Converted: 義大利鄰國法蘭西羅浮宮裡收藏的「蒙娜麗莎的微笑」畫像是曠世之作。
@@ -308,7 +335,7 @@ Converted Code: 1
 [Zstandard](https://github.com/facebook/zstd) - `zstd`: A fast lossless compression algorithm, targeting real-time
 compression scenarios at zlib-level and better compression ratios.
 
-```
+```sh
 zstd -19 src/dictionary_lib/dicts/dictionary.json -o src/dictionary_lib/dicts/dictionary.json.zst
 zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dicts/dict_hans_hant.txt.zst
 ```
@@ -324,7 +351,7 @@ The optional `dictionary-build` feature enables native `zstd` for pack compressi
 For pack-generation APIs in a Rust build tool, enable the feature explicitly:
 
 ```toml
-opencc-jieba-rs = { version = "0.8.1", features = ["dictionary-build"] }
+opencc-jieba-rs = { version = "0.9.0", features = ["dictionary-build"] }
 ```
 
 `dictionary_build` reads plaintext sources from `./dicts` in the working directory. Those source dictionaries are not
@@ -722,13 +749,13 @@ cargo build --release --workspace
 
 The CLI tool will be located at:
 
-```
+```text
 target/release/opencc-jieba
 ```
 
 ## Usage: `opencc-jieba convert`
 
-```
+```text
 opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
 
 Usage: opencc-jieba.exe convert [OPTIONS] --config <config>
@@ -750,7 +777,7 @@ Options:
 
 ## Usage: `opencc-jieba segment`
 
-```
+```text
 opencc-jieba segment: Segment Chinese input text into words
 
 Usage: opencc-jieba.exe segment [OPTIONS]
@@ -774,7 +801,7 @@ Options:
 
 Supported Office formats: `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods`, `.odp`, `.epub`
 
-```
+```text
 opencc-jieba office: Convert Office or EPUB documents using OpenCC
 
 Usage: opencc-jieba.exe office [OPTIONS] --config <config>
@@ -876,8 +903,10 @@ No external dictionary files are needed for ordinary conversion or segmentation.
 
 ## 📦 Dependency Notes
 
-- Core dependencies (`jieba-rs`, `rayon`) are pinned for stability.
-- Other dependencies are allowed to float to benefit from upstream fixes.
+- Jieba, the runtime Zstandard decoder, and Fx hashing are maintained as private vendored modules.
+  There is no external `jieba-rs` dependency. See the bundled maintenance notes and third-party notices.
+- `rayon` and `rayon-core` are pinned for Rust 1.75 compatibility. Keep `Cargo.lock` when
+  reproducing repository builds; other dependency requirements permit compatible updates.
 
 > ⚠️ MSRV note: This crate is developed with Rust 1.75.0 in mind.
 > Most users on modern Rust do not need special setup.
@@ -887,10 +916,29 @@ No external dictionary files are needed for ordinary conversion or segmentation.
 
 ---
 
+## Release integrity checks
+
+Run from the repository root with the checked-in lockfile:
+
+```sh
+cargo test --locked --workspace --all-features
+cargo test --locked -p opencc-jieba-rs --no-default-features
+cargo doc --locked -p opencc-jieba-rs --no-deps --all-features
+cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
+cargo package --locked -p opencc-jieba-rs --allow-dirty
+```
+
+For documentation review, set `RUSTDOCFLAGS="-D warnings"` in your shell. Package verification
+checks that the published sources build independently of the repository. The archive includes
+test fixtures and embedded runtime assets; plaintext pack-generation dictionaries and the
+large benchmark novel remain repository-only. See [C/C++ regression commands](./capi/tests/README.md)
+for native ABI checks. `--allow-dirty` permits a release candidate working tree; it does not publish.
+
 ## Credits
 
 - [OpenCC](https://github.com/BYVoid/OpenCC) – Lexicon source.
-- [jieba-rs](https://github.com/messense/jieba-rs) - Jieba tokenization.
+- [jieba-rs](https://github.com/messense/jieba-rs) — upstream project for the vendored tokenizer;
+  see [JIEBA-LICENSE](./JIEBA-LICENSE).
 
 ## License
 

@@ -235,17 +235,14 @@ impl UnicodeCompat {
     }
 
     fn normalize_impl(&self, input: &str, include_compat: bool) -> String {
-        let mut output = String::with_capacity(input.len());
-
-        for ch in input.chars() {
-            output.push(if include_compat {
+        crate::opencc::map_chars_cow(input, |ch| {
+            if include_compat {
                 self.normalize_all_char(ch)
             } else {
                 self.normalize_char(ch)
-            });
-        }
-
-        output
+            }
+        })
+        .into_owned()
     }
 
     /// Normalizes a mutable character slice using only the curated extended

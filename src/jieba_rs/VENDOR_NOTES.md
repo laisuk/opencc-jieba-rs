@@ -4,14 +4,14 @@
 
 The upstream Rust project is [jieba-rs](https://github.com/messense/jieba-rs),
 an implementation of [Jieba](https://github.com/fxsjy/jieba).
-`INTEGRATION.md` labels the imported bundle as **jieba-rs 0.11.0**. This is an
+The original integration scaffold claimed **jieba-rs 0.11.0**. This was an
 importer's statement, not a verified source identity: the exact upstream version
 and commit are **unknown / unverified**. No source archive checksum or upstream
-revision accompanies the bundle. At this documentation pass, `git log --all --
-src/jieba_rs` has no committed history and the source is staged as new files.
+revision accompanies the bundle. The local import was committed as `21d67d4` (Vendor Jieba core and document local
+adaptations); that local commit does not authenticate the upstream baseline.
 The previous external dependency was pinned to 0.7.4 (see the commented manifest
 entry and historical changelog); that pin does not identify this bundle.
-The retained module documentation mentions several other upstream versions and
+Historical module documentation mentioned other upstream versions; those claims
 must not be used as provenance evidence. No full upstream source comparison or
 drop-in compatibility audit has been performed.
 
@@ -31,12 +31,13 @@ already present on the branch. Without an authenticated upstream baseline, it
 is not an exhaustive attribution of which changes originated locally.
 
 - Imports use `crate::jieba_rs`; the parent re-exports `Keyword`, while the
-  tokenizer, models, and extractor implementations remain private to the crate.
-  Parent `OpenCC` methods are the supported public entry points.
+  tokenizer module, models, and extractor implementations remain private to the crate.
+  `OpenCC::jieba` exposes an instance of the local tokenizer for advanced use, but
+  external Jieba types are not interchangeable. Prefer the parent `OpenCC` methods.
 - `Jieba::empty()` is empty; `new()` and `Default` load the parent's embedded
   dictionary. There is no separate upstream default dictionary or
   `load_default_dict()` method. `with_dict` and `load_dict` accept `BufRead`.
-  Contrary to the scaffold's `INTEGRATION.md`, `new()` is **not** empty now.
+  The original scaffold's claim that `new()` is empty was incorrect.
 - `cut`, `cut_all`, and `cut_for_search` return `Vec<Token>` carrying word and
   position information; parent wrappers expose their own results. Do not assume
   signatures or token offsets match any particular upstream release.
@@ -81,22 +82,21 @@ update. Their exact source revisions and transformation commands are unrecorded.
   is in `build.rs`, with no `jieba-macros` dependency. The precise upstream
   dependency versions/replacement history have not been verified.
 - This module uses `bytecount`, but no regex imports or `include-flate` macros.
-  The parent still depends on `regex` and `include-flate` for other code; do not
-  remove them based on the vendor scaffold's checklist alone.
+  The parent still depends on `regex` for classification; it no longer depends on
+  `include-flate`. Check actual usage before changing dependencies.
 - Embedded Zstd decoding uses the parent's vendored decoder. Native `zstd` is
   optional and tied to the parent's `dictionary-build` feature.
-- TF-IDF and TextRank are compiled unconditionally. The parent has no
-  `default-dict`, `tfidf`, or `textrank` features. Retained upstream installation
-  instructions, feature requirements, and a `cfg_attr` mentioning keyword
-  features are stale descriptions, not supported feature switches.
+- TF-IDF and TextRank use the parent's default-enabled `keywords` feature. POS
+  tagging remains available without it. The parent has no `default-dict`, `tfidf`,
+  or `textrank` feature switches.
 
 ## Tests
 
 Local `cfg(test)` tests cover the trie, sparse DAG, HMM, POS, TextRank, and float
 comparison semantics. HMM expectations use ordinary assertions (a commented
 `expect_test` import remains); POS tests run without the old `default-dict`
-gate. No vendored main-module segmentation test suite or TF-IDF test module is
-present. Parent integration tests cover segmentation, tags, keywords, user
+gate. TF-IDF tests in `keywords/tfidf_tests.rs` cover shared built-in data, custom
+loads, filtering, and concurrent first use; these run with `keywords`. Parent integration tests cover segmentation, tags, keywords, user
 dictionaries, conversion, and public API contracts. This is not evidence that
 the complete upstream test suite or feature matrix has been retained or passed.
 All existing tests must remain intact during maintenance.
@@ -141,8 +141,8 @@ Outstanding checks before release:
 - Establish whether the local OrderedFloat code was independently implemented
   or copied/adapted, and from which revision; upstream ordered-float is MIT
   licensed, but no matching import record or dedicated license copy is present.
-- The current `Cargo.toml` explicit `include` list does not name
-  `JIEBA-LICENSE`, this note, `hmm.model`, or `src/jieba_rs/data/*.zst`.
-  `THIRD_PARTY_NOTICES.md` also has no Jieba/ordered-float entry. Audit and correct
-  archive contents/notices before publishing; this documentation-only change
-  does not repair packaging or certify license compliance.
+- Packaging now explicitly includes `JIEBA-LICENSE`, this note, `hmm.model`,
+  and compressed IDF/POS data; `THIRD_PARTY_NOTICES.md` describes the vendored
+  implementation. Package verification checks these assets and the build script.
+  This corrects the earlier scaffold's packaging omissions without authenticating
+  the unresolved upstream/data provenance above.

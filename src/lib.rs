@@ -166,7 +166,7 @@
 //!
 //! The `freq` field is required and must be a valid integer. The POS `tag`
 //! field is optional. Lines containing only `word`, or `word tag` without an
-//! integer frequency, are rejected before data is passed to `jieba-rs`.
+//! integer frequency, are rejected before data is passed to the vendored tokenizer.
 //!
 //! ```no_run
 //! use opencc_jieba_rs::OpenCC;
@@ -203,13 +203,37 @@
 //!
 //! ```toml
 //! [dependencies]
-//! opencc-jieba-rs = { version = "0.8.2", default-features = false }
+//! opencc-jieba-rs = { version = "0.9.0", default-features = false }
 //! ```
 //!
 //! Segmentation, POS tagging (`jieba_tag()`), user dictionaries, OpenCC conversion,
 //! and custom conversion dictionaries remain available. The C API explicitly enables
 //! `keywords` to preserve all existing exported functions. Cargo features are additive;
 //! another dependency enabling `keywords` enables it for the shared library build.
+//!
+//! ## v0.9 migration and low-level tokenizer access
+//!
+//! Jieba is now maintained inside this crate. The public `OpenCC::jieba` field
+//! contains a local tokenizer, not the external `jieba_rs::Jieba` type. Direct
+//! assignment of external tokenizers and calls into external Jieba APIs therefore
+//! need updating. Low-level `cut*` methods return token records with a `.word`
+//! field; prefer [`OpenCC::jieba_cut`] and its search/full variants for owned tokens.
+//! Weighted results use this crate's `Keyword` type when
+//! `keywords` is enabled. The tokenizer module itself remains private.
+//!
+//! High-level conversion methods continue to return owned `String` values.
+//! Internal `Cow` fast paths avoid unchanged intermediate strings; they do not
+//! make the public conversion API allocation-free.
+//!
+//! ## Feature availability
+//!
+//! | Feature | Default | API |
+//! |---|---|---|
+//! | `keywords` | Yes | TF-IDF, TextRank, keyword result types and POS filters |
+//! | `dictionary-build` | No | Pack-generation utilities and native compression |
+//!
+//! docs.rs enables all features. Runtime conversion, segmentation, POS tagging,
+//! normalization, DeTofu, and custom-pack loading also work with no default features.
 //!
 //! ## Zstandard decoding and Cargo features
 //!
@@ -306,6 +330,8 @@
 //! - [`OpenCC::jieba_cut`] — Jieba segmentation (accurate mode)
 //! - [`OpenCC::jieba_cut_for_search`] — Jieba segmentation optimized for search indexing
 //! - [`OpenCC::jieba_cut_all`] — Jieba full segmentation mode
+//! - [`OpenCC::jieba_cut_and_join`] — accurate segmentation joined without owned per-token strings
+//! - [`OpenCC::jieba_tag`] — segmentation with POS tags
 //! - `OpenCC::keyword_extract_textrank` (requires `keywords`) — keyword extraction using TextRank
 //! - `OpenCC::keyword_extract_tfidf` (requires `keywords`) — keyword extraction using TF-IDF
 //!

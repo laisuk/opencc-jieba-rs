@@ -6,13 +6,63 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.8.2] - Unreleased
+## [Unreleased]
+
+Changes for the upcoming v0.9.0 release, accumulated since the v0.8.1 tag.
+The separately released C API revision 0.8.1.1 is recorded below.
+
+### Added
+
+- Added the default-enabled `keywords` Cargo feature. Disabling default features omits TF-IDF,
+  TextRank, their high-level APIs, and the embedded IDF dictionary while retaining conversion,
+  segmentation, POS tagging, user dictionaries, normalization, DeTofu, and custom-pack loading.
+  The C API explicitly enables keywords to retain its exported functions.
+- Added reproducible segmentation, joined-token, TF-IDF memory, and conversion-allocation benchmarks,
+  plus regression coverage for feature combinations, joined-token equivalence, keyword data sharing,
+  and unchanged conversion paths.
 
 ### Changed
 
-- Replaced the external `rustc-hash` dependency with a private vendored module adapted from rustc-hash 2.1.3,
-  ported from `opencc-fmmseg` with Rust 1.75 compatibility. Internal maps and sets use the vendored Fx hasher;
-  public APIs and serialized dictionary schemas are unchanged. Bundled upstream licenses and vendoring notes.
+- Replaced the external `jieba-rs` dependency with a private vendored implementation. Local trie/DAG
+  storage, generated HMM tables, cached frequencies, and reusable segmentation scratch buffers reduce
+  repeated work. Bundled the Jieba license and maintenance notes; the precise upstream baseline and
+  some linguistic asset provenance remain unverified.
+- **Rust migration:** `OpenCC::jieba` now contains the vendored tokenizer rather than the external
+  `jieba_rs::Jieba`. Low-level segmentation returns token records; use `.word` or the high-level
+  `OpenCC::jieba_cut*` wrappers. Weighted results use `opencc_jieba_rs::Keyword`. External Jieba types
+  are no longer interchangeable with these types. High-level conversion signatures and C ABI version 1
+  are retained.
+- Shared immutable built-in TF-IDF data across extractors with lazy one-time decoding; custom data
+  detaches on mutation. Compressed embedded IDF and POS assets with Zstandard level 19.
+- Replaced token collection and joining with incremental output construction in
+  `OpenCC::jieba_cut_and_join`, preserving serial/parallel order and equivalence to
+  `jieba_cut(input, hmm).join(delimiter)`. The C API now calls this optimized path directly.
+- Reduced conversion allocations with internal borrowed fast paths: unchanged chunks and dictionary
+  rounds borrow their input, character conversion allocates on the first difference, and punctuation
+  passes preserve an existing output buffer when no replacement occurs. Compatibility normalization
+  also uses a lazy scalar mapper. Public string-returning APIs still return owned `String` values.
+- Removed the initial input copy in multi-round conversion and reused the already computed token
+  character count for fallback selection.
+- Replaced the external `rustc-hash` dependency with a private module adapted from rustc-hash 2.1.3,
+  ported from `opencc-fmmseg` with Rust 1.75 compatibility. Bundled upstream licenses and maintenance notes;
+  serialized dictionary schemas are unchanged.
+- Updated OpenCC mappings, the combined Hans/Hant Jieba lexicon, and curated Unicode compatibility data.
+- Refined docs.rs and README feature, tokenizer migration, ownership, and release-verification guidance.
+  Updated package contents to include vendored runtime assets, notices, and integration-test fixtures.
+  Added CI checks for warning-free docs, builds without keyword extraction, and packaged-crate tests.
+- Removed the repository's tracked local Rust toolchain override; use an explicit toolchain when
+  reproducing MSRV or release builds.
+- Rewrote the Rust 1.75 guide for the vendored dependency graph, removing obsolete
+  `include-flate` / `libflate` pins and the `core2` patch. Documented feature combinations,
+  downstream lockfiles, native compression requirements, and the separate Windows 7 build path.
+
+### Fixed
+
+- Made office conversion write through a temporary output and commit by rename after successful
+  conversion, avoiding input truncation and partial destination replacement. Added failure and
+  output-path regression coverage.
+- Corrected stale external Jieba documentation links, dependency claims, and vendoring setup notes;
+  fixed a rustdoc warning that prevented documentation builds with warnings denied.
 
 ---
 

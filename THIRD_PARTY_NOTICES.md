@@ -73,7 +73,24 @@ and `src/rustc_hash/VENDOR_NOTES.md`.
 
 ---
 
-## 5) How to Report Attribution Issues
+## 5) Jieba — Vendored Tokenization and Keyword Extraction
+
+**Upstream:** [jieba-rs](https://github.com/messense/jieba-rs)
+
+**License:** MIT; see `JIEBA-LICENSE` for the retained copyright and permission notice.
+
+**Files in this distribution:** `src/jieba_rs/`, its embedded models and dictionaries,
+and HMM table generation in `build.rs`.
+
+Local adaptations, feature gates, and unresolved source/data provenance are recorded
+in `src/jieba_rs/VENDOR_NOTES.md`. The exact upstream revision has not been authenticated;
+this notice does not establish the source lineage of every repackaged linguistic asset.
+The minimal private float-ordering wrapper has separate provenance limitations recorded
+in its module header and those maintenance notes.
+
+---
+
+## 6) How to Report Attribution Issues
 
 If you believe any attribution or license terms are missing or incorrect, please open an issue with details so we can
 correct it promptly.

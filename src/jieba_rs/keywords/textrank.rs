@@ -86,7 +86,7 @@ impl StateDiagram {
 
 /// Text rank keywords' extraction.
 ///
-/// Requires `textrank` feature to be enabled.
+/// Requires the parent crate's `keywords` feature.
 #[derive(Debug)]
 pub struct TextRank {
     span: usize,

@@ -47,7 +47,7 @@ impl PartialOrd for HeapNode<'_> {
 
 /// TF-IDF keywords extraction
 ///
-/// Require `tfidf` feature to be enabled
+/// Requires the parent crate's `keywords` feature.
 #[derive(Debug)]
 pub struct TfIdf {
     data: Cow<'static, IdfData>,
@@ -148,7 +148,7 @@ impl IdfData {
 
 /// TF-IDF keywords extraction.
 ///
-/// Require `tfidf` feature to be enabled.
+/// Requires the parent crate's `keywords` feature.
 impl Default for TfIdf {
     /// Creates TfIdf with DEFAULT_STOP_WORDS, the default TfIdf dictionary,
     /// 2 Unicode Scalar Value minimum for keywords, and no hmm in segmentation.

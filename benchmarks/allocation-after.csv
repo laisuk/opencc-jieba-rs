@@ -1,0 +1,7 @@
+case,bytes,iterations,ns_per_call,mib_per_s,alloc_calls,allocated_bytes
+short_s2twp,18,10000,537,31.99,5,1010
+short_t2twp,18,10000,265,64.78,3,514
+no_match_s2twp,16,10000,1540,9.91,9,912
+no_match_t2twp,16,10000,805,18.95,5,464
+novel_3mb_s2twp,2999999,5,41638520,68.71,514137,191034327
+novel_3mb_t2twp,2999999,5,23157180,123.55,219989,95959862

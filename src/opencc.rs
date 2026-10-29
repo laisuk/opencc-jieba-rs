@@ -11,7 +11,6 @@ use crate::zstd::decompress;
 use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
 use rayon::prelude::*;
 use regex::Regex;
-#[cfg(feature = "keywords")]
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufRead;
@@ -21,6 +20,67 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
+
+// Append unchanged spans without creating a String until the first difference.
+struct ConversionOutput<'a> {
+    input: &'a str,
+    prefix: usize,
+    owned: Option<String>,
+}
+impl<'a> ConversionOutput<'a> {
+    fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            prefix: 0,
+            owned: None,
+        }
+    }
+    fn push_str(&mut self, value: &str) {
+        if let Some(out) = &mut self.owned {
+            out.push_str(value);
+            return;
+        }
+        if self
+            .input
+            .as_bytes()
+            .get(self.prefix..self.prefix + value.len())
+            == Some(value.as_bytes())
+        {
+            self.prefix += value.len();
+        } else {
+            let mut out = String::with_capacity(self.input.len());
+            out.push_str(&self.input[..self.prefix]);
+            out.push_str(value);
+            self.owned = Some(out);
+        }
+    }
+    fn push(&mut self, ch: char) {
+        self.push_str(ch.encode_utf8(&mut [0; 4]));
+    }
+    fn finish(self) -> Cow<'a, str> {
+        match self.owned {
+            Some(out) => Cow::Owned(out),
+            None if self.prefix == self.input.len() => Cow::Borrowed(self.input),
+            None => Cow::Owned(self.input[..self.prefix].to_owned()),
+        }
+    }
+}
+
+/// Maps scalars lazily, copying the unchanged prefix only on the first replacement.
+pub(crate) fn map_chars_cow(input: &str, mut map: impl FnMut(char) -> char) -> Cow<'_, str> {
+    let mut chars = input.char_indices();
+    while let Some((offset, ch)) = chars.next() {
+        let mapped = map(ch);
+        if mapped != ch {
+            let mut out = String::with_capacity(input.len());
+            out.push_str(&input[..offset]);
+            out.push(mapped);
+            out.extend(chars.map(|(_, ch)| map(ch)));
+            return Cow::Owned(out);
+        }
+    }
+    Cow::Borrowed(input)
+}
 
 pub(crate) const DICT_HANS_HANT_ZSTD: &[u8] =
     include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
@@ -362,7 +422,7 @@ pub struct UserDictEntry {
 
 /// The main struct for performing Chinese text conversion and segmentation.
 ///
-/// `OpenCC` combines a [`Jieba`] tokenizer with OpenCC-style dictionaries,
+/// `OpenCC` combines a vendored Jieba tokenizer with OpenCC-style dictionaries,
 /// allowing high-quality conversion between Simplified, Traditional, Taiwanese,
 /// Hong Kong, and Japanese variants of Chinese. It also supports keyword extraction
 /// and multi-stage phrase replacement.
@@ -384,9 +444,13 @@ pub struct UserDictEntry {
 /// - Conversion between: Simplified ↔ Traditional, Taiwan, HK, Japanese
 /// - Optional punctuation conversion (e.g., 「」 vs “”) and keyword extraction
 ///
-/// [`Jieba`]: https://docs.rs/jieba-rs
 pub struct OpenCC {
-    /// Shared low-level Jieba tokenizer.
+    /// Shared low-level tokenizer from this crate's vendored Jieba implementation.
+    ///
+    /// Since v0.9.0 this is not the external `jieba_rs::Jieba` type. Do not
+    /// assign an external tokenizer here or assume upstream return types:
+    /// low-level segmentation returns token records with a `.word` field.
+    /// Prefer the high-level `jieba_cut*` wrappers for `Vec<String>` results.
     ///
     /// This field is intentionally exposed for advanced callers that need direct
     /// access to `jieba-rs` APIs not wrapped by [`OpenCC`].
@@ -1180,35 +1244,42 @@ impl OpenCC {
     /// );
     /// assert!(out.contains("漢字"));
     /// ```
-    fn phrases_cut_convert<'a>(
-        &'a self,
-        input: &'a str,
-        dictionaries: &'a [&DictMap],
-        hmm: bool,
-    ) -> String {
-        let ranges = self.split_string_ranges(input, true);
-        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+    fn phrases_cut_convert(&self, input: &str, dictionaries: &[&DictMap], hmm: bool) -> String {
+        self.phrases_cut_convert_cow(input, dictionaries, hmm)
+            .into_owned()
+    }
 
-        if use_parallel {
-            ranges
+    fn phrases_cut_convert_cow<'a>(
+        &self,
+        input: &'a str,
+        dictionaries: &[&DictMap],
+        hmm: bool,
+    ) -> Cow<'a, str> {
+        let ranges = self.split_string_ranges(input, true);
+        if input.len() >= PARALLEL_THRESHOLD {
+            let chunks: Vec<Cow<'a, str>> = ranges
                 .into_par_iter()
                 .map(|range| {
                     let chunk = &input[range];
-                    let mut out = String::with_capacity(chunk.len());
+                    let mut out = ConversionOutput::new(chunk);
                     self.append_converted_chunk(chunk, dictionaries, hmm, &mut out);
-                    out
+                    out.finish()
                 })
-                .reduce(String::new, |mut a, b| {
-                    a.reserve(b.len());
-                    a.push_str(&b);
-                    a
-                })
-        } else {
-            let mut out = String::with_capacity(input.len() + (input.len() >> 6));
-            for r in ranges {
-                self.append_converted_chunk(&input[r], dictionaries, hmm, &mut out);
+                .collect();
+            if chunks.iter().all(|chunk| matches!(chunk, Cow::Borrowed(_))) {
+                return Cow::Borrowed(input);
             }
-            out
+            let mut out = String::with_capacity(chunks.iter().map(|chunk| chunk.len()).sum());
+            for chunk in chunks {
+                out.push_str(&chunk);
+            }
+            Cow::Owned(out)
+        } else {
+            let mut out = ConversionOutput::new(input);
+            for range in ranges {
+                self.append_converted_chunk(&input[range], dictionaries, hmm, &mut out);
+            }
+            out.finish()
         }
     }
 
@@ -1229,7 +1300,7 @@ impl OpenCC {
         chunk: &str,
         dictionaries: &[&DictMap],
         hmm: bool,
-        out: &mut String,
+        out: &mut ConversionOutput<'_>,
     ) {
         let tokens = self.jieba.cut(chunk, hmm);
 
@@ -1310,7 +1381,7 @@ impl OpenCC {
     /// ```ignore
     /// // Internal helper; shown here for illustration.
     /// // In production, this is called from phrase-level conversion and internal character-level helpers.
-    /// let mut out = String::new();
+    /// let mut out = ConversionOutput::new("測試");
     /// convert_by_char("測試", &[&dict_chars], &mut out);
     /// assert!(!out.is_empty());
     /// ```
@@ -1319,7 +1390,7 @@ impl OpenCC {
     /// - This function is intentionally non-allocating for per-character keys (uses a stack buffer).
     /// - Keep it non-public if it is only an internal helper.
     #[inline(always)]
-    fn convert_by_char(s: &str, dictionaries: &[&DictMap], out: &mut String) {
+    fn convert_by_char(s: &str, dictionaries: &[&DictMap], out: &mut ConversionOutput<'_>) {
         // tiny stack buffer to avoid alloc for 1-char string creation
         // we’ll build a &str temporarily via encode_utf8
         let mut buf = [0u8; 4];
@@ -1355,7 +1426,7 @@ impl OpenCC {
     /// - len 1: FMM is pointless
     /// - len 2: FMM degenerates to char conversion
     #[inline(always)]
-    fn convert_by_fallback_fmm(s: &str, dictionaries: &[&DictMap], out: &mut String) {
+    fn convert_by_fallback_fmm(s: &str, dictionaries: &[&DictMap], out: &mut ConversionOutput<'_>) {
         debug_assert!(s.chars().count() >= 3);
 
         // Longest key length that exists in any dictionary.
@@ -1537,8 +1608,8 @@ impl OpenCC {
     ///
     /// The input text is first divided into non-delimiter ranges using
     /// `split_string_ranges()`. Each range is then processed by Jieba’s
-    /// `cut()` function. Delimiters such as punctuation and whitespace are
-    /// handled separately and are not segmented.
+    /// `cut()` function. Inclusive ranges retain punctuation and whitespace,
+    /// which are preserved in the token output.
     ///
     /// For large inputs, segmentation may be automatically parallelized
     /// using Rayon. The final output order always matches the original
@@ -1582,8 +1653,8 @@ impl OpenCC {
     ///
     /// The input text is first divided into non-delimiter ranges using
     /// `split_string_ranges()`. Each range is then processed by Jieba’s
-    /// `cut_for_search()` function. Delimiters such as punctuation and
-    /// whitespace are handled separately and are not segmented.
+    /// `cut_for_search()` function. Inclusive ranges retain punctuation and
+    /// whitespace, which are preserved in the token output.
     ///
     /// For large inputs, segmentation may be automatically parallelized
     /// using Rayon. The final output order always matches the original
@@ -1632,8 +1703,8 @@ impl OpenCC {
     ///
     /// The input text is first divided into non-delimiter ranges using
     /// `split_string_ranges()`. Each range is then processed by Jieba’s
-    /// `cut_all()` function. Delimiters such as punctuation and whitespace
-    /// are handled separately and are not segmented.
+    /// `cut_all()` function. Inclusive ranges retain punctuation and whitespace
+    /// in the input passed to the tokenizer.
     ///
     /// For large inputs, segmentation may be automatically parallelized
     /// using Rayon. The final output order always matches the original
@@ -1700,8 +1771,7 @@ impl OpenCC {
     ///
     /// # Notes
     /// - Returned token order is deterministic, including in parallel mode.
-    /// - Delimiters are not tagged by Jieba; they are handled by
-    ///   `split_string_ranges()`.
+    /// - Inclusive ranges retain delimiters for the tokenizer to tag.
     fn phrases_tag_impl<F>(
         &self,
         input: &str,
@@ -1737,8 +1807,8 @@ impl OpenCC {
     ///
     /// The input text is first divided into non-delimiter ranges using
     /// `split_string_ranges()`. Each range is then processed by Jieba’s
-    /// `tag()` function. Delimiters such as punctuation and whitespace are
-    /// handled separately and are not tagged.
+    /// `tag()` function. Inclusive ranges retain punctuation and whitespace;
+    /// those tokens also appear in the output with the tokenizer's tags.
     ///
     /// For large inputs, tagging may be automatically parallelized
     /// using Rayon. The final output order always matches the original
@@ -1882,7 +1952,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.st_phrases, &self.dictionary.st_characters];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -1912,7 +1982,7 @@ impl OpenCC {
         let dict_refs = [&self.dictionary.ts_phrases, &self.dictionary.ts_characters];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(result, "t")
         } else {
             result
         }
@@ -1944,7 +2014,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -1979,7 +2049,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(result, "t")
         } else {
             result
         }
@@ -2018,7 +2088,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2055,7 +2125,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2, &round3], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(result, "t")
         } else {
             result
         }
@@ -2087,7 +2157,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2122,7 +2192,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2154,7 +2224,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(result, "t")
         } else {
             result
         }
@@ -2189,7 +2259,7 @@ impl OpenCC {
         let result = self.convert_rounds(input, &[&round1, &round2], true);
 
         if punctuation {
-            Self::convert_punctuation(&result, "t")
+            Self::convert_punctuation(result, "t")
         } else {
             result
         }
@@ -2224,7 +2294,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2265,7 +2335,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2306,7 +2376,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2347,7 +2417,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2372,7 +2442,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2415,7 +2485,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2442,7 +2512,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2485,7 +2555,7 @@ impl OpenCC {
         ];
         let result = self.phrases_cut_convert(input, &dict_refs, true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2522,7 +2592,7 @@ impl OpenCC {
         };
         let result = self.phrases_cut_convert(input, &[dictionary], true);
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2570,7 +2640,7 @@ impl OpenCC {
             self.phrases_cut_convert(input, &dict_refs, true)
         };
         if punctuation {
-            Self::convert_punctuation(&result, "s")
+            Self::convert_punctuation(result, "s")
         } else {
             result
         }
@@ -2611,8 +2681,7 @@ impl OpenCC {
     ///
     /// - This function is an **internal helper** used to simplify conversion
     ///   pipelines and reduce nested `phrases_cut_convert` calls.
-    /// - Performance is identical to the nested version since each round
-    ///   still performs a single conversion pass.
+    /// - Unchanged rounds borrow their input and retain any existing owned buffer.
     ///
     /// [`DictMap`]: DictMap
     #[inline]
@@ -2623,35 +2692,37 @@ impl OpenCC {
             return input.to_owned();
         };
 
-        let mut current = self.phrases_cut_convert(input, first, hmm);
+        let mut current = self.phrases_cut_convert_cow(input, first, hmm);
 
         for round in iter {
-            current = self.phrases_cut_convert(&current, round, hmm);
+            if let Cow::Owned(next) = self.phrases_cut_convert_cow(&current, round, hmm) {
+                current = Cow::Owned(next);
+            }
         }
 
-        current
+        current.into_owned()
     }
 
     /// Internal character-level Simplified → Traditional conversion.
     ///
     /// Uses only the `st_characters` dictionary, without segmentation or
     /// phrase matching. This helper is not part of the public API.
-    fn st(&self, input: &str) -> String {
+    fn st<'a>(&self, input: &'a str) -> Cow<'a, str> {
         let dict_refs = [&self.dictionary.st_characters];
-        let mut output = String::with_capacity(input.len());
+        let mut output = ConversionOutput::new(input);
         Self::convert_by_char(input, &dict_refs, &mut output);
-        output
+        output.finish()
     }
 
     /// Internal character-level Traditional → Simplified conversion.
     ///
     /// Uses only the `ts_characters` dictionary, without segmentation or
     /// phrase matching. This helper is not part of the public API.
-    fn ts(&self, input: &str) -> String {
+    fn ts<'a>(&self, input: &'a str) -> Cow<'a, str> {
         let dict_refs = [&self.dictionary.ts_characters];
-        let mut output = String::with_capacity(input.len());
+        let mut output = ConversionOutput::new(input);
         Self::convert_by_char(input, &dict_refs, &mut output);
-        output
+        output.finish()
     }
 
     /// Converts Chinese text between different variants using a configuration string.
@@ -2838,36 +2909,25 @@ impl OpenCC {
     /// # Returns
     ///
     /// A `String` with punctuation converted to the opposite style.
-    fn convert_punctuation(text: &str, style: &str) -> String {
-        let mut out = String::with_capacity(text.len());
-
-        match style {
-            "s" => {
-                for ch in text.chars() {
-                    out.push(match ch {
-                        '“' => '「',
-                        '”' => '」',
-                        '‘' => '『',
-                        '’' => '』',
-                        _ => ch,
-                    });
-                }
-            }
-            "t" => {
-                for ch in text.chars() {
-                    out.push(match ch {
-                        '「' => '“',
-                        '」' => '”',
-                        '『' => '‘',
-                        '』' => '’',
-                        _ => ch,
-                    });
-                }
-            }
-            _ => return text.to_owned(),
+    fn convert_punctuation(text: String, style: &str) -> String {
+        match Self::convert_punctuation_cow(&text, style) {
+            Cow::Borrowed(_) => text,
+            Cow::Owned(out) => out,
         }
+    }
 
-        out
+    fn convert_punctuation_cow<'a>(text: &'a str, style: &str) -> Cow<'a, str> {
+        map_chars_cow(text, |ch| match (style, ch) {
+            ("s", '“') => '「',
+            ("s", '”') => '」',
+            ("s", '‘') => '『',
+            ("s", '’') => '』',
+            ("t", '「') => '“',
+            ("t", '」') => '”',
+            ("t", '『') => '‘',
+            ("t", '』') => '’',
+            _ => ch,
+        })
     }
 }
 
@@ -2990,7 +3050,7 @@ impl OpenCC {
     /// }
     /// ```
     ///
-    /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
+    /// [`Keyword`]: crate::Keyword
     pub fn keyword_weight_textrank(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         keyword::keyword_weight_textrank_internal(&self.jieba, input, top_k, None)
     }
@@ -3147,7 +3207,7 @@ impl OpenCC {
     /// }
     /// ```
     ///
-    /// [`Keyword`]: https://docs.rs/jieba-rs/latest/jieba_rs/struct.Keyword.html
+    /// [`Keyword`]: crate::Keyword
     pub fn keyword_weight_tfidf(&self, input: &str, top_k: usize) -> Vec<Keyword> {
         keyword::keyword_weight_tfidf_internal(&self.jieba, input, top_k, None)
     }
@@ -3688,6 +3748,66 @@ fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccErro
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn lazy_output_handles_identity_deletion_and_utf8_growth() {
+        for (input, parts, expected, borrowed) in [
+            ("甲🙂", vec!["甲", "🙂"], "甲🙂", true),
+            ("甲🙂", vec!["甲"], "甲", false),
+            ("ab", vec!["a", "🙂"], "a🙂", false),
+            ("甲🙂", vec!["甲", ""], "甲", false),
+            ("", vec![], "", true),
+        ] {
+            let mut out = ConversionOutput::new(input);
+            for part in parts {
+                out.push_str(part);
+            }
+            let out = out.finish();
+            assert_eq!(out, expected);
+            assert_eq!(matches!(out, Cow::Borrowed(_)), borrowed);
+        }
+    }
+
+    #[test]
+    fn conversion_borrows_identity_and_preserves_dictionary_precedence() {
+        let cc = opencc_with_dictionary(Dictionary::default(), &["甲乙丙"]);
+        let identity = dict(&[("甲乙丙", "甲乙丙")]);
+        let changes = dict(&[("甲", "丁")]);
+        for input in ["", "甲乙丙", "Hello world!", &"甲乙丙，".repeat(400)] {
+            let out = cc.phrases_cut_convert_cow(input, &[&identity, &changes], false);
+            assert!(matches!(out, Cow::Borrowed(_)));
+            assert_eq!(out, input);
+        }
+        assert_eq!(cc.phrases_cut_convert_cow("甲", &[&changes], false), "丁");
+    }
+
+    #[test]
+    fn scalar_mapping_borrows_and_only_maps_once() {
+        assert!(matches!(map_chars_cow("普通🙂", |c| c), Cow::Borrowed(_)));
+        assert_eq!(
+            map_chars_cow("a甲", |c| match c {
+                'a' => '甲',
+                '甲' => 'b',
+                _ => c,
+            }),
+            "甲b"
+        );
+        assert!(matches!(
+            OpenCC::convert_punctuation_cow("普通🙂", "s"),
+            Cow::Borrowed(_)
+        ));
+        assert_eq!(
+            OpenCC::convert_punctuation_cow("“甲”‘乙’", "s"),
+            "「甲」『乙』"
+        );
+        assert_eq!(
+            OpenCC::convert_punctuation_cow("「甲」『乙』", "t"),
+            "“甲”‘乙’"
+        );
+        let input = String::from("普通🙂");
+        let ptr = input.as_ptr();
+        assert_eq!(OpenCC::convert_punctuation(input, "s").as_ptr(), ptr);
+    }
 
     #[test]
     fn incremental_join_preserves_empty_tokens() {

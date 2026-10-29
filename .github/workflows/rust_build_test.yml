@@ -13,6 +13,27 @@ permissions:
   contents: read
 
 jobs:
+  public-api-docs:
+    name: Public docs and package integrity
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build docs with all features and without default features
+        run: |
+          cargo doc --locked -p opencc-jieba-rs --no-deps --all-features
+          cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
+      - name: Test without keyword extraction
+        run: cargo test --locked -p opencc-jieba-rs --no-default-features
+      - name: Verify published sources and packaged tests
+        run: |
+          cargo package --locked -p opencc-jieba-rs
+          for manifest in target/package/opencc-jieba-rs-*/Cargo.toml; do
+            cargo test --locked --all-features --manifest-path "$manifest"
+          done
+
   native-capi:
     name: C and C++17 API regression
     runs-on: ubuntu-latest
