@@ -561,7 +561,7 @@ pub unsafe extern "C" fn opencc_jieba_cut_and_join(
         None => return ptr::null_mut(),
     };
 
-    str_to_raw_c_char_strict(opencc.jieba_cut(input_str, hmm).join(delimiter_str))
+    str_to_raw_c_char_strict(opencc.jieba_cut_and_join(input_str, hmm, delimiter_str))
 }
 
 /// Returns tokens and their part-of-speech tags.
