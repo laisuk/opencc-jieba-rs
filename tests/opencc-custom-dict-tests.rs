@@ -210,7 +210,10 @@ mod tests {
             }])
             .unwrap();
 
-        assert_eq!(opencc.jieba.cut("帕兰蒂尔", false), vec!["帕兰蒂尔"]);
+        let tokens = opencc.jieba.cut("帕兰蒂尔", false);
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].word, "帕兰蒂尔");
         assert_eq!(opencc.s2t("帕兰蒂尔", false), "柏蘭蒂爾");
     }
 }

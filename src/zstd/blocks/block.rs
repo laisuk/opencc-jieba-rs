@@ -1,6 +1,7 @@
 //! Block header definitions.
 
 /// There are 4 different kinds of blocks, and the type of block influences the meaning of `Block_Size`.
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockType {
     /// An uncompressed block.

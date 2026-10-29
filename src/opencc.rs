@@ -1,13 +1,17 @@
 use crate::dictionary_lib::{
     CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictMap, Dictionary,
 };
+#[cfg(feature = "keywords")]
+use crate::jieba_rs::Keyword;
+use crate::jieba_rs::{Jieba, Token};
+#[cfg(feature = "keywords")]
 use crate::keyword::{self, keyword_extract_internal, KeywordMethod};
 use crate::opencc_config::OpenccConfig;
 use crate::zstd::decompress;
 use crate::{compat_ideographs, detofu, dictionary_lib, unicode_compat, DetofuLevel, DetofuMap};
-use jieba_rs::{Jieba, Keyword};
 use rayon::prelude::*;
 use regex::Regex;
+#[cfg(feature = "keywords")]
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufRead;
@@ -18,7 +22,8 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::{fmt, io};
 
-const DICT_HANS_HANT_ZSTD: &[u8] = include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
+pub(crate) const DICT_HANS_HANT_ZSTD: &[u8] =
+    include_bytes!("dictionary_lib/dicts/dict_hans_hant.txt.zst");
 
 /// Master delimiter string containing all punctuation and whitespace treated
 /// as token boundaries by OpenCC-Jieba.
@@ -1228,7 +1233,8 @@ impl OpenCC {
     ) {
         let tokens = self.jieba.cut(chunk, hmm);
 
-        'tok: for phrase in tokens {
+        'tok: for token in tokens {
+            let phrase = token.word;
             if phrase.is_empty() {
                 continue 'tok;
             }
@@ -1502,13 +1508,15 @@ impl OpenCC {
     ///   `split_string_ranges()`.
     fn phrases_cut_impl<F>(&self, input: &str, use_parallel: bool, cutter: F) -> Vec<String>
     where
-        F: for<'a> Fn(&Jieba, &'a str) -> Vec<&'a str> + Sync + Send,
+        F: for<'a> Fn(&Jieba, &'a str) -> Vec<Token<'a>> + Sync + Send,
     {
         let ranges = self.split_string_ranges(input, true);
 
         let process_range = |range: Range<usize>| {
             let chunk = &input[range];
-            cutter(&self.jieba, chunk).into_iter().map(str::to_owned)
+            cutter(&self.jieba, chunk)
+                .into_iter()
+                .map(|token| token.word.to_owned())
         };
 
         if use_parallel {
@@ -1777,25 +1785,77 @@ impl OpenCC {
 
     /// Segments input text using Jieba and joins the result into a single string.
     ///
-    /// Similar to [`OpenCC::jieba_cut`] but returns a space-separated string instead of a vector.
+    /// Equivalent to `jieba_cut(input, hmm).join(delimiter)`, without collecting
+    /// owned strings for every token.
     ///
     /// # Arguments
     ///
-    /// * `text` - The input text to be segmented.
+    /// * `input` - The input text to be segmented.
     /// * `hmm` - Whether to enable HMM for unknown word recognition.
+    /// * `delimiter` - The separator inserted between tokens.
     ///
     /// # Returns
     ///
-    /// A single `String` with segmented words joined by space.
+    /// A single `String` with segmented words joined by `delimiter`.
     ///
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let joined = opencc.jieba_cut_and_join("南京市长江大桥", true, " ");
-    /// println!("{}", joined); // -> "南京市 长江大桥"
+    /// let input = "南京市长江大桥";
+    /// let joined = opencc.jieba_cut_and_join(input, true, " ");
+    ///
+    /// // Verify equivalence with the standard Jieba cut + join.
+    /// assert_eq!(joined, opencc.jieba_cut(input, true).join(" "));
     /// ```
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
-        self.jieba_cut(input, hmm).join(delimiter)
+        let ranges = self.split_string_ranges(input, true);
+        let mut output = String::new();
+        let mut has_tokens = false;
+        if input.len() >= PARALLEL_THRESHOLD {
+            // Indexed collection preserves chunk order. Track token presence
+            // separately: an empty token still needs a boundary separator.
+            let chunks: Vec<_> = ranges
+                .into_par_iter()
+                .map(|range| {
+                    let chunk = &input[range];
+                    let mut joined = String::with_capacity(chunk.len());
+                    let mut has_tokens = false;
+                    for token in self.jieba.cut(chunk, hmm) {
+                        Self::append_joined(&mut joined, &mut has_tokens, token.word, delimiter);
+                    }
+                    (joined, has_tokens)
+                })
+                .collect();
+            let capacity = chunks.iter().map(|(s, _)| s.len()).sum::<usize>()
+                + chunks
+                    .iter()
+                    .filter(|(_, present)| *present)
+                    .count()
+                    .saturating_sub(1)
+                    * delimiter.len();
+            output.reserve(capacity);
+            for (chunk, present) in chunks {
+                if present {
+                    Self::append_joined(&mut output, &mut has_tokens, &chunk, delimiter);
+                }
+            }
+        } else {
+            output.reserve(input.len());
+            for range in ranges {
+                for token in self.jieba.cut(&input[range], hmm) {
+                    Self::append_joined(&mut output, &mut has_tokens, token.word, delimiter);
+                }
+            }
+        }
+        output
+    }
+
+    fn append_joined(output: &mut String, has_tokens: &mut bool, word: &str, delimiter: &str) {
+        if *has_tokens {
+            output.push_str(delimiter);
+        }
+        output.push_str(word);
+        *has_tokens = true;
     }
 
     /// Converts Simplified Chinese to Traditional Chinese.
@@ -2809,7 +2869,11 @@ impl OpenCC {
 
         out
     }
+}
 
+/// Keyword extraction, available with the default-enabled `keywords` feature.
+#[cfg(feature = "keywords")]
+impl OpenCC {
     /// Extracts top keywords using the TextRank algorithm.
     ///
     /// TextRank is a graph-based algorithm that ranks words based on co-occurrence.
@@ -3128,7 +3192,9 @@ impl OpenCC {
     ) -> Vec<Keyword> {
         keyword::keyword_weight_tfidf_internal(&self.jieba, input, top_k, allowed_pos)
     }
+}
 
+impl OpenCC {
     /// Normalizes CJK Compatibility Ideographs with the built-in Unicode table.
     ///
     /// It performs an optional Unicode compatibility normalization pre-pass and
@@ -3533,6 +3599,7 @@ pub fn find_max_utf8_length(sv: &str, max_byte_count: usize) -> usize {
 /// Jieba-based ranking. Returning [`Cow`] avoids allocating for the common
 /// case where the input is already single-line.
 #[inline]
+#[cfg(feature = "keywords")]
 pub(crate) fn strip_newlines_cow(input: &str) -> Cow<'_, str> {
     if input.as_bytes().iter().any(|&b| b == b'\n' || b == b'\r') {
         Cow::Owned(input.replace(['\n', '\r'], ""))
@@ -3621,6 +3688,21 @@ fn validate_user_dict_format<R: BufRead>(reader: R) -> Result<String, OpenccErro
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn incremental_join_preserves_empty_tokens() {
+        for delimiter in [" ", "/", "|", ""] {
+            for words in [vec![], vec![""], vec!["", ""], vec!["", "南京", "", ""]] {
+                let mut output = String::new();
+                let mut present = false;
+                for word in &words {
+                    OpenCC::append_joined(&mut output, &mut present, word, delimiter);
+                }
+                assert_eq!(output, words.join(delimiter));
+                assert_eq!(present, !words.is_empty());
+            }
+        }
+    }
 
     fn dict(entries: &[(&str, &str)]) -> DictMap {
         let mut map = DictMap::default();

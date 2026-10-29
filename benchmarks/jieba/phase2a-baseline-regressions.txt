@@ -1,0 +1,58 @@
+   Compiling opencc-jieba-rs v0.8.2 (D:\codes\Rust\opencc-jieba-rs)
+warning: unused import: `Arc`
+ --> src\jieba_rs\keywords\tfidf_tests.rs:4:17
+  |
+4 | use std::sync::{Arc, Barrier};
+  |                 ^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `opencc-jieba-rs` (lib test) generated 1 warning (run `cargo fix --lib -p opencc-jieba-rs --tests` to apply 1 suggestion)
+    Finished test [unoptimized + debuginfo] target(s) in 2.41s
+     Running unittests src\lib.rs (target\debug\deps\opencc_jieba_rs-7d6be1cb253c9008.exe)
+
+running 7 tests
+test jieba_rs::keywords::tfidf::tests::custom_nonfinite_values_and_signed_zero_keep_their_bits ... ok
+test jieba_rs::keywords::tfidf::tests::custom_duplicates_lower_median_ties_and_merge_semantics ... ok
+thread 'jieba_rs::keywords::tfidf::tests::failed_and_empty_loads_preserve_baseline_partial_update_and_panic_behavior' panicked at /rustc/82e1608dfa6e0b5569232559e3d385fea5a93112\library\core\src\slice\select.rs:135:9:
+partition_at_index index 0 greater than length of slice 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread 'jieba_rs::keywords::tfidf::tests::failed_and_empty_loads_preserve_baseline_partial_update_and_panic_behavior' panicked at /rustc/82e1608dfa6e0b5569232559e3d385fea5a93112\library\core\src\slice\select.rs:135:9:
+partition_at_index index 0 greater than length of slice 0
+thread 'jieba_rs::keywords::tfidf::tests::failed_and_empty_loads_preserve_baseline_partial_update_and_panic_behavior' panicked at /rustc/82e1608dfa6e0b5569232559e3d385fea5a93112\library\core\src\slice\select.rs:135:9:
+partition_at_index index 0 greater than length of slice 0
+thread 'jieba_rs::keywords::tfidf::tests::failed_and_empty_loads_preserve_baseline_partial_update_and_panic_behavior' panicked at /rustc/82e1608dfa6e0b5569232559e3d385fea5a93112\library\core\src\slice\select.rs:135:9:
+partition_at_index index 0 greater than length of slice 0
+test jieba_rs::keywords::tfidf::tests::failed_and_empty_loads_preserve_baseline_partial_update_and_panic_behavior ... ok
+test jieba_rs::keywords::tfidf::tests::default_initialization_and_repeated_extraction_are_thread_safe ... ok
+test jieba_rs::keywords::tfidf::tests::default_custom_load_and_configuration_do_not_affect_other_extractors ... ok
+BASELINE_FINGERPRINTS=[14695981039346656037, 14695981039346656037, 6477159600997857382, 1457761374937938900, 11289714792899811600, 8018754530098106330, 4937961171344006089, 13465046762909509050, 14695981039346656037, 14695981039346656037, 14994981703853690624, 1317971975628895999, 14498102320680334617, 17348593776917521155, 10922536898959028519, 3165218383700049852, 14695981039346656037, 14695981039346656037, 1710473771339932909, 17400080400368549419, 6744908069997980697, 18280821400989701616, 13761940663983229679, 1015211730555719324, 14695981039346656037, 14695981039346656037, 2802850097350524637, 2802850097350524637, 5401311377119180119, 5401311377119180119, 5401311377119180119, 5401311377119180119, 14695981039346656037, 14695981039346656037, 1412146477852310886, 1457761374937938900, 2981332398544718336, 8018754530098106330, 15059695833183440938, 13465046762909509050, 14695981039346656037, 14695981039346656037, 14994981703853690624, 1317971975628895999, 14498102320680334617, 17348593776917521155, 10922536898959028519, 3165218383700049852, 14695981039346656037, 14695981039346656037, 2249975208559882613, 4441786782217203852, 10069700636516515018, 16397396207126959871, 12771588009793017259, 132578651099423752, 14695981039346656037, 14695981039346656037, 9603788837310650171, 2802850097350524637, 5558443323799925671, 5401311377119180119, 16044829514788345667, 5401311377119180119]
+test jieba_rs::keywords::tfidf::tests::builtin_matches_independently_loaded_idf_and_baseline_results ... ok
+test jieba_rs::keywords::tfidf::tests::concurrent_public_calls_across_instances_match_exactly ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 85 filtered out; finished in 6.64s
+
+     Running tests\opencc-custom-dict-tests.rs (target\debug\deps\opencc_custom_dict_tests-caa31caddabfe2c2.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests\opencc-jieba-rs-test.rs (target\debug\deps\opencc_jieba_rs_test-1de4a69525e1ba5e.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.00s
+
+     Running tests\public_api_contracts.rs (target\debug\deps\public_api_contracts-9ee85aa534bb781b.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests\split_string_ranges_test.rs (target\debug\deps\split_string_ranges_test-dee39748f98384ec.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+

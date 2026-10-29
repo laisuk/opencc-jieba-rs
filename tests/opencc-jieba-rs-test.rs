@@ -204,6 +204,7 @@ mod tests {
         assert_eq!(actual_output, expected_output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank() {
         let input = include_str!("data/OneDay.txt");
@@ -212,6 +213,7 @@ mod tests {
         println!("TextRank: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank_pos() {
         let input = include_str!("data/OneDay.txt");
@@ -229,6 +231,7 @@ mod tests {
         assert!(output.len() <= 10);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_textrank_pos_vs_all() {
         let input = include_str!("data/OneDay.txt");
@@ -249,6 +252,7 @@ mod tests {
         assert_ne!(all, filtered);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_weight_textrank() {
         let input = include_str!("data/OneDay.txt");
@@ -257,6 +261,7 @@ mod tests {
         println!("TextRank: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf() {
         let input = include_str!("data/OneDay.txt");
@@ -265,6 +270,7 @@ mod tests {
         println!("TF-IDF: {:?}", output);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf_pos() {
         let input = include_str!("data/OneDay.txt");
@@ -282,6 +288,7 @@ mod tests {
         assert!(output.len() <= 10);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_extract_tfidf_pos_vs_all() {
         let input = include_str!("data/OneDay.txt");
@@ -302,6 +309,7 @@ mod tests {
         assert_ne!(all, filtered);
     }
 
+    #[cfg(feature = "keywords")]
     #[test]
     fn test_keyword_weight_tfidf() {
         let input = include_str!("data/OneDay.txt");
@@ -431,7 +439,12 @@ mod tests {
         let opencc = OpenCC::try_new_with_user_dict_path("tests/dicts/user_dict.txt")
             .unwrap_or_else(|e| panic!("failed to initialize OpenCC with user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|token| token.word)
+            .collect();
 
         println!("{:?}", result);
 
@@ -455,7 +468,12 @@ mod tests {
             .load_user_dict("tests/dicts/user_dict2.txt")
             .unwrap_or_else(|e| panic!("failed to load second user dictionary: {e}"));
 
-        let result = opencc.jieba.cut(input, false);
+        let result: Vec<&str> = opencc
+            .jieba
+            .cut(input, false)
+            .into_iter()
+            .map(|token| token.word)
+            .collect();
 
         println!("{:?}", result);
 

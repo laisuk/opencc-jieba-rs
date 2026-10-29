@@ -57,7 +57,7 @@
 //! - [`OpenCC::keyword_extract_textrank`](crate::OpenCC::keyword_extract_textrank)
 //! - [`OpenCC::keyword_extract_tfidf`](crate::OpenCC::keyword_extract_tfidf)
 
-use jieba_rs::{Keyword, KeywordExtract, TextRank, TfIdf};
+use crate::jieba_rs::{Jieba, Keyword, KeywordExtract, TextRank, TfIdf};
 
 /// Keyword extraction algorithm.
 ///
@@ -261,7 +261,7 @@ pub const POS_KEYWORDS: &[&str] = &["n", "nr", "ns", "nt", "nz", "v", "vn"];
 /// # Since
 /// v0.7.4
 pub(crate) fn keyword_extract_internal(
-    jieba: &jieba_rs::Jieba,
+    jieba: &Jieba,
     input: &str,
     top_k: usize,
     method: KeywordMethod,
@@ -330,7 +330,7 @@ pub(crate) fn keyword_extract_internal(
 /// # Since
 /// v0.7.4
 pub(crate) fn keyword_weight_textrank_internal(
-    jieba: &jieba_rs::Jieba,
+    jieba: &Jieba,
     input: &str,
     top_k: usize,
     allowed_pos: Option<&[&str]>,
@@ -388,7 +388,7 @@ pub(crate) fn keyword_weight_textrank_internal(
 /// # Since
 /// v0.7.4
 pub(crate) fn keyword_weight_tfidf_internal(
-    jieba: &jieba_rs::Jieba,
+    jieba: &Jieba,
     input: &str,
     top_k: usize,
     allowed_pos: Option<&[&str]>,

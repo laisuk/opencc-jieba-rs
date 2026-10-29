@@ -1,0 +1,291 @@
+   Compiling opencc-jieba-rs v0.8.2 (D:\codes\Rust\opencc-jieba-rs)
+    Finished test [unoptimized + debuginfo] target(s) in 4.94s
+     Running unittests src\lib.rs (target\debug\deps\opencc_jieba_rs-7d6be1cb253c9008.exe)
+
+running 85 tests
+test compat_ideographs::tests::rejects_source_outside_supported_ranges ... ok
+test detofu::tests::parses_supported_level_aliases ... ok
+test compat_ideographs::tests::parses_custom_table ... ok
+test compat_ideographs::tests::rejects_multi_char_source_or_target ... ok
+test dictionary_lib::dict_slots::tests::all_slots_round_trip_through_canonical_names ... ok
+test dictionary_lib::dict_slots::tests::case_insensitive_parser_trims_whitespace ... ok
+test dictionary_lib::dict_slots::tests::japanese_filename_aliases_are_supported ... ok
+test dictionary_lib::dict_slots::tests::unknown_slots_are_rejected ... ok
+test compat_ideographs::tests::unmapped_compat_ideographs_stay_self ... ok
+test compat_ideographs::tests::leaves_normal_text_unchanged ... ok
+test compat_ideographs::tests::normalizes_bmp_compat_ideographs ... ok
+test compat_ideographs::tests::normalizes_in_place ... ok
+test jieba_rs::hmm::tests::test_hmm_cut_keeps_connected_alphanumerics_together ... ok
+test jieba_rs::keywords::ordered_float::tests::semantics ... ok
+test jieba_rs::hmm::tests::test_hmm_cut_ties_go_to_the_higher_state ... ok
+test jieba_rs::hmm::tests::test_hmm_cut ... ok
+test jieba_rs::hmm::tests::test_viterbi ... ok
+test jieba_rs::keywords::textrank::tests::test_init_state_diagram ... ok
+test jieba_rs::sparse_dag::tests::test_clear_and_rebuild ... ok
+test jieba_rs::sparse_dag::tests::test_static_sparse_dag ... ok
+test detofu::tests::builtin_detofu_preserves_bmp_text ... ok
+test detofu::tests::direct_custom_pair_overrides_builtin_mapping ... ok
+test detofu::tests::builtin_detofu_replaces_known_mapping ... ok
+test detofu::tests::plain_builtin_map_uses_shared_table ... ok
+test detofu::tests::free_detofu_into_appends ... ok
+test detofu::tests::direct_custom_pair_can_target_bmp_character ... ok
+test detofu::tests::map_detofu_into_reuses_output_buffer ... ok
+test jieba_rs::trie::tests::test_insert_get_prefixes ... ok
+test jieba_rs::trie::tests::test_prefixes_at_every_char ... ok
+test jieba_rs::trie::tests::test_reinsert_replaces_id ... ok
+test jieba_rs::trie::tests::test_wide_fanout ... ok
+test opencc::tests::older_dictionary_json_defaults_new_forward_variant_phrase_slots ... ok
+test jieba_rs::trie::tests::test_reserve_avoids_growth ... ok
+test jieba_rs::trie::tests::test_grows_and_survives_rehash ... ok
+test opencc::tests::schema_3_serialization_uses_only_new_jp_hk_slots ... ok
+test jieba_rs::posseg::tests::test_posseg_empty ... ok
+test jieba_rs::posseg::tests::test_posseg_single_char ... ok
+test jieba_rs::posseg::tests::test_posseg_oov_name ... ok
+test jieba_rs::posseg::tests::test_posseg_basic ... ok
+test jieba_rs::posseg::tests::test_posseg_person_name ... ok
+test jieba_rs::posseg::tests::test_guess_tag_matches_longest_span ... ok
+test rustc_hash::tests::bytes ... ok
+test rustc_hash::tests::signed ... ok
+test rustc_hash::tests::unsigned ... ok
+test unicode_compat::tests::compat_mapping_has_precedence_without_chained_remapping ... ok
+test unicode_compat::tests::ascii_and_unmapped_text_stay_unchanged ... ok
+test unicode_compat::tests::duplicate_sources_are_last_wins ... ok
+test unicode_compat::tests::empty_table_is_valid ... ok
+test unicode_compat::tests::extended_normalization_does_not_apply_compat_ideographs ... ok
+test unicode_compat::tests::normalize_all_combines_compat_and_extended_tables ... ok
+test unicode_compat::tests::builtin_is_cached ... ok
+test unicode_compat::tests::normalize_all_in_place_combines_both_tables ... ok
+test unicode_compat::tests::normalize_in_place_uses_extended_table_only ... ok
+test unicode_compat::tests::parses_comments_blank_lines_and_pairs ... ok
+test unicode_compat::tests::rejects_ascii_source ... ok
+test unicode_compat::tests::rejects_empty_source_or_target ... ok
+test unicode_compat::tests::rejects_missing_target ... ok
+test unicode_compat::tests::rejects_multi_scalar_source_or_target ... ok
+test unicode_compat::tests::rejects_too_many_columns ... ok
+test unicode_compat::tests::supports_astral_source_and_target_scalars ... ok
+test zstd::bit_io::bit_reader_reverse::test::it_works ... ok
+test zstd::decoding::ringbuffer::tests::edge_cases ... ok
+test zstd::decoding::ringbuffer::tests::smoke ... ok
+test zstd::decoding::sequence_section_decoder::test_ll_default ... ok
+test zstd::regression_tests::checksum_consumption_and_truncation ... ok
+test zstd::regression_tests::collection_appends_wrapped_output_and_preserves_history ... ok
+test zstd::regression_tests::dictionary_ids_and_window_limit ... ok
+test zstd::regression_tests::fcs_remains_a_capacity_hint ... ok
+test zstd::regression_tests::frame_boundaries ... ok
+test zstd::regression_tests::invalid_history_offsets_preserve_errors ... ok
+test zstd::regression_tests::skippable_frames_keep_existing_entry_point_behavior ... ok
+test opencc::tests::bundled_dictionary_new_loads ... ok
+test zstd::tests::decompress_embedded_has_valid_dictionary_and_fcs ... ok
+test opencc::tests::hk_forward_variants_apply_phrases_before_characters ... ok
+test opencc::tests::s2twp_combines_taiwan_dictionaries_in_second_round ... ok
+test opencc::tests::schema_2_japanese_chains_keep_legacy_fallbacks ... ok
+test opencc::tests::hk2tp_uses_one_pass_with_dictionary_precedence ... ok
+test opencc::tests::schema_3_japanese_chains_use_shinjitai_slots ... ok
+test jieba_rs::keywords::textrank::tests::test_extract_keywords_filters_invalid_candidates ... ok
+test opencc::tests::t2hkp_uses_one_pass_with_dictionary_precedence ... ok
+test opencc::tests::failed_custom_dictionary_load_preserves_current_dictionary ... ok
+test opencc::tests::tw_forward_variants_apply_phrases_before_characters ... ok
+test opencc::tests::t2twp_uses_one_pass_with_dictionary_precedence ... ok
+test opencc::tests::tw2tp_uses_one_pass_with_dictionary_precedence ... ok
+test opencc::tests::custom_dictionary_zstd_composes_with_jieba_user_dictionary ... ok
+
+test result: ok. 85 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.82s
+
+     Running tests\opencc-custom-dict-tests.rs (target\debug\deps\opencc_custom_dict_tests-caa31caddabfe2c2.exe)
+
+running 9 tests
+test tests::custom_file_parser_supports_comments_bom_and_multiple_values ... ok
+test tests::custom_file_multiple_files_are_applied_in_order ... ok
+test tests::custom_phrase_works_when_jieba_preserves_the_domain_term ... ok
+test tests::custom_file_append_character_mapping ... ok
+test tests::custom_pairs_override_clears_target_slot ... ok
+test tests::custom_pairs_append_is_last_wins ... ok
+test tests::custom_pairs_invalid_entry_is_transactional ... ok
+test tests::custom_file_parse_failure_is_transactional ... ok
+test tests::custom_pairs_append_character_mapping ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+     Running tests\opencc-jieba-rs-test.rs (target\debug\deps\opencc_jieba_rs_test-1de4a69525e1ba5e.exe)
+
+running 59 tests
+test tests::builtin_detofu_replaces_known_st_mappings ... ok
+test tests::newly_unified_direct_apis_honor_punctuation ... ok
+test tests::opencc_normalize_compat_extended_golden ... ok
+test tests::opencc_normalize_compat_then_convert_golden ... ok
+test tests::new_with_user_dict_entries_adds_words ... ok
+test tests::load_user_dict_entries_rejects_empty_word ... ok
+test tests::opencc_normalize_compat_extended_variant_forms_golden ... ok
+test tests::normalize_compat_golden ... ok
+test tests::opencc_normalize_compat_extended_improves_jieba_segmentation ... ok
+test tests::jp2t_test ... ok
+test tests::opencc_normalize_compat_extended_then_convert_golden ... ok
+test tests::load_user_dict_entries_compose_across_calls ... ok
+test tests::normalize_compat_extended_is_superset_of_basic_compat_golden ... ok
+test tests::hong_kong_phrase_chain_tests ... ok
+test tests::new_with_empty_user_dict_entries_succeeds ... ok
+test tests::load_user_dict_entries_adds_words ... ok
+test tests::detofu_with_custom_file_loads_user_mapping ... ok
+test tests::test_detofu_custom_pairs_later_wins ... ok
+test tests::test_detofu_custom_pairs_override_builtin_mapping ... ok
+test tests::test_detofu_custom_pairs_support_bmp_characters ... ok
+test tests::test_detofu_map_with_custom_pairs ... ok
+test tests::test_detofu_map_with_custom_pairs_overrides_builtin ... ok
+test tests::opencc_normalize_unicode_compat_golden ... ok
+test tests::s2t_punct_test ... ok
+test tests::test_add_word_rejects_invalid_tags ... ok
+test tests::test_add_word_multiple_calls_compose ... ok
+test tests::s2twp_test ... ok
+test tests::t2s_test ... ok
+test tests::t2jp_test ... ok
+test tests::test_add_word_shared_tokenizer_uses_copy_on_write ... ok
+test tests::test_add_word_failed_validation_does_not_mutate_tokenizer ... ok
+test tests::test_add_word_without_optional_arguments ... ok
+test tests::s2t_test ... ok
+test tests::test_add_word_with_tag_and_automatic_frequency ... ok
+test tests::test_add_word_rejects_invalid_words ... ok
+test tests::test_add_word_with_frequency_and_tag ... ok
+test tests::s2tw_test ... ok
+test tests::test_jieba_cut ... ok
+test tests::test_jieba_tag_hant ... ok
+test tests::test_jieba_cut_all ... ok
+test tests::test_jieba_cut_for_search ... ok
+test tests::test_keyword_extract_textrank_pos ... ok
+test tests::test_keyword_extract_textrank_pos_vs_all ... ok
+test tests::test_keyword_extract_textrank ... ok
+test tests::test_keyword_weight_textrank ... ok
+test tests::test_opencc_detofu ... ok
+test tests::test_opencc_t2s_detofu ... ok
+test tests::test_load_multiple_user_dicts ... ok
+test tests::test_opencc_detofu_with_custom_pairs ... ok
+test tests::test_opencc_s2t_detofu ... ok
+test tests::test_keyword_extract_tfidf ... ok
+test tests::test_keyword_extract_tfidf_pos ... ok
+test tests::test_keyword_weight_tfidf ... ok
+test tests::test_keyword_extract_tfidf_pos_vs_all ... ok
+test tests::test_opencc_t2s_detofu_into ... ok
+test tests::test_zho_check ... ok
+test tests::test_opencc_t2s_detofu_preserves_unmapped_character ... ok
+test tests::test_user_dict_loading ... ok
+test tests::zho_check_test ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.30s
+
+     Running tests\public_api_contracts.rs (target\debug\deps\public_api_contracts-9ee85aa534bb781b.exe)
+
+running 2 tests
+test converters_can_be_shared_between_threads ... ok
+test configurations_preserve_names_ffi_values_and_dispatch ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+     Running tests\split_string_ranges_test.rs (target\debug\deps\split_string_ranges_test-dee39748f98384ec.exe)
+
+running 2 tests
+test tests::test_split_inclusive_refined ... ok
+test tests::test_split_exclusive_refined ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+   Doc-tests opencc-jieba-rs
+
+running 96 tests
+test src\lib.rs - (line 214) - compile ... ok
+test src\lib.rs - (line 183) - compile ... ok
+test src\lib.rs - (line 171) - compile ... ok
+test src\detofu.rs - detofu::DetofuLevel::parse (line 72) ... ok
+test src\keyword.rs - keyword::KeywordMethod::parse_str (line 138) ... ok
+test src\opencc.rs - opencc::DictRefs (line 144) ... ignored
+test src\detofu.rs - detofu::DetofuMap::builtin (line 226) ... ok
+test src\detofu.rs - detofu::DetofuMap::detofu_into (line 333) ... ok
+test src\detofu.rs - detofu::DetofuMap (line 194) ... ok
+test src\detofu.rs - detofu::DetofuMap::detofu (line 389) ... ok
+test src\detofu.rs - detofu::DetofuMap::with_custom_pairs (line 291) ... ok
+test src\detofu.rs - detofu::DetofuMap::with_custom_pairs (line 302) ... ok
+test src\opencc.rs - opencc::OpenCC::convert_by_char (line 1307) ... ignored
+test src\lib.rs - (line 261) ... ok
+test src\lib.rs - (line 23) ... ok
+test src\lib.rs - (line 242) ... ok
+test src\lib.rs - (line 149) ... ok
+test src\lib.rs - (line 55) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu_with_custom_file (line 3407) - compile ... ok
+test src\lib.rs - (line 70) ... ok
+test src\opencc.rs - opencc::OpenCC (line 3480) ... ok
+test src\keyword.rs - keyword (line 32) ... ok
+test src\opencc.rs - opencc::OpenCC::convert (line 2650) ... ok
+test src\keyword.rs - keyword::POS_KEYWORDS (line 187) ... ok
+test src\opencc.rs - opencc::OpenCC::convert_with_config (line 2686) ... ok
+test src\keyword.rs - keyword::KeywordMethod (line 82) ... ok
+test src\opencc.rs - opencc::OpenCC (line 367) ... ok
+test src\opencc.rs - opencc::OpenCC::add_word (line 882) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu (line 3304) ... ok
+test src\opencc.rs - opencc::OpenCC::add_word (line 897) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu (line 3332) ... ok
+test src\opencc.rs - opencc::OpenCC::add_word (line 912) ... ok
+test src\opencc.rs - opencc::OpenCC::hk2sp (line 2122) ... ok
+test src\opencc.rs - opencc::OpenCC::hk2s (line 2087) ... ok
+test src\opencc.rs - opencc::OpenCC::hk2tp (line 2421) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu_into (line 3368) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu (line 3321) ... ok
+test src\opencc.rs - opencc::OpenCC::jieba_cut (line 1561) ... ok
+test src\opencc.rs - opencc::OpenCC::detofu_with_custom_pairs (line 3443) ... ok
+test src\opencc.rs - opencc::OpenCC::load_dictionary_zstd (line 475) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::load_user_dict (line 734) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::new_with_user_dict (line 1128) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::jieba_cut_all (line 1655) ... ok
+test src\opencc.rs - opencc::OpenCC::jieba_cut_and_join (line 1797) ... ok
+test src\opencc.rs - opencc::OpenCC::jieba_cut_for_search (line 1606) ... ok
+test src\opencc.rs - opencc::OpenCC::jp2t (line 2492) ... ok
+test src\opencc.rs - opencc::OpenCC::jieba_tag (line 1762) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_extract_textrank (line 2830) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_extract_textrank_pos (line 2858) ... ok
+test src\opencc.rs - opencc::OpenCC::phrases_cut_convert (line 1168) ... ignored
+test src\opencc.rs - opencc::OpenCC::load_user_dict_entries (line 788) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_weight_textrank (line 2922) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_weight_textrank_pos (line 2951) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_extract_tfidf (line 2989) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_compat (line 3157) ... ok
+test src\opencc.rs - opencc::OpenCC::new (line 415) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_extract_tfidf_pos (line 3017) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_compat_extended (line 3219) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_compat (line 3148) ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_weight_tfidf (line 3079) ... ok
+test src\opencc.rs - opencc::OpenCC::try_new_internal (line 974) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::keyword_weight_tfidf_pos (line 3110) ... ok
+test src\opencc.rs - opencc::OpenCC::try_new_with_dictionary_zstd (line 438) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::s2hk (line 2020) ... ok
+test src\opencc.rs - opencc::OpenCC::try_new_with_user_dict_path (line 1025) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::try_new_with_user_dict_path (line 1044) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_compat_extended (line 3195) ... ok
+test src\opencc.rs - opencc::OpenCC::s2hkp (line 2055) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_compat_extended (line 3207) ... ok
+test src\opencc.rs - opencc::OpenCC::s2tw (line 1877) ... ok
+test src\opencc.rs - opencc::OpenCC::s2t (line 1821) ... ok
+test src\opencc.rs - opencc::OpenccError (line 180) - compile ... ok
+test src\opencc.rs - opencc::OpenCC::s2twp (line 1950) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_unicode_compat (line 3252) ... ok
+test src\opencc.rs - opencc::UserDictEntry (line 311) ... ok
+test src\opencc.rs - opencc::OpenCC::t2hkp (line 2351) ... ok
+test src\opencc.rs - opencc::UserDictEntry (line 327) ... ok
+test src\opencc.rs - opencc::OpenCC::t2jp (line 2455) ... ok
+test src\opencc.rs - opencc::OpenCC::normalize_unicode_compat (line 3263) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::as_str (line 260) ... ok
+test src\opencc.rs - opencc::OpenCC::t2s (line 1851) ... ok
+test src\opencc.rs - opencc::OpenCC::t2tw (line 2161) ... ok
+test src\opencc.rs - opencc::is_delimiter (line 95) ... ok
+test src\opencc.rs - opencc::find_max_utf8_length (line 3512) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::as_str (line 269) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::from_ffi (line 176) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::is_valid_config_ffi (line 376) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::to_ffi (line 228) ... ok
+test src\opencc_config.rs - opencc_config::OpenccConfig::is_valid_config (line 353) ... ok
+test src\opencc.rs - opencc::OpenCC::t2twp (line 2201) ... ok
+test src\opencc.rs - opencc::OpenCC::try_new_with_user_dict_entries (line 1082) ... ok
+test src\opencc.rs - opencc::OpenCC::tw2s (line 1912) ... ok
+test src\opencc.rs - opencc::OpenCC::tw2sp (line 1987) ... ok
+test src\opencc.rs - opencc::OpenCC::tw2t (line 2241) ... ok
+test src\opencc.rs - opencc::OpenCC::tw2tp (line 2283) ... ok
+test src\opencc.rs - opencc::OpenCC::zho_check (line 2742) ... ok
+
+test result: ok. 93 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 18.67s
+

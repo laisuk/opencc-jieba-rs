@@ -32,171 +32,6 @@ conversion, with support for both segmentation and conversion dictionaries.
 
 ---
 
-## Installation
-
-For the Rust library, see [Library Usage](#library-usage). To build the CLI tools from the repository (with a current
-stable Rust toolchain):
-
-```bash
-git clone https://github.com/laisuk/opencc-jieba-rs
-cd opencc-jieba-rs
-cargo build --release --workspace
-```
-
-The CLI tool will be located at:
-
-```
-target/release/opencc-jieba
-```
-
-## Usage: `opencc-jieba convert`
-
-```
-opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
-
-Usage: opencc-jieba.exe convert [OPTIONS] --config <config>
-
-Options:
-  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
-  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
-  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
-  -p, --punct                         Enable punctuation conversion
-  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
-  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
-  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
-  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
-      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
-      --in-enc <encoding>             Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-      --out-enc <encoding>            Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -h, --help                          Print help
-```
-
-## Usage: `opencc-jieba segment`
-
-```
-opencc-jieba segment: Segment Chinese input text into words
-
-Usage: opencc-jieba.exe segment [OPTIONS]
-
-Options:
-  -i, --input <file>           Input file to segment
-  -o, --output <file>          Write segmented result to file
-  -d, --delim <character>      Delimiter character for segmented text (use " " for space) [default: /]
-  -s, --separator <character>  Separator character for segmented mode=tag (use " " for space) [default: /]
-  -m, --mode <mode>            Segmentation mode: cut | search | all | tag [default: cut] [possible values: cut, search, all, tag]
-      --no-hmm                 Disable HMM for segmentation and tagging
-  -U, --user-dict-file <FILE>  Jieba user dictionary file; may be specified multiple times
-  -n, --norm-compat            Normalize CJK Compatibility Ideographs before processing
-  -E, --norm-compat-extended   Normalize extended Unicode compatibility forms before processing
-      --in-enc <encoding>      Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-      --out-enc <encoding>     Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
-  -h, --help                   Print help
-```
-
-## Usage: `opencc-jieba office`
-
-Supported Office formats: `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods`, `.odp`, `.epub`
-
-```
-opencc-jieba office: Convert Office or EPUB documents using OpenCC
-
-Usage: opencc-jieba.exe office [OPTIONS] --config <config>
-
-Options:
-  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
-  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
-  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
-  -p, --punct                         Enable punctuation conversion
-  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
-  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
-  -f, --format <ext>                  Force office document format <ext>: docx, xlsx, pptx, odt, ods, odp, epub
-  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
-  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
-      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
-  -k, --keep-font                     Preserve original font styles
-  -F, --convert-filename              Convert the output filename using the selected OpenCC configuration
-  -h, --help                          Print help
-```
-
-### Example
-
-```bash
-# Convert Simplified Chinese to Traditional Chinese
-opencc-jieba convert -i input.txt -o output.txt --config s2t
-
-# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
-opencc-jieba convert -i input.txt -o output.txt --config tw2s
-
-# Normalize CJK Compatibility Ideographs before conversion
-opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat
-
-# Normalize CJK Compatibility Ideographs and curated Unicode compatibility forms
-opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat-extended
-
-# Apply rare-character display fallbacks after conversion
-opencc-jieba convert -i input.txt -o output.txt --config t2s --detofu
-
-# Convert with a Jieba user dictionary and a custom OpenCC conversion dictionary
-opencc-jieba convert -i input.txt -o output.txt --config hk2sp \
-  --user-dict-file user_dict.txt \
-  --custom-dict HkPhrasesRev:append:my_hk_dict.txt
-
-# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese with idioms
-opencc-jieba office -i input.docx -o output.docx --config tw2sp --punct --format docx --keep-font
-
-# Convert an Office document with a Jieba user dictionary
-opencc-jieba office -i input.docx -o output.docx --config s2t \
-  --user-dict-file user_dict.txt
-
-# Segment text file contents then output to new file
-opencc-jieba segment -i input.txt -o output.txt --delim ","
-
-# Segment using a Jieba user dictionary
-opencc-jieba segment -i input.txt -o output.txt \
-  --user-dict-file user_dict.txt
-
-# Segment after normalizing CJK Compatibility Ideographs
-opencc-jieba segment -i input.txt -o output.txt --norm-compat
-
-# Segment after applying the full extended compatibility normalization
-opencc-jieba segment -i input.txt -o output.txt --norm-compat-extended
-
-# Segment with POS tagging (format: word:tag)
-opencc-jieba segment -i input.txt -o output.txt --mode tag --delim " " --separator ":"
-
-# Segment from console input with POS tagging
-opencc-jieba segment --mode tag --delim " " --separator ":"
-```
-
-- Supported conversions:
-    - `s2t` – Simplified to Traditional
-    - `s2tw` – Simplified to Traditional Taiwan
-    - `s2twp` – Simplified to Traditional Taiwan with idioms
-    - `s2hk` – Simplified to Hong Kong Traditional
-    - `s2hkp` – Simplified to Hong Kong Traditional with phrase preferences
-    - `t2s` – Traditional to Simplified
-    - `t2tw` – Traditional to Taiwan variants
-    - `t2twp` – Traditional to Taiwan variants with phrase preferences
-    - `t2hk` – Traditional to Hong Kong variants
-    - `t2hkp` – Traditional to Hong Kong variants with phrase preferences
-    - `tw2s` – Traditional Taiwan to Simplified
-    - `tw2sp` – Traditional Taiwan to Simplified with idioms
-    - `tw2t` – Taiwan variants to Traditional
-    - `tw2tp` – Taiwan variants to Traditional with phrase normalization
-    - `hk2s` – Hong Kong variants to Simplified
-    - `hk2sp` – Hong Kong variants to Simplified with phrase normalization
-    - `hk2t` – Hong Kong variants to Traditional
-    - `hk2tp` – Hong Kong variants to Traditional with phrase normalization
-    - `jp2t` – Japanese Shinjitai to Traditional
-    - `t2jp` – Traditional to Japanese Shinjitai
-
-### Lexicons
-
-The library and conversion CLI use embedded OpenCC conversion dictionaries and a combined Hans/Hant Jieba dictionary.
-No external dictionary files are needed for ordinary conversion or segmentation.
-
----
-
 ## Library Usage
 
 To add this crate to your project:
@@ -270,6 +105,23 @@ Run the repository's broader API example with `cargo run --example use_opencc_ji
 
 > 📦 Crate: [opencc-jieba-rs on crates.io](https://crates.io/crates/opencc-jieba-rs)  
 > 📄 Docs: [docs.rs/opencc-jieba-rs](https://docs.rs/opencc-jieba-rs/)
+
+### Optional keyword extraction
+
+The `keywords` Cargo feature is enabled by default and provides TF-IDF and
+TextRank extraction, including all `OpenCC::keyword_extract_*` and
+`OpenCC::keyword_weight_*` methods, `Keyword`, `KeywordMethod`, and `POS_KEYWORDS`.
+To omit those APIs and the embedded IDF dictionary, use:
+
+```toml
+[dependencies]
+opencc-jieba-rs = { version = "0.8.2", default-features = false }
+```
+
+Segmentation, POS tagging (`jieba_tag()`), user dictionaries, OpenCC conversion,
+and custom conversion dictionaries remain available. The C API explicitly enables
+`keywords` to preserve all existing exported functions. Cargo features are additive;
+another dependency enabling `keywords` enables it for the shared library build.
 
 ---
 
@@ -854,6 +706,171 @@ Do not omit the frequency or put the tag in the frequency field.
 
 User dictionaries are loaded into the current tokenizer in order.  
 Conflict handling follows `jieba-rs` behavior.
+
+---
+
+## Installation
+
+For the Rust library, see [Library Usage](#library-usage). To build the CLI tools from the repository (with a current
+stable Rust toolchain):
+
+```bash
+git clone https://github.com/laisuk/opencc-jieba-rs
+cd opencc-jieba-rs
+cargo build --release --workspace
+```
+
+The CLI tool will be located at:
+
+```
+target/release/opencc-jieba
+```
+
+## Usage: `opencc-jieba convert`
+
+```
+opencc-jieba convert: Convert Chinese Traditional/Simplified text using OpenCC
+
+Usage: opencc-jieba.exe convert [OPTIONS] --config <config>
+
+Options:
+  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
+  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
+  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
+  -p, --punct                         Enable punctuation conversion
+  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
+  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
+  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
+  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
+      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
+      --in-enc <encoding>             Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>            Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -h, --help                          Print help
+```
+
+## Usage: `opencc-jieba segment`
+
+```
+opencc-jieba segment: Segment Chinese input text into words
+
+Usage: opencc-jieba.exe segment [OPTIONS]
+
+Options:
+  -i, --input <file>           Input file to segment
+  -o, --output <file>          Write segmented result to file
+  -d, --delim <character>      Delimiter character for segmented text (use " " for space) [default: /]
+  -s, --separator <character>  Separator character for segmented mode=tag (use " " for space) [default: /]
+  -m, --mode <mode>            Segmentation mode: cut | search | all | tag [default: cut] [possible values: cut, search, all, tag]
+      --no-hmm                 Disable HMM for segmentation and tagging
+  -U, --user-dict-file <FILE>  Jieba user dictionary file; may be specified multiple times
+  -n, --norm-compat            Normalize CJK Compatibility Ideographs before processing
+  -E, --norm-compat-extended   Normalize extended Unicode compatibility forms before processing
+      --in-enc <encoding>      Encoding for input: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+      --out-enc <encoding>     Encoding for output: UTF-8|GB2312|GBK|gb18030|BIG5 [default: UTF-8]
+  -h, --help                   Print help
+```
+
+## Usage: `opencc-jieba office`
+
+Supported Office formats: `.docx`, `.xlsx`, `.pptx`, `.odt`, `.ods`, `.odp`, `.epub`
+
+```
+opencc-jieba office: Convert Office or EPUB documents using OpenCC
+
+Usage: opencc-jieba.exe office [OPTIONS] --config <config>
+
+Options:
+  -i, --input <file>                  Input <file> (use stdin if omitted for non-office documents)
+  -o, --output <file>                 Output <file> (use stdout if omitted for non-office documents)
+  -c, --config <config>               Conversion configuration (s2t | s2tw | s2twp | s2hk | s2hkp | t2s | t2tw | t2twp | t2hk | t2hkp | tw2s | tw2sp | tw2t | tw2tp | hk2s | hk2sp | hk2t | hk2tp | jp2t | t2jp)
+  -p, --punct                         Enable punctuation conversion
+  -D, --custom-dict <SLOT:MODE:FILE>  Custom conversion dictionary file, e.g. HKPhrasesRev:append:my_hk_dict.txt (slot names are ASCII case-insensitive)
+  -U, --user-dict-file <FILE>         Jieba user dictionary file; may be specified multiple times
+  -f, --format <ext>                  Force office document format <ext>: docx, xlsx, pptx, odt, ods, odp, epub
+  -n, --norm-compat                   Normalize CJK Compatibility Ideographs before processing
+  -E, --norm-compat-extended          Normalize extended Unicode compatibility forms before processing
+      --detofu                        Apply DeTofu fallback for CJK Extension B-I characters after conversion
+  -k, --keep-font                     Preserve original font styles
+  -F, --convert-filename              Convert the output filename using the selected OpenCC configuration
+  -h, --help                          Print help
+```
+
+### Example
+
+```bash
+# Convert Simplified Chinese to Traditional Chinese
+opencc-jieba convert -i input.txt -o output.txt --config s2t
+
+# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese
+opencc-jieba convert -i input.txt -o output.txt --config tw2s
+
+# Normalize CJK Compatibility Ideographs before conversion
+opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat
+
+# Normalize CJK Compatibility Ideographs and curated Unicode compatibility forms
+opencc-jieba convert -i input.txt -o output.txt --config t2s --norm-compat-extended
+
+# Apply rare-character display fallbacks after conversion
+opencc-jieba convert -i input.txt -o output.txt --config t2s --detofu
+
+# Convert with a Jieba user dictionary and a custom OpenCC conversion dictionary
+opencc-jieba convert -i input.txt -o output.txt --config hk2sp \
+  --user-dict-file user_dict.txt \
+  --custom-dict HkPhrasesRev:append:my_hk_dict.txt
+
+# Convert Traditional Chinese (Taiwan Standard) to Simplified Chinese with idioms
+opencc-jieba office -i input.docx -o output.docx --config tw2sp --punct --format docx --keep-font
+
+# Convert an Office document with a Jieba user dictionary
+opencc-jieba office -i input.docx -o output.docx --config s2t \
+  --user-dict-file user_dict.txt
+
+# Segment text file contents then output to new file
+opencc-jieba segment -i input.txt -o output.txt --delim ","
+
+# Segment using a Jieba user dictionary
+opencc-jieba segment -i input.txt -o output.txt \
+  --user-dict-file user_dict.txt
+
+# Segment after normalizing CJK Compatibility Ideographs
+opencc-jieba segment -i input.txt -o output.txt --norm-compat
+
+# Segment after applying the full extended compatibility normalization
+opencc-jieba segment -i input.txt -o output.txt --norm-compat-extended
+
+# Segment with POS tagging (format: word:tag)
+opencc-jieba segment -i input.txt -o output.txt --mode tag --delim " " --separator ":"
+
+# Segment from console input with POS tagging
+opencc-jieba segment --mode tag --delim " " --separator ":"
+```
+
+- Supported conversions:
+    - `s2t` – Simplified to Traditional
+    - `s2tw` – Simplified to Traditional Taiwan
+    - `s2twp` – Simplified to Traditional Taiwan with idioms
+    - `s2hk` – Simplified to Hong Kong Traditional
+    - `s2hkp` – Simplified to Hong Kong Traditional with phrase preferences
+    - `t2s` – Traditional to Simplified
+    - `t2tw` – Traditional to Taiwan variants
+    - `t2twp` – Traditional to Taiwan variants with phrase preferences
+    - `t2hk` – Traditional to Hong Kong variants
+    - `t2hkp` – Traditional to Hong Kong variants with phrase preferences
+    - `tw2s` – Traditional Taiwan to Simplified
+    - `tw2sp` – Traditional Taiwan to Simplified with idioms
+    - `tw2t` – Taiwan variants to Traditional
+    - `tw2tp` – Taiwan variants to Traditional with phrase normalization
+    - `hk2s` – Hong Kong variants to Simplified
+    - `hk2sp` – Hong Kong variants to Simplified with phrase normalization
+    - `hk2t` – Hong Kong variants to Traditional
+    - `hk2tp` – Hong Kong variants to Traditional with phrase normalization
+    - `jp2t` – Japanese Shinjitai to Traditional
+    - `t2jp` – Traditional to Japanese Shinjitai
+
+### Lexicons
+
+The library and conversion CLI use embedded OpenCC conversion dictionaries and a combined Hans/Hant Jieba dictionary.
+No external dictionary files are needed for ordinary conversion or segmentation.
 
 ---
 
