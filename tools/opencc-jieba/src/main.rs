@@ -15,9 +15,7 @@ mod office_converter;
 mod text_converter;
 
 use office_converter::OfficeConverter;
-use text_converter::{
-    create_text_converter, NormalizationMode, TextConverterOptions,
-};
+use text_converter::{create_text_converter, NormalizationMode, TextConverterOptions};
 
 const BLUE: &str = "\x1B[1;34m";
 const RESET: &str = "\x1B[0m";
@@ -598,9 +596,7 @@ fn handle_segment(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>
 
             out
         }
-        _ => opencc
-            .jieba_cut(segment_input.as_ref(), hmm)
-            .join(delimiter),
+        _ => opencc.jieba_cut_and_join(segment_input.as_ref(), hmm, delimiter),
     };
 
     let (is_console_output, mut output) = open_output(output_file)?;
