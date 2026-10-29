@@ -33,9 +33,9 @@ Worker scratch-buffer reuse and scheduling can vary the allocation totals.
 Both paths still used the original implementation at this point:
 
 | HMM | Expression median (ms) | Public join median (ms) | Public join allocations | Public join requested bytes |
-| --- | ---: | ---: | ---: | ---: |
-| Off | 43.942 | 43.418 | 1,082,724 | 175,715,455 |
-| On | 38.393 | 38.791 | 1,017,662 | 170,784,607 |
+|-----|-----------------------:|------------------------:|------------------------:|----------------------------:|
+| Off |                 43.942 |                  43.418 |               1,082,724 |                 175,715,455 |
+| On  |                 38.393 |                  38.791 |               1,017,662 |                 170,784,607 |
 
 ## Final paired comparison
 
@@ -43,14 +43,14 @@ The original expression remains available as the control. These measurements
 were taken after all builds/tests finished, with no concurrent compilation:
 
 | HMM | Original median ms (min–max) | Incremental median ms (min–max) | Time reduction | Speed ratio |
-| --- | ---: | ---: | ---: | ---: |
-| Off | 42.270 (39.800–45.081) | 24.751 (23.070–26.752) | 41.4% | 1.71× |
-| On | 37.976 (36.759–40.731) | 24.309 (22.684–24.975) | 36.0% | 1.56× |
+|-----|-----------------------------:|--------------------------------:|---------------:|------------:|
+| Off |       42.270 (39.800–45.081) |          24.751 (23.070–26.752) |          41.4% |       1.71× |
+| On  |       37.976 (36.759–40.731) |          24.309 (22.684–24.975) |          36.0% |       1.56× |
 
 | HMM | Original allocation calls | Incremental allocation calls | Original requested bytes | Incremental requested bytes |
-| --- | ---: | ---: | ---: | ---: |
-| Off | 1,080,625 | 579,439 | 175,404,623 | 112,849,191 |
-| On | 1,016,260 | 579,439 | 171,073,639 | 112,785,399 |
+|-----|--------------------------:|-----------------------------:|-------------------------:|----------------------------:|
+| Off |                 1,080,625 |                      579,439 |              175,404,623 |                 112,849,191 |
+| On  |                 1,016,260 |                      579,439 |              171,073,639 |                 112,785,399 |
 
 Allocation calls fell 46.4% / 43.0%, and cumulative requested bytes fell
 35.7% / 34.1% (HMM off / on). Timings describe this fixture, space delimiter,

@@ -38,6 +38,10 @@ unsafe impl GlobalAlloc for Allocator {
         }
         ptr
     }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        LIVE.fetch_sub(layout.size() as i64, Relaxed);
+        System.dealloc(ptr, layout);
+    }
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ptr = System.alloc_zeroed(layout);
         if !ptr.is_null() {
@@ -52,10 +56,6 @@ unsafe impl GlobalAlloc for Allocator {
             allocated(size);
         }
         new_ptr
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        LIVE.fetch_sub(layout.size() as i64, Relaxed);
-        System.dealloc(ptr, layout);
     }
 }
 #[global_allocator]

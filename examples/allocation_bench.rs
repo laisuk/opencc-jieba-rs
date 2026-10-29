@@ -19,6 +19,9 @@ unsafe impl GlobalAlloc for CountingAllocator {
         record(layout.size());
         System.alloc(layout)
     }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        System.dealloc(ptr, layout)
+    }
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         record(layout.size());
         System.alloc_zeroed(layout)
@@ -26,9 +29,6 @@ unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
         record(size);
         System.realloc(ptr, layout, size)
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
     }
 }
 #[global_allocator]

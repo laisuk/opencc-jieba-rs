@@ -53,7 +53,7 @@ public `jieba_cut` to two safe candidates using the same tokenizer:
 
 Both candidates retain the inclusive ranges and 1,000-byte threshold. The short
 path uses a direct loop with per-chunk `extend`. Neither introduces new lifetime
-management or production unsafe code. The counting allocator is diagnostic code
+management nor production unsafe code. The counting allocator is diagnostic code
 following the preceding join benchmark's methodology.
 
 ## Method
@@ -85,22 +85,22 @@ target/release/examples/phrases_cut_bench.exe 21
 All values are median milliseconds within each run:
 
 | Run | HMM | Original | fold_extend | indexed_chunks |
-| --- | --- | ---: | ---: | ---: |
-| 1 | Off | 35.265 | 34.297 | 43.384 |
-| 1 | On | 34.408 | 35.018 | 43.119 |
-| 2 | Off | 32.445 | 32.664 | 40.504 |
-| 2 | On | 32.193 | 32.273 | 39.963 |
-| 3 | Off | 32.962 | 33.035 | 40.651 |
-| 3 | On | 32.582 | 32.467 | 39.155 |
+|-----|-----|---------:|------------:|---------------:|
+| 1   | Off |   35.265 |      34.297 |         43.384 |
+| 1   | On  |   34.408 |      35.018 |         43.119 |
+| 2   | Off |   32.445 |      32.664 |         40.504 |
+| 2   | On  |   32.193 |      32.273 |         39.963 |
+| 3   | Off |   32.962 |      33.035 |         40.651 |
+| 3   | On  |   32.582 |      32.467 |         39.155 |
 
 Final run, including the separate allocation measurements (Off / On):
 
-| Metric | Original | fold_extend candidate | Difference |
-| --- | ---: | ---: | ---: |
-| HMM Off median | 32.962 ms | 33.035 ms | 0.073 ms slower (+0.22%) |
-| HMM On median | 32.582 ms | 32.467 ms | 0.115 ms faster (-0.35%) |
-| Allocation calls Off / On | 1,078,994 / 1,016,286 | 1,078,081 / 1,013,599 | -913 / -2,687 |
-| Allocated bytes Off / On | 172,109,582 / 166,815,350 | 172,235,206 / 167,145,590 | +125,624 / +330,240 |
+| Metric                    |                  Original |     fold_extend candidate |               Difference |
+|---------------------------|--------------------------:|--------------------------:|-------------------------:|
+| HMM Off median            |                 32.962 ms |                 33.035 ms | 0.073 ms slower (+0.22%) |
+| HMM On median             |                 32.582 ms |                 32.467 ms | 0.115 ms faster (-0.35%) |
+| Allocation calls Off / On |     1,078,994 / 1,016,286 |     1,078,081 / 1,013,599 |            -913 / -2,687 |
+| Allocated bytes Off / On  | 172,109,582 / 166,815,350 | 172,235,206 / 167,145,590 |      +125,624 / +330,240 |
 
 The fold candidate's timing advantage changes sign between runs. Allocation
 changes are small and also vary between runs; this is not a meaningful benefit.
@@ -111,7 +111,7 @@ approximately 21–23% slower execution and 21–22% more allocation calls.
 ## Correctness and decision
 
 The harness directly compares complete `Vec<String>` results for the novel in
-both HMM modes. Before timing it also validates both candidates against the
+both HMM modes. Before timing, it also validates both candidates against the
 public implementation on empty text, whitespace, punctuation, NUL, Unicode,
 999/1,000-byte boundaries, long single chunks and many chunks, using one, four,
 and eight-worker pools. All comparisons passed. Token contents and order are
