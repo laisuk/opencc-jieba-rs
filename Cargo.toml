@@ -21,22 +21,34 @@ readme = "README.md"
 keywords = ["chinese", "jieba", "opencc", "nlp", "text-processing"]
 categories = ["text-processing", "internationalization", "command-line-utilities"]
 include = [
+    # Rust sources
     "src/**/*.rs",
+    "build.rs",
+    # OpenCC dictionaries and data
     "src/dictionary_lib/dicts/*.zst",
     "src/data/*.txt",
+    # Vendored Jieba models and compressed dictionaries
+    "src/jieba_rs/hmm.model",
+    "src/jieba_rs/data/*.zst",
+    # Package metadata and documentation
     "Cargo.toml",
     "README.md",
     "CHANGELOG.md",
     "DETOFU_USER_GUIDE.md",
+    "MSRV-1.75.0-GUIDE.md",
+    # Third-party attribution and licenses
+    "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "dicts/LICENSE",
+    "JIEBA-LICENSE",
+    "src/jieba_rs/VENDOR_NOTES.md",
+    # Vendored Zstandard decoder
     "src/zstd/NOTICE.md",
     "src/zstd/LICENSE-RUZSTD",
+    # Vendored rustc-hash
     "src/rustc_hash/LICENSE-MIT",
     "src/rustc_hash/LICENSE-APACHE",
     "src/rustc_hash/VENDOR_NOTES.md",
-    "MSRV-1.75.0-GUIDE.md",
-    "/LICENSE"
 ]
 
 [package.metadata.docs.rs]
