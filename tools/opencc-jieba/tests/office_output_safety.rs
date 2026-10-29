@@ -7,6 +7,7 @@ use std::process::{Command, Output};
 #[path = "../src/office_converter/zip/mod.rs"]
 pub(crate) mod zip;
 // Mirror the binary module path for this private-source integration harness.
+#[allow(dead_code)]
 mod office_converter {
     pub(crate) use super::zip;
 }
