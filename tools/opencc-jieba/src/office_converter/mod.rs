@@ -1,2 +1,3 @@
 mod converter;
-pub(crate) use converter::{OfficeConverter};
+mod zip;
+pub(crate) use converter::OfficeConverter;

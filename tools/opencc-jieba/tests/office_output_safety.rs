@@ -4,6 +4,12 @@ use std::hash::BuildHasher;
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+#[path = "../src/office_converter/zip/mod.rs"]
+pub(crate) mod zip;
+// Mirror the binary module path for this private-source integration harness.
+mod office_converter {
+    pub(crate) use super::zip;
+}
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 struct TestDirectory(PathBuf);
