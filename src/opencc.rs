@@ -1803,8 +1803,11 @@ impl OpenCC {
     /// # Example
     /// ```
     /// let opencc = opencc_jieba_rs::OpenCC::new();
-    /// let joined = opencc.jieba_cut_and_join("南京市长江大桥", true, " ");
-    /// println!("{}", joined); // -> "南京市 长江大桥"
+    /// let input = "南京市长江大桥";
+    /// let joined = opencc.jieba_cut_and_join(input, true, " ");
+    ///
+    /// // Verify equivalence with the standard Jieba cut + join.
+    /// assert_eq!(joined, opencc.jieba_cut(input, true).join(" "));
     /// ```
     pub fn jieba_cut_and_join(&self, input: &str, hmm: bool, delimiter: &str) -> String {
         let ranges = self.split_string_ranges(input, true);
