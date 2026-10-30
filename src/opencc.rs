@@ -191,8 +191,13 @@ fn strip_regex() -> &'static Regex {
     })
 }
 
-// Minimum input length (in chars) to trigger parallel processing
-const PARALLEL_THRESHOLD: usize = 1000;
+// Minimum UTF-8 input size in bytes for parallel dispatch.
+const PARALLEL_THRESHOLD: usize = 5000;
+
+#[inline]
+fn use_parallel(input_len: usize) -> bool {
+    input_len >= PARALLEL_THRESHOLD && rayon::current_num_threads() > 1
+}
 
 /// A slice of dictionary references used in a single conversion round.
 ///
@@ -1256,7 +1261,7 @@ impl OpenCC {
         hmm: bool,
     ) -> Cow<'a, str> {
         let ranges = self.split_string_ranges(input, true);
-        if input.len() >= PARALLEL_THRESHOLD {
+        if use_parallel(input.len()) {
             let chunks: Vec<Cow<'a, str>> = ranges
                 .into_par_iter()
                 .map(|range| {
@@ -1640,7 +1645,7 @@ impl OpenCC {
     /// assert!(tokens.contains(&"南京市".to_string()));
     /// ```
     pub fn jieba_cut(&self, input: &str, hmm: bool) -> Vec<String> {
-        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        let use_parallel = use_parallel(input.len());
         self.phrases_cut_impl(input, use_parallel, |jieba, chunk| jieba.cut(chunk, hmm))
     }
 
@@ -1689,7 +1694,7 @@ impl OpenCC {
     /// # Since
     /// v0.7.3
     pub fn jieba_cut_for_search(&self, input: &str, hmm: bool) -> Vec<String> {
-        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        let use_parallel = use_parallel(input.len());
         self.phrases_cut_impl(input, use_parallel, |jieba, chunk| {
             jieba.cut_for_search(chunk, hmm)
         })
@@ -1738,7 +1743,7 @@ impl OpenCC {
     /// # Since
     /// v0.7.3
     pub fn jieba_cut_all(&self, input: &str) -> Vec<String> {
-        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        let use_parallel = use_parallel(input.len());
         self.phrases_cut_impl(input, use_parallel, |jieba, chunk| jieba.cut_all(chunk))
     }
 
@@ -1843,7 +1848,7 @@ impl OpenCC {
     /// # Since
     /// v0.7.3
     pub fn jieba_tag(&self, input: &str, hmm: bool) -> Vec<(String, String)> {
-        let use_parallel = input.len() >= PARALLEL_THRESHOLD;
+        let use_parallel = use_parallel(input.len());
         self.phrases_tag_impl(input, use_parallel, |jieba, chunk| {
             jieba
                 .tag(chunk, hmm)
@@ -1881,7 +1886,7 @@ impl OpenCC {
         let ranges = self.split_string_ranges(input, true);
         let mut output = String::new();
         let mut has_tokens = false;
-        if input.len() >= PARALLEL_THRESHOLD {
+        if use_parallel(input.len()) {
             // Indexed collection preserves chunk order. Track token presence
             // separately: an empty token still needs a boundary separator.
             let chunks: Vec<_> = ranges
