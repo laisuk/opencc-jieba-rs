@@ -156,7 +156,7 @@ fn cold() {
             tfidf
                 .as_ref()
                 .unwrap()
-                .extract_keywords(&core, MIXED, 10, vec![]),
+                .extract_keywords(&core, MIXED, 10, &[]),
         );
     });
     let mut public = None;
@@ -243,10 +243,10 @@ fn main() {
                 );
             }
             bench(&format!("core.tfidf.{label}"), input.len(), || {
-                black_box(tfidf.extract_keywords(&core, black_box(&input), 10, vec![]));
+                black_box(tfidf.extract_keywords(&core, black_box(&input), 10, &[]));
             });
             bench(&format!("core.textrank.{label}"), input.len(), || {
-                black_box(textrank.extract_keywords(&core, black_box(&input), 10, vec![]));
+                black_box(textrank.extract_keywords(&core, black_box(&input), 10, &[]));
             });
             bench(&format!("public.tfidf.{label}"), input.len(), || {
                 black_box(public.keyword_weight_tfidf(black_box(&input), 10));
@@ -273,10 +273,10 @@ fn main() {
     }
     for top_k in [0, 1, 100] {
         bench(&format!("core.tfidf.top_{top_k}"), MIXED.len(), || {
-            black_box(tfidf.extract_keywords(&core, MIXED, top_k, vec![]));
+            black_box(tfidf.extract_keywords(&core, MIXED, top_k, &[]));
         });
         bench(&format!("core.textrank.top_{top_k}"), MIXED.len(), || {
-            black_box(textrank.extract_keywords(&core, MIXED, top_k, vec![]));
+            black_box(textrank.extract_keywords(&core, MIXED, top_k, &[]));
         });
     }
 

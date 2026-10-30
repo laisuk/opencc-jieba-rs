@@ -79,12 +79,8 @@ fn builtin_matches_independently_loaded_idf_and_baseline_results() {
         *independent.config_mut() = shared.config().clone();
         for text in TEXTS {
             for top_k in [0, 1, 5, 100] {
-                for allowed in [
-                    vec![],
-                    vec!["n".to_owned(), "v".to_owned(), "eng".to_owned()],
-                ] {
-                    let expected =
-                        bits(independent.extract_keywords(&jieba, text, top_k, allowed.clone()));
+                for allowed in [&[][..], &["n", "v", "eng"][..]] {
+                    let expected = bits(independent.extract_keywords(&jieba, text, top_k, allowed));
                     let actual = bits(shared.extract_keywords(&jieba, text, top_k, allowed));
                     assert_eq!(actual, expected);
                     snapshots.push(fingerprint(&actual));
@@ -170,7 +166,7 @@ fn custom_duplicates_lower_median_ties_and_merge_semantics() {
     assert_eq!(extractor.data.median_idf, 4.0); // lower median of [2,8,10,4], duplicates included
     assert_eq!(extractor.data.idf_dict.len(), 3);
     assert_eq!(
-        bits(extractor.extract_keywords(&jieba, "alpha beta gamma delta alpha", 100, vec![])),
+        bits(extractor.extract_keywords(&jieba, "alpha beta gamma delta alpha", 100, &[])),
         vec![
             ("alpha".into(), 4.0f64.to_bits(), "n".into()),
             ("beta".into(), 1.6f64.to_bits(), "v".into()),
@@ -186,7 +182,7 @@ fn custom_duplicates_lower_median_ties_and_merge_semantics() {
     assert_eq!(extractor.data.idf_dict["alpha"], 10.0);
     assert_eq!(extractor.data.idf_dict["delta"], 14.0);
     assert_eq!(
-        extractor.extract_keywords(&jieba, "alpha beta gamma delta", 0, vec![]),
+        extractor.extract_keywords(&jieba, "alpha beta gamma delta", 0, &[]),
         vec![]
     );
 }
@@ -208,7 +204,7 @@ fn custom_nonfinite_values_and_signed_zero_keep_their_bits() {
 fn default_custom_load_and_configuration_do_not_affect_other_extractors() {
     let jieba = small_jieba();
     let untouched = TfIdf::default();
-    let before = bits(untouched.extract_keywords(&jieba, "alpha beta gamma delta", 10, vec![]));
+    let before = bits(untouched.extract_keywords(&jieba, "alpha beta gamma delta", 10, &[]));
     let mut changed = TfIdf::default();
     changed
         .load_dict(&mut Cursor::new("alpha 99\nalpha 7\nbeta 15\n"))
@@ -219,7 +215,7 @@ fn default_custom_load_and_configuration_do_not_affect_other_extractors() {
         .add_stop_word("alpha")
         .build();
     assert!(changed
-        .extract_keywords(&jieba, "alpha beta gamma delta", 10, vec![])
+        .extract_keywords(&jieba, "alpha beta gamma delta", 10, &[])
         .iter()
         .all(|k| k.keyword != "alpha"));
     changed.load_dict(&mut Cursor::new("beta 3\n")).unwrap();
@@ -227,11 +223,11 @@ fn default_custom_load_and_configuration_do_not_affect_other_extractors() {
     assert_eq!(changed.data.idf_dict["alpha"], 7.0);
     assert_eq!(
         before,
-        bits(untouched.extract_keywords(&jieba, "alpha beta gamma delta", 10, vec![]))
+        bits(untouched.extract_keywords(&jieba, "alpha beta gamma delta", 10, &[]))
     );
     assert_eq!(
         before,
-        bits(TfIdf::default().extract_keywords(&jieba, "alpha beta gamma delta", 10, vec![]))
+        bits(TfIdf::default().extract_keywords(&jieba, "alpha beta gamma delta", 10, &[]))
     );
     let empty = TfIdf::new(None::<&mut io::Empty>, KeywordExtractConfig::default());
     assert!(empty.data.idf_dict.is_empty());
@@ -337,16 +333,11 @@ fn default_initialization_and_repeated_extraction_are_thread_safe() {
                 barrier.wait();
                 let extractor = TfIdf::default();
                 let first =
-                    bits(extractor.extract_keywords(jieba, "alpha beta gamma delta", 10, vec![]));
+                    bits(extractor.extract_keywords(jieba, "alpha beta gamma delta", 10, &[]));
                 for _ in 0..8 {
                     assert_eq!(
                         first,
-                        bits(extractor.extract_keywords(
-                            jieba,
-                            "alpha beta gamma delta",
-                            10,
-                            vec![]
-                        ))
+                        bits(extractor.extract_keywords(jieba, "alpha beta gamma delta", 10, &[]))
                     );
                 }
                 first
@@ -357,7 +348,7 @@ fn default_initialization_and_repeated_extraction_are_thread_safe() {
     });
     // Also share a single immutable extractor, not just its default table.
     let extractor = TfIdf::default();
-    let expected = bits(extractor.extract_keywords(&jieba, "alpha beta gamma delta", 10, vec![]));
+    let expected = bits(extractor.extract_keywords(&jieba, "alpha beta gamma delta", 10, &[]));
     std::thread::scope(|scope| {
         for _ in 0..8 {
             let extractor = &extractor;
@@ -366,12 +357,7 @@ fn default_initialization_and_repeated_extraction_are_thread_safe() {
             scope.spawn(move || {
                 for _ in 0..8 {
                     assert_eq!(
-                        &bits(extractor.extract_keywords(
-                            jieba,
-                            "alpha beta gamma delta",
-                            10,
-                            vec![]
-                        )),
+                        &bits(extractor.extract_keywords(jieba, "alpha beta gamma delta", 10, &[])),
                         expected
                     );
                 }

@@ -51,7 +51,11 @@ impl StateDiagram {
         for v in 0..size {
             outflow[v] = weight[offsets[v]..offsets[v + 1]].iter().sum();
         }
-        let share = dst.iter().zip(&weight).map(|(&d, &w)| w / outflow[d]).collect();
+        let share = dst
+            .iter()
+            .zip(&weight)
+            .map(|(&d, &w)| w / outflow[d])
+            .collect();
 
         StateDiagram {
             damping_factor: 0.85,
@@ -112,9 +116,15 @@ impl KeywordExtract for TextRank {
     ///
     /// If `allowed_pos` is not empty, then only terms matching those parts if
     /// speech are considered.
-    fn extract_keywords(&self, jieba: &Jieba, sentence: &str, top_k: usize, allowed_pos: Vec<String>) -> Vec<Keyword> {
+    fn extract_keywords(
+        &self,
+        jieba: &Jieba,
+        sentence: &str,
+        top_k: usize,
+        allowed_pos: &[&str],
+    ) -> Vec<Keyword> {
         // A handful of tags at most, so a scan beats building a set.
-        let allowed = |tag: &str| allowed_pos.is_empty() || allowed_pos.iter().any(|p| p == tag);
+        let allowed = |tag: &str| allowed_pos.is_empty() || allowed_pos.contains(&tag);
 
         // Sized for the roughly one token per four bytes that Chinese text
         // segments into, about half of them candidates.
@@ -155,7 +165,10 @@ impl KeywordExtract for TextRank {
             return Vec::new();
         }
 
-        let edges: Vec<(usize, usize, Weight)> = cooccurence.iter().map(|(&(u, v), &c)| (u, v, c as f64)).collect();
+        let edges: Vec<(usize, usize, Weight)> = cooccurence
+            .iter()
+            .map(|(&(u, v), &c)| (u, v, c as f64))
+            .collect();
         let ranking_vector = StateDiagram::new(unique_words.len(), &edges).rank();
 
         // The `top_k` best so far, the worst of them at the root.
@@ -232,10 +245,12 @@ mod tests {
             .build();
         let extractor = TextRank::new(5, config);
 
-        let keywords = extractor.extract_keywords(&jieba, "今天股票跌很厉害，股票又跌", 100, vec![]);
+        let keywords = extractor.extract_keywords(&jieba, "今天股票跌很厉害，股票又跌", 100, &[]);
 
         assert!(!keywords.is_empty());
-        assert!(keywords.iter().all(|keyword| keyword.keyword.chars().count() >= 2));
+        assert!(keywords
+            .iter()
+            .all(|keyword| keyword.keyword.chars().count() >= 2));
         assert!(keywords.iter().all(|keyword| keyword.keyword != "股票"));
     }
 }

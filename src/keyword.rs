@@ -48,7 +48,7 @@
 //! - This module centralizes keyword extraction logic to avoid duplication.
 //! - Internal functions are marked `pub(crate)` and are not part of the public API.
 //! - POS filters are accepted as `&[&str]` for zero-allocation input at the API level,
-//!   and converted internally to match the `jieba-rs` interface.
+//!   and passed directly to the extractors.
 //!
 //! # See also
 //!
@@ -243,8 +243,7 @@ pub const POS_KEYWORDS: &[&str] = &["n", "nr", "ns", "nt", "nz", "v", "vn"];
 /// # Implementation notes
 ///
 /// - Newline characters are removed from the input before processing.
-/// - POS filters are converted to `Vec<String>` to match the underlying
-///   `jieba-rs` API requirements.
+/// - POS filters are borrowed directly by the underlying extractors.
 /// - This function centralizes shared logic for both TextRank and TF-IDF
 ///   keyword extraction, ensuring consistent behavior across all variants.
 ///
@@ -269,18 +268,16 @@ pub(crate) fn keyword_extract_internal(
 ) -> Vec<String> {
     let cleaned_input = crate::strip_newlines_cow(input);
 
-    let pos_vec: Vec<String> = allowed_pos
-        .map(|v| v.iter().map(|&s| s.to_string()).collect())
-        .unwrap_or_default();
+    let allowed_pos = allowed_pos.unwrap_or_default();
 
     let keywords = match method {
         KeywordMethod::TextRank => {
             let extractor = TextRank::default();
-            extractor.extract_keywords(jieba, &cleaned_input, top_k, pos_vec)
+            extractor.extract_keywords(jieba, &cleaned_input, top_k, allowed_pos)
         }
         KeywordMethod::TfIdf => {
             let extractor = TfIdf::default();
-            extractor.extract_keywords(jieba, &cleaned_input, top_k, pos_vec)
+            extractor.extract_keywords(jieba, &cleaned_input, top_k, allowed_pos)
         }
     };
 
@@ -312,8 +309,7 @@ pub(crate) fn keyword_extract_internal(
 /// # Implementation notes
 ///
 /// - Newline characters are removed from the input before processing.
-/// - POS filters are converted to `Vec<String>` to match the underlying
-///   `jieba-rs` API requirements.
+/// - POS filters are borrowed directly by the underlying extractors.
 /// - This function is shared by public APIs to avoid duplication and ensure
 ///   consistent behavior.
 ///
@@ -338,11 +334,9 @@ pub(crate) fn keyword_weight_textrank_internal(
     let cleaned_input = crate::strip_newlines_cow(input);
     let keyword_extractor = TextRank::default();
 
-    let pos_vec: Vec<String> = allowed_pos
-        .map(|v| v.iter().map(|&s| s.to_string()).collect())
-        .unwrap_or_default();
+    let allowed_pos = allowed_pos.unwrap_or_default();
 
-    keyword_extractor.extract_keywords(jieba, &cleaned_input, top_k, pos_vec)
+    keyword_extractor.extract_keywords(jieba, &cleaned_input, top_k, allowed_pos)
 }
 
 /// Internal weighted keyword extraction using the TF-IDF algorithm.
@@ -370,8 +364,7 @@ pub(crate) fn keyword_weight_textrank_internal(
 /// # Implementation notes
 ///
 /// - Newline characters are removed from the input before processing.
-/// - POS filters are converted to `Vec<String>` to match the underlying
-///   `jieba-rs` API requirements.
+/// - POS filters are borrowed directly by the underlying extractors.
 /// - This function is shared by public APIs to avoid duplication and ensure
 ///   consistent behavior.
 ///
@@ -396,9 +389,41 @@ pub(crate) fn keyword_weight_tfidf_internal(
     let cleaned_input = crate::strip_newlines_cow(input);
     let keyword_extractor = TfIdf::default();
 
-    let pos_vec: Vec<String> = allowed_pos
-        .map(|v| v.iter().map(|&s| s.to_string()).collect())
-        .unwrap_or_default();
+    let allowed_pos = allowed_pos.unwrap_or_default();
 
-    keyword_extractor.extract_keywords(jieba, &cleaned_input, top_k, pos_vec)
+    keyword_extractor.extract_keywords(jieba, &cleaned_input, top_k, allowed_pos)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keyword_pos_filters_preserve_results_and_empty_semantics() {
+        let jieba = Jieba::new();
+        let text = "研究人员正在开发自然语言处理和机器学习软件。臺北銀行提供金融服務。";
+        for method in [KeywordMethod::TextRank, KeywordMethod::TfIdf] {
+            let weighted = match method {
+                KeywordMethod::TextRank => keyword_weight_textrank_internal,
+                KeywordMethod::TfIdf => keyword_weight_tfidf_internal,
+            };
+            let all = weighted(&jieba, text, 100, None);
+            assert!(!all.is_empty());
+            assert_eq!(all, weighted(&jieba, text, 100, Some(&[])));
+            for filter in [None, Some(&[][..]), Some(&["n", "v"][..])] {
+                let keywords = weighted(&jieba, text, 100, filter);
+                assert!(!keywords.is_empty());
+                if filter.is_some_and(|tags| !tags.is_empty()) {
+                    assert!(keywords
+                        .iter()
+                        .all(|k| ["n", "v"].contains(&k.tag.as_str())));
+                }
+                assert_eq!(
+                    keyword_extract_internal(&jieba, text, 100, method, filter),
+                    keywords.into_iter().map(|k| k.keyword).collect::<Vec<_>>()
+                );
+            }
+            assert!(weighted(&jieba, text, 100, Some(&["unknown"])).is_empty());
+        }
+    }
 }

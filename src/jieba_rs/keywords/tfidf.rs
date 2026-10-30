@@ -170,10 +170,10 @@ impl KeywordExtract for TfIdf {
         jieba: &Jieba,
         sentence: &str,
         top_k: usize,
-        allowed_pos: Vec<String>,
+        allowed_pos: &[&str],
     ) -> Vec<Keyword> {
         // A handful of tags at most, so a scan beats building a set.
-        let allowed = |tag: &str| allowed_pos.is_empty() || allowed_pos.iter().any(|p| p == tag);
+        let allowed = |tag: &str| allowed_pos.is_empty() || allowed_pos.contains(&tag);
 
         // Per word: its frequency and the tag of its first occurrence,
         // counted as the tags come rather than from a materialized list.
