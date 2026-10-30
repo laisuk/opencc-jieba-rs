@@ -148,19 +148,21 @@ fn main() {
                 times[index].push(start.elapsed().as_secs_f64() * 1000.0);
             }
         }
-        for index in 0..3 {
+        for (index, samples_times) in times.iter_mut().enumerate() {
             CALLS.store(0, Relaxed);
             BYTES.store(0, Relaxed);
             ENABLED.store(true, Relaxed);
             black_box(run(index));
             ENABLED.store(false, Relaxed);
-            times[index].sort_by(f64::total_cmp);
+
+            samples_times.sort_by(f64::total_cmp);
+
             println!(
                 "{hmm},{},{:.3},{:.3},{:.3},{},{}",
                 ["original", "fold_extend", "indexed_chunks"][index],
-                times[index][0],
-                times[index][samples / 2],
-                times[index][samples - 1],
+                samples_times[0],
+                samples_times[samples / 2],
+                samples_times[samples - 1],
                 CALLS.load(Relaxed),
                 BYTES.load(Relaxed)
             );
