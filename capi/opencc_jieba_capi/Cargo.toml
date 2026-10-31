@@ -17,5 +17,7 @@ libc = "0.2"
 crate-type = ["cdylib"]
 
 [build-dependencies]
-winres = "0.1"
 toml = "=0.8"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
