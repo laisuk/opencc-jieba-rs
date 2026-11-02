@@ -55,6 +55,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 - Rewrote the Rust 1.75 guide for the vendored dependency graph, removing obsolete
   `include-flate` / `libflate` pins and the `core2` patch. Documented feature combinations,
   downstream lockfiles, native compression requirements, and the separate Windows 7 build path.
+- CLI: Optimized font placeholder restoration during Office and EPUB document conversion.
 
 ### Fixed
 

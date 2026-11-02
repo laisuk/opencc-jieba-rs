@@ -368,17 +368,43 @@ impl OfficeConverter {
             Self::mask_font(&mut content, format, &mut font_map);
         }
 
-        let mut converted = if is_xlsx {
+        let converted = if is_xlsx {
             Self::convert_xlsx_entry(&content, name, text_converter)
         } else {
             text_converter.convert(&content)
         };
 
-        for (marker, original) in font_map {
-            converted = converted.replace(&marker, &original);
+        Self::restore_fonts(converted, &font_map)
+    }
+
+    /// Restore markers in the converted text without rescanning inserted fonts.
+    fn restore_fonts(converted: String, font_map: &HashMap<String, String>) -> String {
+        if font_map.is_empty() {
+            return converted;
         }
 
-        converted
+        const PREFIX: &str = "__F_O_N_T_";
+        let mut restored = String::with_capacity(converted.len());
+        let mut cursor = 0;
+        while let Some(offset) = converted[cursor..].find(PREFIX) {
+            let start = cursor + offset;
+            restored.push_str(&converted[cursor..start]);
+            let prefix_end = start + PREFIX.len();
+            let replacement = converted[prefix_end..].find('_').and_then(|offset| {
+                let end = prefix_end + offset + 1;
+                font_map.get(&converted[start..end]).map(|font| (end, font))
+            });
+            if let Some((end, font)) = replacement {
+                restored.push_str(font);
+                cursor = end;
+            } else {
+                // Preserve unknown/incomplete markers and still find later known ones.
+                restored.push_str(PREFIX);
+                cursor = prefix_end;
+            }
+        }
+        restored.push_str(&converted[cursor..]);
+        restored
     }
 
     fn validate_input_zip(input_zip: &[u8]) -> io::Result<()> {
@@ -690,6 +716,52 @@ fn replace_with_temp(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn font_restoration_known_markers() {
+        let fonts = HashMap::from([
+            ("__F_O_N_T_0_".to_owned(), "宋体".to_owned()),
+            ("__F_O_N_T_10_".to_owned(), "Arial".to_owned()),
+        ]);
+        assert_eq!(
+            OfficeConverter::restore_fonts(
+                "前__F_O_N_T_10___F_O_N_T_0_ / __F_O_N_T_0_后".to_owned(),
+                &fonts,
+            ),
+            "前Arial宋体 / 宋体后"
+        );
+    }
+
+    #[test]
+    fn font_restoration_preserves_unknown_and_incomplete_markers() {
+        let fonts = HashMap::from([("__F_O_N_T_0_".to_owned(), "宋体".to_owned())]);
+        let input = "__F_O_N_T_99_ __F_O_N_T_bad__F_O_N_T_0_ __F_O_N_T___F_O_N_T_0_ __F_O_N_T_";
+        assert_eq!(
+            OfficeConverter::restore_fonts(input.to_owned(), &fonts),
+            "__F_O_N_T_99_ __F_O_N_T_bad宋体 __F_O_N_T_宋体 __F_O_N_T_"
+        );
+        assert_eq!(
+            OfficeConverter::restore_fonts(input.to_owned(), &HashMap::new()),
+            input
+        );
+        assert_eq!(OfficeConverter::restore_fonts(String::new(), &fonts), "");
+        assert_eq!(
+            OfficeConverter::restore_fonts("普通文本".to_owned(), &fonts),
+            "普通文本"
+        );
+    }
+
+    #[test]
+    fn font_restoration_is_nonrecursive() {
+        let fonts = HashMap::from([
+            ("__F_O_N_T_0_".to_owned(), "__F_O_N_T_1_".to_owned()),
+            ("__F_O_N_T_1_".to_owned(), "__F_O_N_T_0_".to_owned()),
+        ]);
+        assert_eq!(
+            OfficeConverter::restore_fonts("__F_O_N_T_0___F_O_N_T_1_".to_owned(), &fonts),
+            "__F_O_N_T_1___F_O_N_T_0_"
+        );
+    }
     use crate::office_converter::zip::{
         write::{ExtendedFileOptions, FileOptions},
         CompressionMethod, ZipArchive, ZipWriter,
