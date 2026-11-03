@@ -24,8 +24,7 @@ include = [
     # Rust sources and build script
     "src/**/*.rs",
     "build.rs",
-    # Examples and integration tests
-    "examples/*.rs",
+    # integration tests
     "tests/**/*.rs",
     "tests/data/*.txt",
     "tests/dicts/*.txt",
@@ -36,15 +35,15 @@ include = [
     "src/jieba_rs/hmm.model",
     "src/jieba_rs/data/*.zst",
     # Documentation
-    "Cargo.toml",
-    "README.md",
-    "CHANGELOG.md",
-    "DETOFU_USER_GUIDE.md",
-    "MSRV-1.75.0-GUIDE.md",
+    "/Cargo.toml",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/DETOFU_USER_GUIDE.md",
+    "/MSRV-1.75.0-GUIDE.md",
     # Licenses and attribution
-    "LICENSE",
-    "JIEBA-LICENSE",
-    "THIRD_PARTY_NOTICES.md",
+    "/LICENSE",
+    "/JIEBA-LICENSE",
+    "/THIRD_PARTY_NOTICES.md",
     "dicts/LICENSE",
     "src/jieba_rs/VENDOR_NOTES.md",
     "src/zstd/NOTICE.md",
@@ -87,11 +86,3 @@ debug = 0                  # No debug info to minimize size
 
 [badges]
 maintenance = { status = "actively-developed" }
-
-[[example]]
-name = "jieba_baseline"
-required-features = ["keywords"]
-
-[[example]]
-name = "tfidf_memory_probe"
-required-features = ["keywords"]
