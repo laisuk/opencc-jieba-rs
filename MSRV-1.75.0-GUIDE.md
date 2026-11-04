@@ -36,7 +36,8 @@ From a checkout, exercise the supported library feature combinations with:
 
 ```sh
 cargo +1.75.0 test --locked -p opencc-jieba-rs
-cargo +1.75.0 test --locked -p opencc-jieba-rs --no-default-features
+cargo +1.75.0 test --locked -p opencc-jieba-rs --no-default-features --lib --tests
+cargo +1.75.0 test --locked -p opencc-jieba-rs --no-default-features --doc
 cargo +1.75.0 test --locked -p opencc-jieba-rs --all-features
 ```
 

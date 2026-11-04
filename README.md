@@ -927,7 +927,8 @@ Run from the repository root with the checked-in lockfile:
 
 ```sh
 cargo test --locked --workspace --all-features
-cargo test --locked -p opencc-jieba-rs --no-default-features
+cargo test --locked -p opencc-jieba-rs --no-default-features --lib --tests
+cargo test --locked -p opencc-jieba-rs --no-default-features --doc
 cargo doc --locked -p opencc-jieba-rs --no-deps --all-features
 cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
 cargo package --locked -p opencc-jieba-rs --allow-dirty
@@ -943,7 +944,9 @@ for native ABI checks. `--allow-dirty` permits a release candidate working tree;
 
 CI also builds warning-free documentation from the packaged sources in both feature configurations
 and checks that the runtime dictionaries, HMM model, and third-party license notices are present.
-The runnable API example is included in the archive. Use a clean, reviewed tree for the final release
+Examples and benchmarks remain repository-only. The checkout checks above select library, integration,
+and documentation tests explicitly so they do not compile keyword-dependent benchmark examples.
+Use a clean, reviewed tree for the final release
 and rerun `cargo package` without `--allow-dirty`.
 
 Before publishing v0.9.0, resolve the outstanding source and linguistic-data provenance questions in

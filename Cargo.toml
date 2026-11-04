@@ -41,7 +41,6 @@ include = [
     "/CHANGELOG.md",
     "/DETOFU_USER_GUIDE.md",
     "/MSRV-1.75.0-GUIDE.md",
-    "/examples/use_opencc_jieba_tests.rs",
     # Licenses and attribution
     "/LICENSE",
     "/JIEBA-LICENSE",
