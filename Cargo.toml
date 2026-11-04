@@ -11,6 +11,7 @@ members = [
 name = "opencc-jieba-rs"
 version = "0.9.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Laisuk Lai <laisuk@yahoo.com>"]
 description = "High-performance Chinese text conversion and segmentation using Jieba and OpenCC-style dictionaries."
 license = "MIT"
@@ -40,6 +41,7 @@ include = [
     "/CHANGELOG.md",
     "/DETOFU_USER_GUIDE.md",
     "/MSRV-1.75.0-GUIDE.md",
+    "/examples/use_opencc_jieba_tests.rs",
     # Licenses and attribution
     "/LICENSE",
     "/JIEBA-LICENSE",

@@ -235,6 +235,31 @@
 //! docs.rs enables all features. Runtime conversion, segmentation, POS tagging,
 //! normalization, DeTofu, and custom-pack loading also work with no default features.
 //!
+//! The minimum supported Rust version is **1.75**. See the
+//! [MSRV guide](https://github.com/laisuk/opencc-jieba-rs/blob/v0.9.0/MSRV-1.75.0-GUIDE.md)
+//! for dependency-lockfile and native compression requirements.
+//!
+//! ## Segmentation and keywords
+//!
+//! These APIs operate on the supplied text without implicitly converting its script:
+//!
+//! ```rust
+//! use opencc_jieba_rs::OpenCC;
+//!
+//! let cc = OpenCC::new();
+//! let words = cc.jieba_cut("自然语言处理", true);
+//! assert_eq!(cc.jieba_cut_and_join("自然语言处理", true, "/"), words.join("/"));
+//!
+//! // Keyword extraction requires the default-enabled `keywords` feature.
+//! # #[cfg(feature = "keywords")]
+//! # {
+//! let keywords = cc.keyword_weight_tfidf_pos(
+//!     "自然语言处理与机器学习", 5, Some(opencc_jieba_rs::POS_KEYWORDS),
+//! );
+//! assert!(keywords.len() <= 5);
+//! # }
+//! ```
+//!
 //! ## Zstandard decoding and Cargo features
 //!
 //! Embedded OpenCC and Jieba dictionaries and custom conversion packs are

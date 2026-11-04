@@ -26,12 +26,18 @@ jobs:
           cargo doc --locked -p opencc-jieba-rs --no-deps --all-features
           cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
       - name: Test without keyword extraction
-        run: cargo test --locked -p opencc-jieba-rs --no-default-features --lib --tests
+        run: cargo test --locked -p opencc-jieba-rs --no-default-features
       - name: Verify published sources and packaged tests
         run: |
           cargo package --locked -p opencc-jieba-rs
-          for manifest in target/package/opencc-jieba-rs-*/Cargo.toml; do
-            cargo test --locked --all-features --manifest-path "$manifest"
+          package_name=$(cargo read-manifest --manifest-path Cargo.toml | python3 -c 'import json, sys; p = json.load(sys.stdin); print(p["name"] + "-" + p["version"])')
+          package_dir="target/package/$package_name"
+          for required in JIEBA-LICENSE THIRD_PARTY_NOTICES.md dicts/LICENSE src/zstd/LICENSE-RUZSTD src/rustc_hash/LICENSE-MIT src/rustc_hash/LICENSE-APACHE src/jieba_rs/VENDOR_NOTES.md src/jieba_rs/hmm.model src/jieba_rs/data/idf.txt.zst src/jieba_rs/data/posseg.txt.zst src/dictionary_lib/dicts/dictionary.json.zst src/dictionary_lib/dicts/dict_hans_hant.txt.zst; do
+            test -s "$package_dir/$required"
+          done
+          for features in --all-features --no-default-features; do
+            cargo test --locked "$features" --manifest-path "$package_dir/Cargo.toml"
+            cargo doc --locked "$features" --no-deps --manifest-path "$package_dir/Cargo.toml"
           done
 
   native-capi:

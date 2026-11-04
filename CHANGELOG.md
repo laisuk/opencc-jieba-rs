@@ -50,6 +50,9 @@ The separately released C API revision 0.8.1.1 is recorded below.
 - Refined docs.rs and README feature, tokenizer migration, ownership, and release-verification guidance.
   Updated package contents to include vendored runtime assets, notices, and integration-test fixtures.
   Added CI checks for warning-free docs, builds without keyword extraction, and packaged-crate tests.
+- Declared Rust 1.75 in package metadata, included the runnable public API example in the crate,
+  and extended packaged-source checks to cover documentation and tests with all features and
+  without default features, plus explicit runtime-asset and license-notice checks.
 - Removed the repository's tracked local Rust toolchain override; use an explicit toolchain when
   reproducing MSRV or release builds.
 - Rewrote the Rust 1.75 guide for the vendored dependency graph, removing obsolete

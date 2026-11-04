@@ -9,8 +9,8 @@ importer's statement, not a verified source identity: the exact upstream version
 and commit are **unknown / unverified**. No source archive checksum or upstream
 revision accompanies the bundle. The local import was committed as `21d67d4` (Vendor Jieba core and document local
 adaptations); that local commit does not authenticate the upstream baseline.
-The previous external dependency was pinned to 0.7.4 (see the commented manifest
-entry and historical changelog); that pin does not identify this bundle.
+The previous external dependency was pinned to 0.7.4 (see the repository history
+and historical changelog); that pin does not identify this bundle.
 Historical module documentation mentioned other upstream versions; those claims
 must not be used as provenance evidence. No full upstream source comparison or
 drop-in compatibility audit has been performed.
@@ -73,7 +73,7 @@ update. Their exact source revisions and transformation commands are unrecorded.
 
 ## Dependencies and features
 
-- The external `jieba-rs` dependency is commented out.
+- The external `jieba-rs` dependency has been removed from the manifest.
 - `ordered-float` is replaced here by `keywords/ordered_float.rs` (f64 ordering
   only); see its module header for scope and provenance limitations.
 - Hash maps/sets use `std::collections` with the parent's vendored

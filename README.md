@@ -275,23 +275,28 @@ live in [`capi/include`](./capi/include); add that directory to your compiler's 
 #include <stdio.h>
 #include "opencc_jieba_capi.h"
 
-int main(int argc, char **argv) {
+int main(void) {
     void *opencc = opencc_jieba_new();
+    if (opencc == NULL) {
+        fputs("Failed to initialize OpenCC\n", stderr);
+        return 1;
+    }
     const char *config = u8"s2twp";
     const char *text = u8"意大利邻国法兰西罗浮宫里收藏的“蒙娜丽莎的微笑”画像是旷世之作。";
     printf("Text: %s\n", text);
     int code = opencc_jieba_zho_check(opencc, text);
     printf("Text Code: %d\n", code);
     char *result = opencc_jieba_convert(opencc, text, config, true);
+    if (result == NULL) {
+        fputs("Conversion failed\n", stderr);
+        opencc_jieba_delete(opencc);
+        return 1;
+    }
     code = opencc_jieba_zho_check(opencc, result);
     printf("Converted: %s\n", result);
     printf("Converted Code: %d\n", code);
-    if (result != NULL) {
-        opencc_jieba_free_string(result);
-    }
-    if (opencc != NULL) {
-        opencc_jieba_delete(opencc);
-    }
+    opencc_jieba_free_string(result);
+    opencc_jieba_delete(opencc);
 
     return 0;
 }
@@ -926,6 +931,8 @@ cargo test --locked -p opencc-jieba-rs --no-default-features
 cargo doc --locked -p opencc-jieba-rs --no-deps --all-features
 cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
 cargo package --locked -p opencc-jieba-rs --allow-dirty
+cargo test --locked --all-features --manifest-path target/package/opencc-jieba-rs-0.9.0/Cargo.toml
+cargo test --locked --no-default-features --manifest-path target/package/opencc-jieba-rs-0.9.0/Cargo.toml
 ```
 
 For documentation review, set `RUSTDOCFLAGS="-D warnings"` in your shell. Package verification
@@ -933,6 +940,16 @@ checks that the published sources build independently of the repository. The arc
 test fixtures and embedded runtime assets; plaintext pack-generation dictionaries and the
 large benchmark novel remain repository-only. See [C/C++ regression commands](./capi/tests/README.md)
 for native ABI checks. `--allow-dirty` permits a release candidate working tree; it does not publish.
+
+CI also builds warning-free documentation from the packaged sources in both feature configurations
+and checks that the runtime dictionaries, HMM model, and third-party license notices are present.
+The runnable API example is included in the archive. Use a clean, reviewed tree for the final release
+and rerun `cargo package` without `--allow-dirty`.
+
+Before publishing v0.9.0, resolve the outstanding source and linguistic-data provenance questions in
+the [Jieba maintenance notes](src/jieba_rs/VENDOR_NOTES.md#licenses-attribution-and-unresolved-release-questions).
+Passing build and package checks does not resolve those attribution questions. Keep the changelog's
+release date marked `Unreleased` until the release is finalized.
 
 ## Credits
 
@@ -943,7 +960,8 @@ for native ABI checks. `--allow-dirty` permits a release candidate working tree;
 ## License
 
 - This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
-- See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled OpenCC lexicons (_Apache License 2.0_).
+- See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled OpenCC lexicons (Apache-2.0),
+  Jieba and the Zstandard decoder (MIT), and Fx hashing (MIT OR Apache-2.0).
 
 ## Contributing
 
