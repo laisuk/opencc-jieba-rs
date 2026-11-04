@@ -360,6 +360,38 @@ char *opencc_jieba_normalize_compat_extended(
     const char *input
 );
 
+/**
+ * @brief Normalizes only curated Unicode compatibility and variant forms.
+ *
+ * This is the C API counterpart of `OpenCC::normalize_unicode_compat()`.
+ * It maps selected radicals, glyph variants, punctuation forms, and known
+ * text-extraction artifacts using the built-in curated Unicode table.
+ * For example, `聼⽟神` becomes `聽玉神`. CJK Compatibility Ideographs are
+ * preserved unless explicitly mapped by that table; use
+ * `opencc_jieba_normalize_compat_extended()` to apply both tables.
+ * This is not general-purpose Unicode NFKC/NFKD normalization.
+ *
+ * No Simplified/Traditional conversion is performed. The instance, its
+ * configuration, dictionaries, segmentation, and punctuation behavior are
+ * unchanged. Each input Unicode scalar produces exactly one output scalar.
+ *
+ * @param instance Live instance returned by any `opencc_jieba_new*()` constructor.
+ *                 It must not be mutated or freed during this call.
+ * @param input Readable, NUL-terminated UTF-8 string, unchanged during the call.
+ *              The caller retains ownership of the input.
+ * @return Newly allocated NUL-terminated UTF-8 string, including for empty input.
+ *         Release exactly once with `opencc_jieba_free_string()`.
+ *         Returns NULL for a NULL instance/input or invalid UTF-8. Retrieve
+ *         details immediately on the same thread with `opencc_jieba_last_error()`.
+ *         Success clears any stale thread-local C API error.
+ *
+ * @since Available since v0.9.0.0. Additive export; ABI number remains 1.
+ */
+char *opencc_jieba_normalize_unicode_compat(
+    const void *instance,
+    const char *input
+);
+
 /* =========================================================================
  * DeTofu
  * ========================================================================= */
@@ -645,7 +677,8 @@ void opencc_jieba_clear_last_error(void);
  *
  * This includes strings returned by `opencc_jieba_convert()`,
  * `opencc_jieba_normalize_compat()`,
- * `opencc_jieba_normalize_compat_extended()`, `opencc_jieba_detofu()`,
+ * `opencc_jieba_normalize_compat_extended()`,
+ * `opencc_jieba_normalize_unicode_compat()`, `opencc_jieba_detofu()`,
  * `opencc_jieba_cut_and_join()`,
  * `opencc_jieba_join_str()`, and `opencc_jieba_last_error()`.
  *

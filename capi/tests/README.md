@@ -19,3 +19,13 @@ checks the four-component numeric format and ABI number `1`, so package version
 and revision updates do not require changing the test. Rust unit tests check the
 exact version against the build metadata. The release workflow accepts
 four-component `v*` tags and packages both canonical headers.
+
+Curated-only normalization regressions exercise the additive C export and the
+C++ RAII method, including preserved CJK Compatibility Ideographs and empty input:
+
+```sh
+cc -std=c11 -Wall -Wextra -Werror -I capi/include capi/tests/normalize_unicode_compat.c -L target/debug -lopencc_jieba_capi -o target/debug/normalize_unicode_compat_c
+c++ -std=c++17 -Wall -Wextra -Werror -I capi/include capi/tests/normalize_unicode_compat.cpp -L target/debug -lopencc_jieba_capi -o target/debug/normalize_unicode_compat_cpp
+LD_LIBRARY_PATH=target/debug target/debug/normalize_unicode_compat_c
+LD_LIBRARY_PATH=target/debug target/debug/normalize_unicode_compat_cpp
+```

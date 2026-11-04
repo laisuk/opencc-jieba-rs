@@ -259,6 +259,21 @@ public:
         return transformString(input, opencc_jieba_normalize_compat_extended);
     }
 
+    /**
+     * Normalize only curated Unicode compatibility and variant forms.
+     * For example, 聼⽟神 becomes 聽玉神. This is not Unicode NFKC/NFKD;
+     * CJK Compatibility Ideographs are preserved unless explicitly mapped
+     * by the curated table. Use normalizeCompatExtended() for both tables.
+     * Does not convert Simplified/Traditional text or modify this instance.
+     * Returns an empty string for empty input. Native output is released
+     * automatically; native failures return the last error text, matching
+     * the other string transformation helpers.
+     */
+    [[nodiscard]] std::string normalizeUnicodeCompat(const std::string_view input) const {
+        if (input.empty()) return {};
+        return transformString(input, opencc_jieba_normalize_unicode_compat);
+    }
+
     // Applies the built-in DeTofu display-compatibility fallback.
     [[nodiscard]] std::string detofu(
         const std::string_view input,

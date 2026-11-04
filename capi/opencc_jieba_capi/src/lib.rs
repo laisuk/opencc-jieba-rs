@@ -366,6 +366,48 @@ pub unsafe extern "C" fn opencc_jieba_normalize_compat(
     }
 }
 
+/// Normalizes curated Unicode compatibility and variant forms in a UTF-8 string.
+///
+/// This is the C API counterpart of [`OpenCC::normalize_unicode_compat`]. It
+/// applies only the curated Unicode compatibility table, including selected
+/// radicals, glyph variants, punctuation forms, and text-extraction artifacts.
+/// For example, `聼⽟神` becomes `聽玉神`: CJK Compatibility Ideographs are
+/// preserved unless explicitly present in the curated table. Use
+/// [`opencc_jieba_normalize_compat_extended`] to apply both tables.
+///
+/// This is not general-purpose Unicode NFKC/NFKD normalization. It performs
+/// no Simplified/Traditional conversion and does not modify the instance,
+/// its configuration, dictionaries, segmentation, or punctuation behavior.
+/// Empty input returns an allocated empty string. Success clears any stale
+/// thread-local C API error.
+///
+/// The returned string must be released with [`opencc_jieba_free_string`].
+///
+/// Returns NULL and records a thread-local C API error when `instance` or
+/// `input` is NULL or `input` is not valid UTF-8.
+///
+/// # Safety
+/// Non-NULL `instance` must be aligned and point to a live, initialized
+/// `OpenCC` that remains valid and is not mutated or freed during this call.
+/// Every non-NULL string pointer must reference a readable NUL-terminated
+/// byte sequence in one allocation (including the terminator, at most
+/// `isize::MAX` bytes), unchanged and valid throughout the call.
+/// Borrowed memory remains caller-owned; NULL arguments are handled as errors
+/// or optional values as appropriate. UTF-8 is validated before use.
+/// A non-NULL returned string is caller-owned and must be released exactly
+/// once with [`opencc_jieba_free_string`].
+#[no_mangle]
+pub unsafe extern "C" fn opencc_jieba_normalize_unicode_compat(
+    instance: *const OpenCC,
+    input: *const c_char,
+) -> *mut c_char {
+    unsafe {
+        transform_utf8_ffi(instance, input, |opencc, input_str| {
+            Ok(opencc.normalize_unicode_compat(input_str))
+        })
+    }
+}
+
 /// Applies the full built-in compatibility normalization pre-pass.
 ///
 /// This is the C API counterpart of [`OpenCC::normalize_compat_extended`]. It
@@ -2008,6 +2050,46 @@ mod tests {
 #[cfg(test)]
 mod compatibility_normalization_capi_tests {
     use super::*;
+
+    #[test]
+    fn normalize_unicode_compat_preserves_cjk_compatibility_and_instance() {
+        let opencc = OpenCC::new();
+        let input = CString::new("聼⽟神汉语").unwrap();
+        let before = opencc.convert("汉语", "s2t", false);
+        let result = unsafe { opencc_jieba_normalize_unicode_compat(&opencc, input.as_ptr()) };
+        assert_eq!(read_owned_string(result), "聽玉神汉语");
+        assert_eq!(opencc.convert("汉语", "s2t", false), before);
+        let extended = unsafe { opencc_jieba_normalize_compat_extended(&opencc, input.as_ptr()) };
+        assert_eq!(read_owned_string(extended), "聽玉神汉语");
+    }
+
+    #[test]
+    fn normalize_unicode_compat_validates_arguments_and_clears_errors() {
+        let opencc = OpenCC::new();
+        let input = CString::new("").unwrap();
+        for (instance, text) in [
+            (ptr::null(), input.as_ptr()),
+            (&opencc as *const OpenCC, ptr::null()),
+        ] {
+            assert!(unsafe { opencc_jieba_normalize_unicode_compat(instance, text) }.is_null());
+            assert_eq!(
+                read_owned_string(opencc_jieba_last_error()),
+                "Invalid argument: instance/input is NULL"
+            );
+        }
+        let invalid = [0xff_u8, 0];
+        assert!(
+            unsafe { opencc_jieba_normalize_unicode_compat(&opencc, invalid.as_ptr().cast()) }
+                .is_null()
+        );
+        assert_eq!(
+            read_owned_string(opencc_jieba_last_error()),
+            "Invalid UTF-8 input"
+        );
+        let result = unsafe { opencc_jieba_normalize_unicode_compat(&opencc, input.as_ptr()) };
+        assert_eq!(read_owned_string(result), "");
+        assert_eq!(read_owned_string(opencc_jieba_last_error()), "No error");
+    }
 
     fn read_owned_string(ptr: *mut c_char) -> String {
         assert!(!ptr.is_null());
