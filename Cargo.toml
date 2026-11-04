@@ -23,7 +23,7 @@ categories = ["text-processing", "internationalization", "command-line-utilities
 include = [
     # Rust sources and build script
     "src/**/*.rs",
-    "build.rs",
+    "/build.rs",
     # integration tests
     "tests/**/*.rs",
     "tests/data/*.txt",
