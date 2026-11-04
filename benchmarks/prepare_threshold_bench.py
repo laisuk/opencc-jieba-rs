@@ -12,7 +12,7 @@ manifest = (dest / 'Cargo.toml').read_text()
 start = manifest.index('[workspace]')
 end = manifest.index('[package]')
 manifest = '[workspace]\nmembers = []\n\n' + manifest[end:]
-manifest = manifest[:manifest.index('[[example]]')]
+manifest = manifest.split('[[example]]', 1)[0]
 (dest / 'Cargo.toml').write_text(manifest)
 p = dest / 'src/opencc.rs'
 s = p.read_text(encoding='utf-8')

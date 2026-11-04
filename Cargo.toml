@@ -1,4 +1,5 @@
 [workspace]
+exclude = ["benchmarks"]
 members = [
     "capi/opencc_jieba_capi",
     "tools/dict-generate",

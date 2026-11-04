@@ -14,7 +14,7 @@ processors), repository release profile (opt-level 3, fat LTO, one codegen unit)
 
 ```powershell
 $env:RAYON_NUM_THREADS = '8'
-cargo run --release -j 1 --example jieba_join_bench -- 15
+cargo run --release -j 1 --manifest-path benchmarks/Cargo.toml --target-dir target --bin jieba_join_bench -- 15
 cargo test --release -j 1 -p opencc-jieba-rs --lib --tests
 cargo test --release -j 1 --test jieba_join -- --include-ignored
 ```

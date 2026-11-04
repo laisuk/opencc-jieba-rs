@@ -2,19 +2,19 @@
 
 Baseline: `21d67d439f77e676e3bca33907ecdc5c24b1fbf3`.
 The implementation, manifest, lockfile, dictionaries, and build script are
-unchanged. The isolated harness is `examples/jieba_baseline.rs`; no dependencies
+unchanged. The isolated harness is `benchmarks/jieba_baseline.rs`; no dependencies
 or public APIs were added. This is a measurement tool, not a performance test
 with pass/fail timing thresholds.
 
 ## Reproduce (PowerShell, repository root)
 
 ```powershell
-cargo +1.75.0 build --locked --release --example jieba_baseline --target-dir target/jieba-baseline
+cargo +1.75.0 build --locked --release --manifest-path benchmarks/Cargo.toml --bin jieba_baseline --target-dir target/jieba-baseline
 $env:RAYON_NUM_THREADS = '1'
-& ./target/jieba-baseline/release/examples/jieba_baseline.exe |
+& ./target/jieba-baseline/release/jieba_baseline.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/baseline-1-thread.csv
 $env:RAYON_NUM_THREADS = '16'
-& ./target/jieba-baseline/release/examples/jieba_baseline.exe |
+& ./target/jieba-baseline/release/jieba_baseline.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/baseline-16-threads.csv
 ```
 

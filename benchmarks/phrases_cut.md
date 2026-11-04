@@ -40,7 +40,7 @@ justified by this focused investigation; its performance remains unmeasured.
 
 ## Experiments
 
-The library was not modified. `examples/phrases_cut_bench.rs` compares the current
+The library was not modified. `benchmarks/phrases_cut_bench.rs` compares the current
 public `jieba_cut` to two safe candidates using the same tokenizer:
 
 1. **fold_extend:** explicitly extend a task-local vector from each exact-sized
@@ -74,10 +74,10 @@ Scheduling and thread-local scratch reuse cause small variations.
 
 ```powershell
 $env:RAYON_NUM_THREADS = '8'
-cargo run --release -j 1 --example phrases_cut_bench -- 21
+cargo run --release -j 1 --manifest-path benchmarks/Cargo.toml --target-dir target --bin phrases_cut_bench -- 21
 # Repeat the built executable twice:
-target/release/examples/phrases_cut_bench.exe 21
-target/release/examples/phrases_cut_bench.exe 21
+target/release/phrases_cut_bench.exe 21
+target/release/phrases_cut_bench.exe 21
 ```
 
 ## Timing results

@@ -27,8 +27,7 @@ jobs:
           cargo doc --locked -p opencc-jieba-rs --no-deps --no-default-features
       - name: Test without keyword extraction
         run: |
-          cargo test --locked -p opencc-jieba-rs --no-default-features --lib --tests
-          cargo test --locked -p opencc-jieba-rs --no-default-features --doc
+          cargo test --locked -p opencc-jieba-rs --no-default-features
       - name: Verify published sources and packaged tests
         run: |
           cargo package --locked -p opencc-jieba-rs

@@ -1,6 +1,6 @@
 # Allocation / Cow benchmark for v0.9.0
 
-Run: `cargo run --release --example allocation_bench`
+Run: `cargo run --release --manifest-path benchmarks/Cargo.toml --target-dir target --bin allocation_bench`
 
 Environment: Windows, rustc 1.75.0, default features, release profile, default Rayon pool. Same working tree and
 benchmark harness before/after. Dictionary initialization and three warm-up calls are excluded. Allocation counts

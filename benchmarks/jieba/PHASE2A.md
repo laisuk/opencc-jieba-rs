@@ -55,7 +55,7 @@ The original tests are unchanged. See the verification results below for command
 
 ## Reproduce the timing comparison
 
-The existing `examples/jieba_baseline.rs` is **unchanged**, SHA-256
+The existing `benchmarks/jieba_baseline.rs` is **unchanged**, SHA-256
 `476bfe5a67a1d26090050843e21fdd8d7576b3d1fd7eb9915b69132a2117a7e8`.
 Use the same environment and method as `README.md` and `REPORT.md`: Rust 1.75.0,
 locked default-feature release build, fat LTO, seven batches of at least 40 ms,
@@ -64,12 +64,12 @@ includes output destruction; allocation counters run separately. Do not run
 builds/tests simultaneously with benchmarks.
 
 ```powershell
-cargo +1.75.0 build --locked --release --example jieba_baseline --target-dir target/jieba-baseline
+cargo +1.75.0 build --locked --release --manifest-path benchmarks/Cargo.toml --bin jieba_baseline --target-dir target/jieba-baseline
 $env:RAYON_NUM_THREADS = '1'
-& ./target/jieba-baseline/release/examples/jieba_baseline.exe |
+& ./target/jieba-baseline/release/jieba_baseline.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/phase2a-1-thread.csv
 $env:RAYON_NUM_THREADS = '16'
-& ./target/jieba-baseline/release/examples/jieba_baseline.exe |
+& ./target/jieba-baseline/release/jieba_baseline.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/phase2a-16-threads.csv
 ```
 
@@ -184,7 +184,7 @@ below. No allocation reduction outside default TF-IDF setup is claimed.
 
 ## Memory probe
 
-`examples/tfidf_memory_probe.rs` is a separate, dependency-free allocator probe,
+`benchmarks/tfidf_memory_probe.rs` is a separate, dependency-free allocator probe,
 not a timing harness. It isolates IDF/config setup without constructing a Jieba
 tokenizer or an OpenCC conversion dictionary. It counts successful allocation
 requests, cumulative requested bytes, live requested-byte deltas, and incremental
@@ -204,7 +204,7 @@ New-Item -ItemType Directory -Force target/phase2a-baseline-source | Out-Null
 git archive --format=tar --output=target/phase2a-baseline-source.tar 21d67d4 Cargo.toml Cargo.lock build.rs rust-toolchain.toml src capi/opencc_jieba_capi tools/dict-generate tools/opencc-clip-jieba tools/opencc-jieba tools/opencc-tool-common
 tar -xf target/phase2a-baseline-source.tar -C target/phase2a-baseline-source
 New-Item -ItemType Directory -Force target/phase2a-baseline-source/examples | Out-Null
-Copy-Item examples/tfidf_memory_probe.rs target/phase2a-baseline-source/examples/tfidf_memory_probe.rs
+Copy-Item benchmarks/tfidf_memory_probe.rs target/phase2a-baseline-source/examples/tfidf_memory_probe.rs
 cargo +1.75.0 build --locked --release --example tfidf_memory_probe --manifest-path target/phase2a-baseline-source/Cargo.toml --target-dir target/phase2a-legacy-build
 & ./target/phase2a-legacy-build/release/examples/tfidf_memory_probe.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/phase2a-baseline-memory.csv
@@ -213,8 +213,8 @@ cargo +1.75.0 build --locked --release --example tfidf_memory_probe --manifest-p
 For the patched probe:
 
 ```powershell
-cargo +1.75.0 build --locked --release --example tfidf_memory_probe --target-dir target/jieba-baseline
-& ./target/jieba-baseline/release/examples/tfidf_memory_probe.exe |
+cargo +1.75.0 build --locked --release --manifest-path benchmarks/Cargo.toml --bin tfidf_memory_probe --target-dir target/jieba-baseline
+& ./target/jieba-baseline/release/tfidf_memory_probe.exe |
     Set-Content -Encoding utf8 benchmarks/jieba/phase2a-memory.csv
 ```
 
@@ -278,7 +278,7 @@ Patched probe executable SHA-256:
   the additional paired baseline/patched one-worker run.
 - Production change: `src/jieba_rs/keywords/tfidf.rs` only. New regression tests:
   `src/jieba_rs/keywords/tfidf_tests.rs`. New memory probe:
-  `examples/tfidf_memory_probe.rs`. This report and `phase2a-*` results/logs are
+  `benchmarks/tfidf_memory_probe.rs`. This report and `phase2a-*` results/logs are
   isolated under `benchmarks/jieba/`.
 - The original timing harness, Phase-1 results, existing tests, Cargo manifest,
   lockfile, build script, and all other production modules remain unchanged.
