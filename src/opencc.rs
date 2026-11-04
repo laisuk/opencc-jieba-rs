@@ -3811,7 +3811,8 @@ mod tests {
         );
         let input = String::from("普通🙂");
         let ptr = input.as_ptr();
-        assert_eq!(OpenCC::convert_punctuation(input, "s").as_ptr(), ptr);
+        let output = OpenCC::convert_punctuation(input, "s");
+        assert_eq!(output.as_ptr(), ptr);
     }
 
     #[test]
