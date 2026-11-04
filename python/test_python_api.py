@@ -74,6 +74,10 @@ class PythonApiTests(unittest.TestCase):
             self.assertTrue(cc.jieba_segment_join(text, mode=mode))
         self.assertEqual(cc.jieba_segment_join(text, delim=''), text)
         self.assertEqual(cc.jieba_cut_and_join(text, True, '/'), cc.jieba_cut_and_join(text, '/'))
+        self.assertEqual(cc.jieba_cut_and_join(text, '/', hmm=False), '/'.join(cc.jieba_cut(text, False)))
+        self.assertEqual(cc.jieba_cut_and_join(text=text, hmm=False, delimiter='|'), '|'.join(cc.jieba_cut(text, False)))
+        self.assertEqual(cc.jieba_cut_and_join(text, False), ', '.join(cc.jieba_cut(text, False)))
+        self.assertEqual(cc.convert(text='汉语'), '漢語')
         for algorithm in ('textrank', 'tfidf'):
             extract = getattr(cc, 'jieba_keyword_extract_' + algorithm)
             weighted = getattr(cc, 'jieba_keyword_weight_' + algorithm)
@@ -83,40 +87,41 @@ class PythonApiTests(unittest.TestCase):
         self.assertEqual(cc.jieba_join_str(['', '中国'], '/'), '/中国')
 
 
+def run_cli(args):
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+        status = main(args)
+    return status, err.getvalue()
+
+
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def run_cli(self, args):
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
-            status = main(args)
-        return status, err.getvalue()
-
     def test_convert_segment_and_errors(self):
         source, target = self.root / 'input.txt', self.root / 'output.txt'
         source.write_text('汉语神', encoding='utf-8')
-        self.assertEqual(self.run_cli(['convert', '-i', str(source), '-o', str(target), '-E', '--detofu'])[0], 0)
+        self.assertEqual(run_cli(['convert', '-i', str(source), '-o', str(target), '-E', '--detofu'])[0], 0)
         self.assertEqual(target.read_text(encoding='utf-8'), '漢語神')
-        self.assertEqual(self.run_cli(['segment', '-i', str(source), '-o', str(target), '-d', ''])[0], 0)
+        self.assertEqual(run_cli(['segment', '-i', str(source), '-o', str(target), '-d', ''])[0], 0)
         self.assertEqual(target.read_text(encoding='utf-8'), '汉语神')
-        self.assertEqual(self.run_cli(['convert', '-i', str(source), '-o', str(source)])[0], 1)
+        self.assertEqual(run_cli(['convert', '-i', str(source), '-o', str(source)])[0], 1)
         self.assertEqual(source.read_text(encoding='utf-8'), '汉语神')
-        self.assertEqual(self.run_cli(['convert', '-c', 'invalid'])[0], 1)
-        self.assertEqual(self.run_cli(['convert', '--detofu-file', 'missing'])[0], 1)
-        self.assertEqual(self.run_cli(['convert', '-i', str(source), '--detofu', '--detofu-file', 'missing'])[0], 1)
+        self.assertEqual(run_cli(['convert', '-c', 'invalid'])[0], 1)
+        self.assertEqual(run_cli(['convert', '--detofu-file', 'missing'])[0], 1)
+        self.assertEqual(run_cli(['convert', '-i', str(source), '--detofu', '--detofu-file', 'missing'])[0], 1)
 
     def test_office_pipeline_and_filename(self):
         source = self.root / '汉语.docx'
         with zipfile.ZipFile(source, 'w') as package:
             package.writestr('word/document.xml', '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>汉语神</w:t></w:r></w:p></w:document>')
-        status, message = self.run_cli(['office', '-i', str(source), '-c', 's2t', '-F', '-E', '-k'])
+        status, message = run_cli(['office', '-i', str(source), '-c', 's2t', '-F', '-E', '-k'])
         self.assertEqual(status, 0, message)
         output = self.root / '漢語_converted.docx'
         with zipfile.ZipFile(output) as package:
             self.assertIn('漢語神', package.read('word/document.xml').decode('utf-8'))
-        self.assertEqual(self.run_cli(['office', '-i', str(source), '-o', str(source)])[0], 1)
+        self.assertEqual(run_cli(['office', '-i', str(source), '-o', str(source)])[0], 1)
 
     def test_windows_dictionary_path_parser(self):
         path = self.root / 'dict.txt'

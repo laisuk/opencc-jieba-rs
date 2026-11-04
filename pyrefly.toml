@@ -1,0 +1,8 @@
+# Public Python API and CLI; resolve the package from its source root instead
+# of confusing it with python/opencc_jieba_rs/opencc_jieba_rs.py.
+project-includes = [
+    "python/opencc_jieba_rs/__init__.py",
+    "python/opencc_jieba_rs/__main__.py",
+]
+search-path = ["python"]
+preset = "strict"

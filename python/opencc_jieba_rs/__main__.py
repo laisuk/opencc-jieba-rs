@@ -10,9 +10,9 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import BinaryIO, Callable, List, Optional, Tuple, cast
 
-from opencc_jieba_rs import CustomDictFileSpec, OpenCC
+from . import CustomDictFileSpec, OpenCC
 
 SUPPORTED_CONFIGS = OpenCC.supported_configs()
 AVAILABLE_SLOTS = OpenCC.available_slots()
@@ -20,6 +20,32 @@ CONFIG_HELP = "Configuration: " + "|".join(SUPPORTED_CONFIGS)
 SLOT_HELP = "Available slots: " + "|".join(AVAILABLE_SLOTS)
 
 TextConverter = Callable[[str], str]
+
+
+class CliArgs(argparse.Namespace):
+    """Typed namespace populated by argparse; shared options have safe defaults."""
+
+    command: str = ""
+    func: Optional[Callable[["CliArgs"], int]] = None
+    input: Optional[str] = None
+    output: Optional[str] = None
+    config: Optional[str] = None
+    in_enc: str = "UTF-8"
+    out_enc: str = "UTF-8"
+    punct: bool = False
+    norm_compat: bool = False
+    norm_compat_extended: bool = False
+    detofu: Optional[str] = None
+    detofu_file: Optional[str] = None
+    custom_dict: Optional[List[str]] = None
+    user_dict_file: Optional[List[str]] = None
+    mode: str = "cut"
+    delim: Optional[str] = " "
+    separator: Optional[str] = "/"
+    no_hmm: bool = False
+    format: Optional[str] = None
+    keep_font: bool = False
+    convert_filename: bool = False
 
 
 def resolve_config(config: Optional[str]) -> Optional[str]:
@@ -66,7 +92,7 @@ def parse_custom_dict_spec(spec: str) -> CustomDictFileSpec:
 
     slot, mode, path = (part.strip() for part in parts)
 
-    if not slot:
+    if slot == "":
         raise ValueError(
             "Invalid --custom-dict spec {!r}: slot is empty".format(spec)
         )
@@ -79,7 +105,7 @@ def parse_custom_dict_spec(spec: str) -> CustomDictFileSpec:
             )
         )
 
-    if not path:
+    if path == "":
         raise ValueError(
             "Invalid --custom-dict spec {!r}: path is empty".format(spec)
         )
@@ -94,16 +120,16 @@ def parse_custom_dict_spec(spec: str) -> CustomDictFileSpec:
     }
 
 
-def custom_dict_specs_from_args(args: argparse.Namespace) -> List[CustomDictFileSpec]:
+def custom_dict_specs_from_args(args: CliArgs) -> List[CustomDictFileSpec]:
     return [
         parse_custom_dict_spec(spec)
-        for spec in (getattr(args, "custom_dict", None) or [])
+        for spec in (args.custom_dict if args.custom_dict is not None else [])
     ]
 
 
-def user_dict_files_from_args(args: argparse.Namespace) -> List[str]:
+def user_dict_files_from_args(args: CliArgs) -> List[str]:
     """Validate and return ``-U/--user-dict-file`` paths in CLI order."""
-    paths = getattr(args, "user_dict_file", None) or []
+    paths = args.user_dict_file if args.user_dict_file is not None else []
 
     for path in paths:
         if not Path(path).is_file():
@@ -114,7 +140,7 @@ def user_dict_files_from_args(args: argparse.Namespace) -> List[str]:
 
 def build_opencc(
         config: str,
-        args: argparse.Namespace,
+        args: CliArgs,
 ) -> Tuple[OpenCC, List[CustomDictFileSpec]]:
     """
     Construct one OpenCC instance and apply optional Jieba and OpenCC files.
@@ -127,21 +153,21 @@ def build_opencc(
 
     opencc = OpenCC(config)
 
-    if user_files:
+    if len(user_files) > 0:
         opencc.load_user_dict_files(user_files)
 
-    if custom_specs:
+    if len(custom_specs) > 0:
         opencc.load_custom_dict_files(custom_specs)
 
     return opencc, custom_specs
 
 
-def build_jieba(args: argparse.Namespace) -> OpenCC:
+def build_jieba(args: CliArgs) -> OpenCC:
     """Construct the Jieba instance and load only ``-U`` user dictionaries."""
     user_files = user_dict_files_from_args(args)
     opencc = OpenCC("s2t")
 
-    if user_files:
+    if len(user_files) > 0:
         opencc.load_user_dict_files(user_files)
 
     return opencc
@@ -164,11 +190,11 @@ def validate_input_output_paths(
         input_path: Optional[str],
         output_path: Optional[str],
 ) -> bool:
-    if input_path and not Path(input_path).is_file():
+    if input_path not in (None, "") and not Path(input_path).is_file():
         print(f"❌ Input file not found: {input_path}", file=sys.stderr)
         return False
 
-    if input_path and output_path and paths_refer_to_same_file(input_path, output_path):
+    if input_path not in (None, "") and output_path not in (None, "") and paths_refer_to_same_file(input_path, output_path):
         print("❌ Input and output files must be different.", file=sys.stderr)
         return False
 
@@ -177,20 +203,20 @@ def validate_input_output_paths(
 
 def read_text_input(input_path: Optional[str], encoding: str) -> Optional[str]:
     try:
-        if input_path:
+        if input_path not in (None, ""):
             with io.open(input_path, "r", encoding=encoding) as stream:
                 return stream.read()
 
-        binary_stream = getattr(sys.stdin, "buffer", None)
+        binary_stream = cast(Optional[BinaryIO], getattr(sys.stdin, "buffer", None))
         if binary_stream is not None:
             return binary_stream.read().decode(encoding)
         # Embedded callers may supply an already-decoded text stream.
-        codecs.lookup(encoding)
+        _ = codecs.lookup(encoding)
         return sys.stdin.read()
     except LookupError as ex:
         print(f"❌ Invalid input encoding '{encoding}': {ex}", file=sys.stderr)
     except (OSError, UnicodeError) as ex:
-        source = input_path or "<stdin>"
+        source = input_path if input_path not in (None, "") else "<stdin>"
         print(f"❌ Failed to read input '{source}': {ex}", file=sys.stderr)
 
     return None
@@ -203,40 +229,40 @@ def write_text_output(
 ) -> bool:
     # Validate even for interactive consoles, which write Unicode directly.
     try:
-        codecs.lookup(encoding)
+        _ = codecs.lookup(encoding)
     except LookupError as ex:
         print(f"❌ Invalid output encoding '{encoding}': {ex}", file=sys.stderr)
         return False
 
     try:
-        if output_path:
+        if output_path not in (None, ""):
             with io.open(output_path, "w", encoding=encoding) as stream:
-                stream.write(output_str)
+                _ = stream.write(output_str)
         elif sys.stdout.isatty() or not hasattr(sys.stdout, "buffer"):
-            sys.stdout.write(output_str)
-            sys.stdout.flush()
+            _ = sys.stdout.write(output_str)
+            _ = sys.stdout.flush()
         else:
-            sys.stdout.buffer.write(output_str.encode(encoding))
-            sys.stdout.buffer.flush()
+            _ = sys.stdout.buffer.write(output_str.encode(encoding))
+            _ = sys.stdout.buffer.flush()
     except (OSError, UnicodeError) as ex:
-        target = output_path or "<stdout>"
+        target = output_path if output_path not in (None, "") else "<stdout>"
         print(f"❌ Failed to write output '{target}': {ex}", file=sys.stderr)
         return False
 
     return True
 
 
-def normalize_input(opencc: OpenCC, input_str: str, args: argparse.Namespace) -> str:
-    if getattr(args, "norm_compat_extended", False):
+def normalize_input(opencc: OpenCC, input_str: str, args: CliArgs) -> str:
+    if args.norm_compat_extended:
         return opencc.normalize_compat_extended(input_str)
-    if getattr(args, "norm_compat", False):
+    if args.norm_compat:
         return opencc.normalize_compat(input_str)
     return input_str
 
 
-def validate_detofu_args(args: argparse.Namespace) -> bool:
+def validate_detofu_args(args: CliArgs) -> bool:
     """Validate shared DeTofu CLI argument dependencies."""
-    if getattr(args, "detofu_file", None) and not getattr(args, "detofu", None):
+    if args.detofu_file not in (None, "") and args.detofu in (None, ""):
         print("❌ --detofu-file requires --detofu", file=sys.stderr)
         return False
     return True
@@ -244,7 +270,7 @@ def validate_detofu_args(args: argparse.Namespace) -> bool:
 
 def make_text_converter(
         opencc: OpenCC,
-        args: argparse.Namespace,
+        args: CliArgs,
 ) -> TextConverter:
     """
     Build the shared text transformation pipeline.
@@ -256,15 +282,15 @@ def make_text_converter(
         Normalize -> Convert -> DeTofu
     """
     normalize: Optional[TextConverter] = None
-    if getattr(args, "norm_compat_extended", False):
+    if args.norm_compat_extended:
         normalize = opencc.normalize_compat_extended
-    elif getattr(args, "norm_compat", False):
+    elif args.norm_compat:
         normalize = opencc.normalize_compat
     convert = opencc.convert
-    punct = getattr(args, "punct", False)
+    punct = args.punct
 
-    detofu: Optional[str] = getattr(args, "detofu", None)
-    detofu_file: Optional[str] = getattr(args, "detofu_file", None)
+    detofu: Optional[str] = args.detofu
+    detofu_file: Optional[str] = args.detofu_file
     # Resolve bound methods once: Office documents call this pipeline for many
     # separate text fragments. Custom DeTofu files still use the native API.
     builtin_fallback = opencc.detofu
@@ -287,16 +313,16 @@ def make_text_converter(
     return convert_text
 
 
-def normalization_status(args: argparse.Namespace) -> str:
-    if getattr(args, "norm_compat_extended", False):
+def normalization_status(args: CliArgs) -> str:
+    if args.norm_compat_extended:
         return ", norm-compat:extended"
-    if getattr(args, "norm_compat", False):
+    if args.norm_compat:
         return ", norm-compat"
     return ""
 
 
 def custom_dict_status(specs: List[CustomDictFileSpec]) -> str:
-    if not specs:
+    if len(specs) == 0:
         return ""
 
     details = ",".join(
@@ -314,14 +340,14 @@ def finish_text_status(
         return
 
     # Add only a display newline after direct interactive stdout output.
-    if not output_path and sys.stdout.isatty() and output_str and not output_str.endswith("\n"):
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+    if output_path in (None, "") and sys.stdout.isatty() and output_str != "" and not output_str.endswith("\n"):
+        _ = sys.stdout.write("\n")
+        _ = sys.stdout.flush()
 
     print(status, file=sys.stderr)
 
 
-def subcommand_convert(args: argparse.Namespace) -> int:
+def subcommand_convert(args: CliArgs) -> int:
     config = resolve_config(args.config)
     if config is None:
         return 1
@@ -360,8 +386,8 @@ def subcommand_convert(args: argparse.Namespace) -> int:
     if not write_text_output(output_str, args.output, args.out_enc):
         return 1
 
-    in_from = args.input or "<stdin>"
-    out_to = args.output or "<stdout>"
+    in_from = args.input if args.input not in (None, "") else "<stdin>"
+    out_to = args.output if args.output not in (None, "") else "<stdout>"
     status = (
         f"Conversion completed ({config}"
         f"{normalization_status(args)}"
@@ -372,7 +398,7 @@ def subcommand_convert(args: argparse.Namespace) -> int:
     return 0
 
 
-def subcommand_segment(args: argparse.Namespace) -> int:
+def subcommand_segment(args: CliArgs) -> int:
     if not validate_input_output_paths(args.input, args.output):
         return 1
 
@@ -412,8 +438,8 @@ def subcommand_segment(args: argparse.Namespace) -> int:
     if not write_text_output(output_str, args.output, args.out_enc):
         return 1
 
-    in_from = args.input or "<stdin>"
-    out_to = args.output or "<stdout>"
+    in_from = args.input if args.input not in (None, "") else "<stdin>"
+    out_to = args.output if args.output not in (None, "") else "<stdout>"
     hmm_status = "" if mode == "full" else f", HMM:{hmm}"
     status = (
         f"Segmentation completed ({mode}"
@@ -425,7 +451,7 @@ def subcommand_segment(args: argparse.Namespace) -> int:
     return 0
 
 
-def subcommand_office(args: argparse.Namespace) -> int:
+def subcommand_office(args: CliArgs) -> int:
     """Convert an Office or EPUB document using OpenCC + Jieba.
 
     Reuse the shared text pipeline for document contents and, optionally,
@@ -442,11 +468,11 @@ def subcommand_office(args: argparse.Namespace) -> int:
 
     input_file = args.input
     output_file = args.output
-    office_format = args.format.lower() if args.format else None
+    office_format = args.format.lower() if args.format not in (None, "") else None
     keep_font = args.keep_font
-    convert_filename = getattr(args, "convert_filename", False)
+    convert_filename = args.convert_filename
 
-    if not input_file:
+    if input_file in (None, ""):
         print("❌ Input file is missing.", file=sys.stderr)
         return 1
 
@@ -460,7 +486,7 @@ def subcommand_office(args: argparse.Namespace) -> int:
 
     if office_format not in OFFICE_FORMATS:
         print(
-            f"❌ Unsupported Office format: {office_format or '(none)'}",
+            f"❌ Unsupported Office format: {office_format if office_format != '' else '(none)'}",
             file=sys.stderr,
         )
         print(
@@ -486,7 +512,7 @@ def subcommand_office(args: argparse.Namespace) -> int:
     office_text_converter = make_text_converter(opencc, args)
 
     # Generate the default output filename only when -o is absent.
-    if not output_file:
+    if output_file in (None, ""):
         stem = input_path.stem
 
         if convert_filename:
@@ -499,7 +525,7 @@ def subcommand_office(args: argparse.Namespace) -> int:
                 )
                 return 1
 
-            if not stem or stem in (".", ".."):
+            if stem in ("", ".", ".."):
                 print(
                     "❌ Filename conversion produced an invalid name.",
                     file=sys.stderr,
@@ -528,7 +554,7 @@ def subcommand_office(args: argparse.Namespace) -> int:
         )
 
     # Append the format extension when an explicit output has none.
-    elif not Path(output_file).suffix:
+    elif Path(output_file).suffix == "":
         output_file += f".{office_format}"
         print(
             f"ℹ️ Auto-extension applied: {output_file}",
@@ -574,7 +600,7 @@ def subcommand_office(args: argparse.Namespace) -> int:
 
 
 def add_custom_dict_option(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "-D",
         "--custom-dict",
         action="append",
@@ -588,7 +614,7 @@ def add_custom_dict_option(parser: argparse.ArgumentParser) -> None:
 
 
 def add_user_dict_option(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "-U",
         "--user-dict-file",
         action="append",
@@ -606,13 +632,13 @@ def add_conversion_dictionary_options(parser: argparse.ArgumentParser) -> None:
 
 
 def add_normalization_options(parser: argparse.ArgumentParser, action: str) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "-n",
         "--norm-compat",
         action="store_true",
         help=f"Normalize CJK Compatibility Ideographs before {action}.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-E",
         "--norm-compat-extended",
         action="store_true",
@@ -621,7 +647,7 @@ def add_normalization_options(parser: argparse.ArgumentParser, action: str) -> N
 
 
 def add_detofu_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "--detofu",
         nargs="?",
         const="all",
@@ -632,7 +658,7 @@ def add_detofu_options(parser: argparse.ArgumentParser) -> None:
             "Optional level: all/ExtB, ExtC, ExtD, ExtE, ExtF, ExtG, ExtH, ExtI."
         ),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--detofu-file",
         metavar="<file>",
         help="Load additional DeTofu mappings from a UTF-8 text file. Requires --detofu.",
@@ -640,19 +666,19 @@ def add_detofu_options(parser: argparse.ArgumentParser) -> None:
 
 
 def add_text_io_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    _ = parser.add_argument(
         "-i", "--input", metavar="<file>", help="Read input text from <file>."
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-o", "--output", metavar="<file>", help="Write output text to <file>."
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--in-enc",
         metavar="<encoding>",
         default="UTF-8",
         help="Encoding for input.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--out-enc",
         metavar="<encoding>",
         default="UTF-8",
@@ -674,10 +700,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Convert Chinese text using OpenCC + Jieba",
     )
     add_text_io_options(parser_convert)
-    parser_convert.add_argument(
+    _ = parser_convert.add_argument(
         "-c", "--config", metavar="<conversion>", help=CONFIG_HELP
     )
-    parser_convert.add_argument(
+    _ = parser_convert.add_argument(
         "-p",
         "--punct",
         action="store_true",
@@ -694,26 +720,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Segment Chinese text using Jieba",
     )
     add_text_io_options(parser_segment)
-    parser_segment.add_argument(
+    _ = parser_segment.add_argument(
         "-d",
         "--delim",
         metavar="<char>",
         default=" ",
         help="Text between tokens; use an empty string to concatenate tokens.",
     )
-    parser_segment.add_argument(
+    _ = parser_segment.add_argument(
         "-s",
         "--separator",
         metavar="<char>",
         default="/",
         help="Text between each word and its POS tag; used only in tag mode.",
     )
-    parser_segment.add_argument(
+    _ = parser_segment.add_argument(
         "--no-hmm",
         action="store_true",
         help="Disable HMM word discovery (ignored in full mode).",
     )
-    parser_segment.add_argument(
+    _ = parser_segment.add_argument(
         "-m",
         "--mode",
         choices=["cut", "search", "full", "tag"],
@@ -728,7 +754,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Backward compatibility: accept -D/--custom-dict for segment, but do not
     # expose or load it. OpenCC custom dictionaries do not affect Jieba-only
     # segmentation.
-    parser_segment.add_argument(
+    _ = parser_segment.add_argument(
         "-D",
         "--custom-dict",
         action="append",
@@ -742,14 +768,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         help="Convert Office document Chinese text using OpenCC + Jieba",
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-i",
         "--input",
         metavar="<file>",
         required=True,
         help="Input Office or EPUB document.",
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-o",
         "--output",
         metavar="<file>",
@@ -759,19 +785,19 @@ def build_parser() -> argparse.ArgumentParser:
             "A missing extension is appended automatically."
         ),
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-c",
         "--config",
         metavar="<conversion>",
         help=CONFIG_HELP,
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-p",
         "--punct",
         action="store_true",
         help="Enable punctuation conversion.",
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-F",
         "--convert-filename",
         action="store_true",
@@ -780,13 +806,13 @@ def build_parser() -> argparse.ArgumentParser:
             "output filename. Ignored when --output is specified."
         ),
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-f",
         "--format",
         choices=("docx", "xlsx", "pptx", "odt", "ods", "odp", "epub"),
         help="Office or EPUB format (inferred from input extension by default).",
     )
-    parser_office.add_argument(
+    _ = parser_office.add_argument(
         "-k", "--keep-font",
         action="store_true",
         help="Preserve font-family information in Office content.",
@@ -803,8 +829,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Run a command and return its exit status; None reads ``sys.argv[1:]``."""
-    args = build_parser().parse_args(argv)
-    return args.func(args)
+    args = build_parser().parse_args(argv, namespace=CliArgs())
+    command = args.func
+    if command is None:
+        raise RuntimeError("The selected subcommand has no handler")
+    return command(args)
 
 
 if __name__ == "__main__":
