@@ -1,0 +1,58 @@
+# Standalone development tools; excluded from the library workspace.
+[workspace]
+
+[package]
+name = "opencc-jieba-benchmarks"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.75"
+publish = false
+
+[dependencies]
+opencc-jieba-rs = { path = "..", default-features = false }
+bytecount = "0.6.9"
+rayon = "=1.10"
+
+[features]
+default = ["keywords"]
+keywords = ["opencc-jieba-rs/keywords"]
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+strip = "symbols"
+debug = 0
+
+[[bin]]
+name = "allocation_bench"
+path = "allocation_bench.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "jieba_join_bench"
+path = "jieba_join_bench.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "phrases_cut_bench"
+path = "phrases_cut_bench.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "jieba_baseline"
+path = "jieba_baseline.rs"
+test = false
+bench = false
+required-features = ["keywords"]
+
+[[bin]]
+name = "tfidf_memory_probe"
+path = "tfidf_memory_probe.rs"
+test = false
+bench = false
+required-features = ["keywords"]
