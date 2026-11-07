@@ -3,6 +3,9 @@ name = "dict-generate"
 version = "0.9.0"
 edition = "2021"
 
+[package.metadata.capi]
+revision = 0
+
 [dependencies]
 opencc-jieba-rs = { path = "../..", features = ["dictionary-build"] }
 opencc-tool-common = { path = "../opencc-tool-common" }
@@ -10,3 +13,9 @@ clap = "=4.5"
 # Exact dependency pins to preserve MSRV (rustc 1.75.0):
 # clap_lex@1.0.1
 clap_lex = "=1.0"
+
+[build-dependencies]
+toml = "=0.8"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"

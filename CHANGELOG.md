@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.9.0] - Unreleased
+## 0.9.0 - Unreleased
 
 Changes for the upcoming v0.9.0 release, accumulated since the v0.8.1 tag.
 The separately released C API revision 0.8.1.1 is recorded below.
@@ -71,7 +71,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [C API 0.8.1.1] - 2026-10-23
+## C API 0.8.1.1 - 2026-10-23
 
 ### Added
 
@@ -87,7 +87,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
   Cargo retains version `0.8.1` with C API metadata revision `1`; the core Rust
   version and C ABI number `1` are unchanged.
 
-## [0.8.1] - 2026-10-21
+## 0.8.1 - 2026-10-21
 
 ### Added
 
@@ -129,7 +129,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.8.0] - 2026-08-26
+## 0.8.0 - 2026-08-26
 
 ### Added
 
@@ -210,7 +210,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.6] - 2026-05-06
+## 0.7.6 - 2026-05-06
 
 ### Changed
 
@@ -237,7 +237,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.5] - 2026-05-01
+## 0.7.5 - 2026-05-01
 
 ### Added
 
@@ -274,7 +274,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.4] - 2026-03-23
+## 0.7.4 - 2026-03-23
 
 ### Added
 
@@ -301,7 +301,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.3] - 2026-03-16
+## 0.7.3 - 2026-03-16
 
 ### Added
 
@@ -323,7 +323,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.2] – 2025-10-28
+## 0.7.2 – 2025-10-28
 
 ### Changed
 
@@ -346,7 +346,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 --
 
-## [0.7.1] - 2025-10-05
+## 0.7.1 - 2025-10-05
 
 ### Changed
 
@@ -362,7 +362,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.7.0] - 2025-08-23
+## 0.7.0 - 2025-08-23
 
 ### Added
 
@@ -377,7 +377,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.6.0] -2025-07-13
+## 0.6.0 - 2025-07-13
 
 ### Changed
 
@@ -386,7 +386,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## [0.5.0] – 2025-06-18
+## 0.5.0 – 2025-06-18
 
 ### Added
 

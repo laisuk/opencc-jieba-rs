@@ -245,6 +245,8 @@ dependencies = [
  "clap_lex",
  "opencc-jieba-rs",
  "opencc-tool-common",
+ "toml 0.8.23",
+ "winres",
 ]
 
 [[package]]
@@ -584,6 +586,8 @@ dependencies = [
  "opencc-jieba-rs",
  "opencc-tool-common",
  "regex",
+ "toml 0.8.23",
+ "winres",
 ]
 
 [[package]]

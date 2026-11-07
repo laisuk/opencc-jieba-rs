@@ -3,6 +3,9 @@ name = "opencc-jieba"
 version = "0.9.0"
 edition = "2021"
 
+[package.metadata.capi]
+revision = 0
+
 [dependencies]
 opencc-jieba-rs = { path = "../.." }
 opencc-tool-common = { path = "../opencc-tool-common" }
@@ -20,3 +23,9 @@ memchr = "2.7"
 clap_lex = "=1.0"
 #deranged = "=0.4.0"
 #time = "=0.3.41"
+
+[build-dependencies]
+toml = "=0.8"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
