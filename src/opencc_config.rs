@@ -360,7 +360,6 @@ impl OpenccConfig {
     ///
     /// # Since
     /// v0.7.3
-
     #[inline]
     pub fn is_valid_config(s: &str) -> bool {
         Self::parse(s).is_some()

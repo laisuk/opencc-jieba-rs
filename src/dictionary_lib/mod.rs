@@ -466,7 +466,7 @@ impl Dictionary {
     /// one shot so the Zstandard frame records its uncompressed content size.
     #[cfg(feature = "dictionary-build")]
     pub(crate) fn save_json_compressed(&self, path: impl AsRef<Path>) -> io::Result<()> {
-        let json = serde_json::to_vec(self).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let json = serde_json::to_vec(self).map_err(io::Error::other)?;
 
         let compressed = zstd::bulk::compress(&json, 19)?;
 
