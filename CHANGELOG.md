@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## \[0.9.0] - Unreleased
+## \[0.9.0] - 2026-11-18
 
 Changes for the upcoming v0.9.0 release, accumulated since the v0.8.1 tag.
 The separately released C API revision 0.8.1.1 is recorded below.
