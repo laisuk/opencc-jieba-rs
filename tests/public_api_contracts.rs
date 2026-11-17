@@ -2,6 +2,27 @@
 use opencc_jieba_rs::{DetofuMap, OpenCC, OpenccConfig};
 
 #[test]
+fn tokenizer_types_are_accessible_to_consumers() {
+    use opencc_jieba_rs::{HmmModel, Jieba, JiebaError, Tag, Token, TokenizeMode};
+    use std::sync::Arc;
+
+    let mut cc = OpenCC::new();
+    let tokenizer: &Arc<Jieba> = &cc.jieba;
+    let tokens: Vec<Token<'_>> = tokenizer.tokenize("汉字", TokenizeMode::Search, false);
+    for token in tokens {
+        assert_eq!(&"汉字"[token.byte_start..token.byte_end], token.word);
+    }
+    let tags: Vec<Tag<'_>> = tokenizer.tag("汉字", false);
+    assert!(!tags.is_empty());
+
+    let custom: Result<Jieba, JiebaError> = Jieba::with_dict(&mut "汉字 10 n\n".as_bytes());
+    cc.jieba = Arc::new(custom.unwrap());
+    assert_eq!(cc.jieba_cut("汉字", false), vec!["汉字"]);
+    // The HMM setter's argument must also be nameable outside the crate.
+    let _: fn(&mut Jieba, HmmModel) = Jieba::set_hmm_model;
+}
+
+#[test]
 fn configurations_preserve_names_ffi_values_and_dispatch() {
     use OpenccConfig::*;
     type Convert = fn(&OpenCC, &str, bool) -> String;

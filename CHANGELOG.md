@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## 0.9.0 - Unreleased
+## \[0.9.0] - Unreleased
 
 Changes for the upcoming v0.9.0 release, accumulated since the v0.8.1 tag.
 The separately released C API revision 0.8.1.1 is recorded below.
@@ -46,16 +46,19 @@ The separately released C API revision 0.8.1.1 is recorded below.
 - Replaced the external `rustc-hash` dependency with a private module adapted from rustc-hash 2.1.3,
   ported from `opencc-fmmseg` with Rust 1.75 compatibility. Bundled upstream licenses and maintenance notes;
   serialized dictionary schemas are unchanged.
-- Updated OpenCC mappings, the combined Hans/Hant Jieba lexicon, and curated Unicode compatibility data.
+- Updated `OpenCC` mappings, the combined Hans/Hant Jieba lexicon, and curated Unicode compatibility data.
+- Re-exported `Jieba`, `Token`, `Tag`, `TokenizeMode`, `HmmModel`, and `JiebaError` at the crate
+  root so advanced callers can name the types exposed through `OpenCC::jieba`.
 - Refined docs.rs and README feature, tokenizer migration, ownership, and release-verification guidance.
   Updated package contents to include vendored runtime assets, notices, and integration-test fixtures.
   Added CI checks for warning-free docs, builds without keyword extraction, and packaged-crate tests.
-- Declared Rust 1.75 in package metadata and extended packaged-source checks to cover documentation
+- Kept edition 2021 and Rust 1.75.0 as the development/test baseline without imposing a
+  `rust-version` requirement. Extended packaged-source checks to cover documentation
   and tests with all features and without default features, plus explicit runtime-asset and
   license-notice checks. No-default-feature checkout checks select library, integration, and
   documentation tests explicitly; examples and benchmarks remain excluded from the published crate.
-- Removed the repository's tracked local Rust toolchain override; use an explicit toolchain when
-  reproducing MSRV or release builds.
+- Kept the maintainer's ignored local Rust 1.75.0 toolchain override for IDE and
+  build/test gates; it is not included in the published crate.
 - Rewrote the Rust 1.75 guide for the vendored dependency graph, removing obsolete
   `include-flate` / `libflate` pins and the `core2` patch. Documented feature combinations,
   downstream lockfiles, native compression requirements, and the separate Windows 7 build path.
@@ -87,7 +90,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
   Cargo retains version `0.8.1` with C API metadata revision `1`; the core Rust
   version and C ABI number `1` are unchanged.
 
-## 0.8.1 - 2026-10-21
+## \[0.8.1] - 2026-10-21
 
 ### Added
 
@@ -107,7 +110,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 - Updated conversion dictionary data and the curated Unicode compatibility mapping table.
 - Replaced runtime native `zstd` / `zstd-sys` decoding with a private vendored pure Rust decoder derived from
-  ruzstd 0.9.0 for embedded OpenCC and Jieba dictionaries and custom conversion packs. Native `zstd` is now optional
+  ruzstd 0.9.0 for embedded `OpenCC` and Jieba dictionaries and custom conversion packs. Native `zstd` is now optional
   and enabled only by `dictionary-build` for compression; runtime loading requires no Cargo feature.
 - Retained support for frames without a frame content size. Declared sizes up to 64 MiB serve only as allocation
   hints; decoding retains the required backreference history and enforces a 100 MiB window limit.
@@ -129,7 +132,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.8.0 - 2026-08-26
+## \[0.8.0] - 2026-08-26
 
 ### Added
 
@@ -153,7 +156,8 @@ The separately released C API revision 0.8.1.1 is recorded below.
   dictionaries to be composed into generated JSON and Zstd packs without modifying the base dictionary sources. Multiple
   custom dictionaries are applied in command-line order using the same slot and mode semantics as the Rust API.
 - Added `-D` / `--custom-dict <slot>:<append|override>:<path>` to the `opencc-jieba convert` command, allowing custom
-  conversion dictionaries to be applied post-load for individual text conversions. This option affects OpenCC conversion
+  conversion dictionaries to be applied post-load for individual text conversions. This option affects `OpenCC`
+  conversion
   mappings only and does not modify Jieba tokenization.
 - Added `UserDictEntry` for defining Jieba user-dictionary entries directly in memory with a word, required frequency,
   and optional part-of-speech tag.
@@ -161,7 +165,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
   existing converter without requiring a temporary dictionary file.
 - Added `OpenCC::try_new_with_user_dict_entries` for constructing a converter with in-memory Jieba user-dictionary
   entries.
-- Kept custom OpenCC conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
+- Kept custom `OpenCC` conversion dictionaries independent of Jieba user dictionaries, allowing applications to control
   conversion mappings and domain-specific tokenization separately through either file-based or in-memory APIs.
 - Added Hong Kong phrase configurations `s2hkp` and `hk2sp`, backed by the new `HKPhrases.txt` and `HKPhrasesRev.txt`
   dictionary slots.
@@ -210,7 +214,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.6 - 2026-05-06
+## \[0.7.6] - 2026-05-06
 
 ### Changed
 
@@ -237,7 +241,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.5 - 2026-05-01
+## \[0.7.5] - 2026-05-01
 
 ### Added
 
@@ -274,7 +278,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.4 - 2026-03-23
+## \[0.7.4] - 2026-03-23
 
 ### Added
 
@@ -301,7 +305,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.3 - 2026-03-16
+## \[0.7.3] - 2026-03-16
 
 ### Added
 
@@ -323,7 +327,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.2 – 2025-10-28
+## \[0.7.2] – 2025-10-28
 
 ### Changed
 
@@ -346,7 +350,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 --
 
-## 0.7.1 - 2025-10-05
+## \[0.7.1] - 2025-10-05
 
 ### Changed
 
@@ -362,7 +366,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.7.0 - 2025-08-23
+## \[0.7.0] - 2025-08-23
 
 ### Added
 
@@ -377,7 +381,7 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.6.0 - 2025-07-13
+## \[0.6.0] - 2025-07-13
 
 ### Changed
 
@@ -386,12 +390,12 @@ The separately released C API revision 0.8.1.1 is recorded below.
 
 ---
 
-## 0.5.0 – 2025-06-18
+## \[0.5.0] – 2025-06-18
 
 ### Added
 
 - First official crates.io release of `opencc-jieba-rs`.
-- Built with **Rust** and a **Jieba-style lexicon segmenter**, powered by **OpenCC lexicons** for Chinese text
+- Built with **Rust** and a **Jieba-style lexicon segmenter**, powered by **`OpenCC lexicons`** for Chinese text
   conversion.
 - Support for:
     - Simplified ↔ Traditional (ST, TS)

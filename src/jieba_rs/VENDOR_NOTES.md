@@ -45,7 +45,7 @@ is not an exhaustive attribution of which changes originated locally.
   interned POS tags, cached log frequencies, and reusable thread-local scratch
   buffers with retention limits. Character-class scanning is implemented locally
   rather than through regular expressions in this module.
-- HMM segmentation uses generated indexed emission tables and reusable Viterbi
+- `HMM` segmentation uses generated indexed emission tables and reusable Viterbi
   buffers. `HmmModel` supports a custom segmentation model. POS uses a separate
   lazily loaded compound HMM and longest-span fallback tag selection.
 - TF-IDF and TextRank use local hash aliases, a minimal float ordering wrapper,
@@ -61,7 +61,7 @@ is not an exhaustive attribution of which changes originated locally.
 parent constructor decode it through `crate::zstd::decompress` and pass a cursor
 to `Jieba::with_dict`. `load_dict` parses word/frequency/optional-tag entries;
 parent user-dictionary APIs add their own validation and transactional handling.
-OpenCC conversion dictionaries are a separate representation and should not be
+`OpenCC` conversion dictionaries are a separate representation and should not be
 confused with the tokenizer lexicon.
 
 `data/idf.txt.zst` and `data/posseg.txt.zst` are embedded with `include_bytes!`
@@ -93,15 +93,21 @@ update. Their exact source revisions and transformation commands are unrecorded.
 ## Tests
 
 Local `cfg(test)` tests cover the trie, sparse DAG, HMM, POS, TextRank, and float
-comparison semantics. HMM expectations use ordinary assertions (a commented
+comparison semantics. `HMM` expectations use ordinary assertions (a commented
 `expect_test` import remains); POS tests run without the old `default-dict`
 gate. TF-IDF tests in `keywords/tfidf_tests.rs` cover shared built-in data, custom
-loads, filtering, and concurrent first use; these run with `keywords`. Parent integration tests cover segmentation, tags, keywords, user
+loads, filtering, and concurrent first use; these run with `keywords`. Parent integration tests cover segmentation,
+tags, keywords, user
 dictionaries, conversion, and public API contracts. This is not evidence that
 the complete upstream test suite or feature matrix has been retained or passed.
 All existing tests must remain intact during maintenance.
 
 ## Importing future upstream changes
+
+The implementation module stays private, but the parent crate re-exports `Jieba`,
+`Token`, `Tag`, `TokenizeMode`, `HmmModel`, and `JiebaError` for the public
+`OpenCC::jieba` field. Those types and their public methods are part of the Rust
+API contract; review upstream changes to them as public API changes.
 
 1. Obtain a specific upstream tag and commit, retain its archive checksum,
    license, model/dictionary provenance, and a clean source baseline. Resolve

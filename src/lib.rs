@@ -219,7 +219,24 @@
 //! need updating. Low-level `cut*` methods return token records with a `.word`
 //! field; prefer [`OpenCC::jieba_cut`] and its search/full variants for owned tokens.
 //! Weighted results use this crate's `Keyword` type when
-//! `keywords` is enabled. The tokenizer module itself remains private.
+//! `keywords` is enabled. For advanced access, [`Jieba`], [`Token`], [`Tag`],
+//! [`TokenizeMode`], [`HmmModel`], and [`JiebaError`] are available at the crate root.
+//! The tokenizer implementation module itself remains private.
+//!
+//! ```rust
+//! use opencc_jieba_rs::{OpenCC, Token, TokenizeMode};
+//!
+//! let cc = OpenCC::new();
+//! let text = "汉字";
+//! let tokens: Vec<Token<'_>> = cc.jieba.tokenize(text, TokenizeMode::Default, false);
+//! for token in tokens {
+//!     assert_eq!(&text[token.byte_start..token.byte_end], token.word);
+//! }
+//! ```
+//!
+//! Token `start` / `end` offsets count Unicode scalar values; `byte_start` /
+//! `byte_end` are UTF-8 byte offsets for slicing the original input. End offsets
+//! are exclusive. Tokens borrow the input; tags can also borrow the tokenizer.
 //!
 //! High-level conversion methods continue to return owned `String` values.
 //! Internal `Cow` fast paths avoid unchanged intermediate strings; they do not
@@ -235,7 +252,10 @@
 //! docs.rs enables all features. Runtime conversion, segmentation, POS tagging,
 //! normalization, DeTofu, and custom-pack loading also work with no default features.
 //!
-//! The minimum supported Rust version is **1.75**. See the
+//! The crate uses edition **2021** and is developed and tested against Rust
+//! **1.75.0**. No `rust-version` requirement is imposed on crate consumers;
+//! older compilers may work but are not verified. Dependency resolution can
+//! impose its own compiler requirements. See the
 //! [MSRV guide](https://github.com/laisuk/opencc-jieba-rs/blob/v0.9.0/MSRV-1.75.0-GUIDE.md)
 //! for dependency-lockfile and native compression requirements.
 //!
@@ -381,8 +401,10 @@ mod unicode_compat;
 mod zstd;
 
 pub use dictionary_lib::{CustomDictFileSpec, CustomDictMode, CustomDictSpec, DictSlot};
+// Name every type exposed by the public OpenCC::jieba tokenizer API.
 #[cfg(feature = "keywords")]
 pub use jieba_rs::Keyword;
+pub use jieba_rs::{Error as JiebaError, HmmModel, Jieba, Tag, Token, TokenizeMode};
 #[cfg(feature = "keywords")]
 pub use keyword::{KeywordMethod, POS_KEYWORDS};
 pub use opencc::{find_max_utf8_length, is_delimiter, OpenCC, OpenccError, UserDictEntry};

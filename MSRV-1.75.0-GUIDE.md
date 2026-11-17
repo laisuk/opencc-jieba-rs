@@ -1,7 +1,13 @@
 # Rust 1.75.0 compatibility guide
 
-This guide applies to the v0.9.0 source tree. Rust **1.75.0** compatibility is an
-intentional goal for the published `opencc-jieba-rs` library. Use the repository's
+This guide applies to the v0.9.0 source tree. Rust **1.75.0** compatibility is the
+development and test baseline for the edition 2021 `opencc-jieba-rs` library.
+The manifest deliberately omits `rust-version`. The maintainer's ignored local
+`rust-toolchain.toml` selects Rust 1.75.0 for IDE integration and local build/test
+gates; it is not included in the published crate and does not select a toolchain
+for downstream applications. This avoids imposing a new Cargo version gate on existing
+users, but does not promise that compilers below 1.75.0 can build this release
+or its resolved dependencies. Use the repository's
 lockfile when reproducing its tested dependency graph. Older releases can have a
 different dependency graph and may need their own release-specific guidance.
 
@@ -22,8 +28,8 @@ from the bundled model, without an external Jieba macro crate.
 
 ## Reproduce a library build
 
-Install and select the toolchain explicitly; the repository no longer tracks a
-local Rust toolchain override:
+The maintainer's local override selects Rust 1.75.0 automatically. For other
+checkouts, install and select the same toolchain explicitly:
 
 ```sh
 rustup toolchain install 1.75.0
@@ -94,7 +100,8 @@ keep the lockfile compatible with the oldest toolchain you support.
 
 ## Repository checks and policy scope
 
-The [Build and Test workflow](.github/workflows/rust_build_test.yml) installs Rust
+The [Build and Test workflow](https://github.com/laisuk/opencc-jieba-rs/blob/v0.9.0/.github/workflows/rust_build_test.yml)
+installs Rust
 1.75.0 and tests the locked workspace with all features. Push runs cover libraries,
 binaries, integration tests, and examples; pull-request and manual runs also include
 doctests. A separate stable-toolchain job checks public docs, operation without

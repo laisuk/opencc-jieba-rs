@@ -32,9 +32,9 @@ mod posseg;
 mod sparse_dag;
 mod trie;
 
-// Jieba::new and OpenCC share the parent's embedded Hans/Hant dictionary.
+// Jieba::new and `OpenCC` share the parent's embedded Hans/Hant dictionary.
 
-use sparse_dag::{NO_MATCH, StaticSparseDAG};
+use sparse_dag::{StaticSparseDAG, NO_MATCH};
 use trie::CharTrie;
 
 /// One step of the best segmentation of a block.
@@ -181,7 +181,11 @@ pub(crate) struct SplitByCharacterClass<'t, F> {
 impl<'t, F: Fn(char) -> bool> SplitByCharacterClass<'t, F> {
     #[inline]
     fn new(text: &'t str, classify: F) -> Self {
-        SplitByCharacterClass { text, pos: 0, classify }
+        SplitByCharacterClass {
+            text,
+            pos: 0,
+            classify,
+        }
     }
 
     /// The next run, with each of its characters recorded in `chars` as
@@ -248,6 +252,7 @@ impl<'t> SplitState<'t> {
     }
 }
 
+/// Segmentation mode for [`Jieba::tokenize`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenizeMode {
     /// Default mode
@@ -344,16 +349,14 @@ impl Jieba {
 
     /// Create an empty tokenizer; dictionary loading is controlled by the parent.
     // pub fn new() -> Self { Self::empty() }
-    /// Creates a Jieba instance using OpenCC's embedded Chinese dictionary.
+    /// Creates a Jieba instance using `OpenCC`'s embedded Chinese dictionary.
     ///
-    /// The dictionary is shared with the parent OpenCC implementation.
+    /// The dictionary is shared with the parent `OpenCC` implementation.
     /// No separate `jieba.dict` is embedded.
     ///
     /// Requires the `default-dict` feature.
     pub fn new() -> Self {
-        let bytes = crate::zstd::decompress(
-            crate::opencc::DICT_HANS_HANT_ZSTD
-        )
+        let bytes = crate::zstd::decompress(crate::opencc::DICT_HANS_HANT_ZSTD)
             .expect("failed to decompress embedded OpenCC dictionary");
 
         let mut reader = std::io::Cursor::new(bytes);
@@ -368,8 +371,6 @@ impl Jieba {
         instance.load_dict(dict)?;
         Ok(instance)
     }
-
-
 
     /// Set a custom HMM model for segmentation.
     ///
@@ -562,14 +563,19 @@ impl Jieba {
         let logfreq = self.cut(segment, false).iter().fold(0f64, |freq, token| {
             freq + (self.get_word_freq(token.word, 1) as f64).ln() - logtotal
         });
-        std::cmp::max((logfreq + logtotal).exp() as usize + 1, self.get_word_freq(segment, 1))
+        std::cmp::max(
+            (logfreq + logtotal).exp() as usize + 1,
+            self.get_word_freq(segment, 1),
+        )
     }
 
     /// Byte offset of character `idx` of `block`, or the block's length
     /// for the index past its last character.
     #[inline(always)]
     fn byte_at(block: &str, chars: &[(u32, char)], idx: usize) -> usize {
-        chars.get(idx).map_or(block.len(), |&(offset, _)| offset as usize)
+        chars
+            .get(idx)
+            .map_or(block.len(), |&(offset, _)| offset as usize)
     }
 
     /// Find the best segmentation of a block along `dag`, leaving in `route`
@@ -621,7 +627,9 @@ impl Jieba {
 
     fn dag(&self, chars: &[(u32, char)], dag: &mut StaticSparseDAG) {
         self.trie
-            .for_each_prefix_at_every_char(chars, |char_idx, end, word_id| dag.push_edge(char_idx, end, word_id));
+            .for_each_prefix_at_every_char(chars, |char_idx, end, word_id| {
+                dag.push_edge(char_idx, end, word_id)
+            });
         dag.finish(chars.len());
     }
 
@@ -638,18 +646,19 @@ impl Jieba {
         // come straight from it; nothing else reads this block's matches,
         // so no DAG is built.
         let byte_offset_in_sentence = block.as_ptr() as usize - base;
-        self.trie.for_each_prefix_at_every_char(chars, |idx, end, _| {
-            let byte_start = chars[idx].0 as usize;
-            let word = &block[byte_start..Self::byte_at(block, chars, end)];
-            let bs = byte_offset_in_sentence + byte_start;
-            tokens.push(Token {
-                word,
-                start: block_unicode_start + idx,
-                end: block_unicode_start + end,
-                byte_start: bs,
-                byte_end: bs + word.len(),
+        self.trie
+            .for_each_prefix_at_every_char(chars, |idx, end, _| {
+                let byte_start = chars[idx].0 as usize;
+                let word = &block[byte_start..Self::byte_at(block, chars, end)];
+                let bs = byte_offset_in_sentence + byte_start;
+                tokens.push(Token {
+                    word,
+                    start: block_unicode_start + idx,
+                    end: block_unicode_start + end,
+                    byte_start: bs,
+                    byte_end: bs + word.len(),
+                });
             });
-        });
     }
 
     /// Emit the word spanning characters `x..y` of `block` with `word_id`.
@@ -686,7 +695,9 @@ impl Jieba {
         let mut left: Option<usize> = None;
 
         while x < n {
-            let RouteEntry { end: y, word_id, .. } = route[x];
+            let RouteEntry {
+                end: y, word_id, ..
+            } = route[x];
 
             if y - x == 1 && (HMM || chars[x].1.is_ascii_alphanumeric()) {
                 if left.is_none() {
@@ -729,7 +740,11 @@ impl Jieba {
         if HMM {
             self.cut_unjoined_run(block, chars, route, x, y, dag, words, hmm_context);
         } else {
-            let id = if y - x == 1 { route[x].word_id } else { NO_MATCH };
+            let id = if y - x == 1 {
+                route[x].word_id
+            } else {
+                NO_MATCH
+            };
             Self::emit_span(block, chars, x, y, id, dag, words);
         }
     }
@@ -760,7 +775,9 @@ impl Jieba {
             // Each character is a route step of its own, so its id is known.
             let mut x = x;
             while x < y {
-                let RouteEntry { end: next, word_id, .. } = route[x];
+                let RouteEntry {
+                    end: next, word_id, ..
+                } = route[x];
                 Self::emit_span(block, chars, x, next, word_id, dag, words);
                 x = next;
             }
@@ -790,7 +807,13 @@ impl Jieba {
         if let Some(ref model) = self.hmm_model {
             hmm::cut_with_allocated_memory(block, run, &mut words, model, hmm_context);
         } else {
-            hmm::cut_with_allocated_memory(block, run, &mut words, &hmm::builtin_hmm(), hmm_context);
+            hmm::cut_with_allocated_memory(
+                block,
+                run,
+                &mut words,
+                &hmm::builtin_hmm(),
+                hmm_context,
+            );
         }
     }
 
@@ -822,7 +845,12 @@ impl Jieba {
     /// its dictionary id when the segmentation looked the word up
     /// (`NO_MATCH` otherwise, which does not mean the word is unknown) and;
     /// for a token cut from a dictionary block, where it sits in that block.
-    fn cut_each<'a>(&self, sentence: &'a str, hmm: bool, mut emit: impl FnMut(Token<'a>, i32, Option<BlockRef<'_>>)) {
+    fn cut_each<'a>(
+        &self,
+        sentence: &'a str,
+        hmm: bool,
+        mut emit: impl FnMut(Token<'a>, i32, Option<BlockRef<'_>>),
+    ) {
         let base = sentence.as_ptr() as usize;
         let mut unicode_offset = 0;
 
@@ -843,17 +871,40 @@ impl Jieba {
 
                         let chars: &[(u32, char)] = chars;
                         let mut sink =
-                            |word: &'a str, word_id: i32, char_count: usize, start: usize, dag: &StaticSparseDAG| {
+                            |word: &'a str,
+                             word_id: i32,
+                             char_count: usize,
+                             start: usize,
+                             dag: &StaticSparseDAG| {
                                 emit(
-                                    Self::make_token_incremental(word, base, &mut unicode_offset, char_count),
+                                    Self::make_token_incremental(
+                                        word,
+                                        base,
+                                        &mut unicode_offset,
+                                        char_count,
+                                    ),
                                     word_id,
                                     Some(BlockRef { dag, chars, start }),
                                 );
                             };
                         if hmm {
-                            self.cut_route::<true>(block, chars, &mut sink, route, dag, hmm_context);
+                            self.cut_route::<true>(
+                                block,
+                                chars,
+                                &mut sink,
+                                route,
+                                dag,
+                                hmm_context,
+                            );
                         } else {
-                            self.cut_route::<false>(block, chars, &mut sink, route, dag, hmm_context);
+                            self.cut_route::<false>(
+                                block,
+                                chars,
+                                &mut sink,
+                                route,
+                                dag,
+                                hmm_context,
+                            );
                         }
                     }
                     SplitState::Unmatched(block) => {
@@ -863,14 +914,20 @@ impl Jieba {
                         while let Some(&(offset, c)) = chars.get(i) {
                             let offset = offset as usize;
                             // Group \r\n as a single token, otherwise emit each char
-                            let (word, count) = if c == '\r' && matches!(chars.get(i + 1), Some(&(_, '\n'))) {
-                                (&block[offset..offset + 2], 2)
-                            } else {
-                                (&block[offset..offset + c.len_utf8()], 1)
-                            };
+                            let (word, count) =
+                                if c == '\r' && matches!(chars.get(i + 1), Some(&(_, '\n'))) {
+                                    (&block[offset..offset + 2], 2)
+                                } else {
+                                    (&block[offset..offset + c.len_utf8()], 1)
+                                };
                             i += count;
                             emit(
-                                Self::make_token_incremental(word, base, &mut unicode_offset, count),
+                                Self::make_token_incremental(
+                                    word,
+                                    base,
+                                    &mut unicode_offset,
+                                    count,
+                                ),
                                 NO_MATCH,
                                 None,
                             );
@@ -932,8 +989,14 @@ impl Jieba {
                                     j += 1;
                                 }
                             }
-                            let word = &block[Self::byte_at(block, chars, i)..Self::byte_at(block, chars, j)];
-                            tokens.push(Self::make_token_incremental(word, base, &mut unicode_offset, j - i));
+                            let word = &block
+                                [Self::byte_at(block, chars, i)..Self::byte_at(block, chars, j)];
+                            tokens.push(Self::make_token_incremental(
+                                word,
+                                base,
+                                &mut unicode_offset,
+                                j - i,
+                            ));
                             i = j;
                         }
                     }
@@ -959,7 +1022,12 @@ impl Jieba {
             // its parts too: `WES-5.4.5` is findable as `WES` and `5.4.5` as
             // well as whole. Without this, making `cut` keep such tokens whole
             // would cost the recall the parts used to provide.
-            if token.word.as_bytes().iter().any(|&b| hmm::is_skip_connector(b)) {
+            if token
+                .word
+                .as_bytes()
+                .iter()
+                .any(|&b| hmm::is_skip_connector(b))
+            {
                 let mut offset = 0;
                 for part in token.word.split(hmm::is_skip_connector_char) {
                     // Only parts that could be searched on their own: a purely
@@ -984,7 +1052,12 @@ impl Jieba {
             // neither the words nor the offsets need computing again. A token
             // from outside a dictionary block is a single character (or
             // `\r\n`) and has no such substrings.
-            let Some(BlockRef { dag, chars, start: x }) = block else {
+            let Some(BlockRef {
+                dag,
+                chars,
+                start: x,
+            }) = block
+            else {
                 new_words.push(token);
                 return;
             };
@@ -1059,7 +1132,12 @@ impl Jieba {
     /// callers that consume the tags as they come. `emit` runs while the
     /// segmentation scratch is borrowed, so it must not segment.
     #[allow(dead_code)]
-    pub(crate) fn tag_each<'a>(&'a self, sentence: &'a str, hmm: bool, mut emit: impl FnMut(Tag<'a>)) {
+    pub(crate) fn tag_each<'a>(
+        &'a self,
+        sentence: &'a str,
+        hmm: bool,
+        mut emit: impl FnMut(Tag<'a>),
+    ) {
         self.cut_each(sentence, hmm, |token, word_id, block| {
             let word = token.word;
             let word_id = if word_id != NO_MATCH {
@@ -1113,4 +1191,3 @@ impl Jieba {
         "x"
     }
 }
-

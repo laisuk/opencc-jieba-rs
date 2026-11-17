@@ -1,6 +1,6 @@
 # opencc-jieba-rs
 
-High-performance Rust-based Chinese text converter integrating Jieba segmentation with OpenCC dictionaries.
+High-performance Rust-based Chinese text converter integrating Jieba segmentation with `OpenCC` dictionaries.
 
 [![GitHub release](https://img.shields.io/github/v/release/laisuk/opencc-jieba-rs?style=flat-square)](https://github.com/laisuk/opencc-jieba-rs/releases)
 [![Crates.io](https://img.shields.io/crates/v/opencc-jieba-rs)](https://crates.io/crates/opencc-jieba-rs)
@@ -11,14 +11,14 @@ High-performance Rust-based Chinese text converter integrating Jieba segmentatio
 [![Build and Release](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml/badge.svg)](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/release.yml)
 ![Build Status](https://github.com/laisuk/opencc-jieba-rs/actions/workflows/rust_build_test.yml/badge.svg)
 
-A Rust-based Chinese text converter that integrates **Jieba word segmentation** with **OpenCC lexicons** for
+A Rust-based Chinese text converter that integrates **Jieba word segmentation** with **`OpenCC lexicons`** for
 phrase-aware conversion. It provides high-performance **Simplified ↔ Traditional Chinese** (zh-Hans ↔ zh-Hant)
 conversion, with support for both segmentation and conversion dictionaries.
 
 ## Features
 
 - 📦 Simple CLI tool for converting between Simplified and Traditional Chinese.
-- 🔍 Lexicon-driven phrase conversion using OpenCC dictionaries.
+- 🔍 Lexicon-driven phrase conversion using `OpenCC` dictionaries.
 - ⚡ Accurate segmentation powered by Jieba with a **combined Hans + Hant dictionary**.
 - 🔠 Works with both **Simplified (zh-Hans)** and **Traditional (zh-Hant)** Chinese text.
 - 🧹 Optional Unicode compatibility normalization for CJK compatibility and extracted-text forms.
@@ -125,7 +125,7 @@ To omit those APIs and the embedded IDF dictionary, use:
 opencc-jieba-rs = { version = "0.9.0", default-features = false }
 ```
 
-Segmentation, POS tagging (`jieba_tag()`), user dictionaries, OpenCC conversion,
+Segmentation, POS tagging (`jieba_tag()`), user dictionaries, O`penCC` conversion,
 and custom conversion dictionaries remain available. The C API explicitly enables
 `keywords` to preserve all existing exported functions. Cargo features are additive;
 another dependency enabling `keywords` enables it for the shared library build.
@@ -146,7 +146,8 @@ v0.9.0 vendors the Jieba implementation inside this crate. Prefer the `OpenCC` w
 Code that assigns an external tokenizer to that field or passes it to external Jieba APIs
 needs updating. Low-level `cut*` calls return token records; use `.word` for text, or use
 `OpenCC::jieba_cut*` for `Vec<String>`. Import weighted results as `opencc_jieba_rs::Keyword`,
-not `jieba_rs::Keyword`. The private tokenizer module is not a standalone replacement crate.
+not `jieba_rs::Keyword`. Advanced callers can import `Jieba`, `Token`, `Tag`, `TokenizeMode`, `HmmModel`, and
+`JiebaError` from `opencc_jieba_rs`. The implementation module remains private.
 The high-level conversion methods still return owned `String` values; internal borrowed
 fast paths do not change those signatures. The C ABI remains version 1.
 
@@ -196,7 +197,7 @@ fn main() {
 }
 ```
 
-Use extended normalization before OpenCC conversion when both normalization tables are desired:
+Use extended normalization before `OpenCC` conversion when both normalization tables are desired:
 
 ```rust
 use opencc_jieba_rs::OpenCC;
@@ -258,7 +259,7 @@ fn main() {
 Unmapped characters remain unchanged. DeTofu does not detect font support, and its fallback forms can differ from the
 converted script. Keep the original text when fidelity matters. The CLI `--detofu` flag uses `ExtB`.
 
-This is an advanced compatibility feature rather than common OpenCC conversion usage. See the
+This is an advanced compatibility feature rather than common `OpenCC` conversion usage. See the
 [DeTofu User Guide](DETOFU_USER_GUIDE.md) for Rust APIs, threshold behavior, custom fallback pairs, and custom fallback
 files.
 
@@ -316,7 +317,7 @@ Converted Code: 1
 - `opencc_jieba_new()` initializes the engine.
 - `opencc_jieba_convert(...)` performs the conversion with the specified config (e.g., `s2t`, `t2hkp`, `hk2tp`).
 - `opencc_jieba_free_string(...)` must be called to free the returned string.
-- `opencc_jieba_delete(...)` must be called to free OpenCC instance.
+- `opencc_jieba_delete(...)` must be called to free `OpenCC` instance.
 - `opencc_jieba_zho_check(...)` to detect zh-Hant (1), zh-Hans (2), others (0).
 
 ---
@@ -331,7 +332,7 @@ Converted Code: 1
 - `capi/opencc_jieba_capi` – C ABI implementation crate.
 - `capi/include` – Canonical public C and C++ headers.
 - `tools/opencc-jieba/src/main.rs` – `opencc-jieba` CLI implementation.
-- `dicts/` – OpenCC text lexicons which converted into JSON format.
+- `dicts/` – `OpenCC` text lexicons which converted into JSON format.
 
 ---
 
@@ -369,7 +370,7 @@ IDs, and leading skippable frames are rejected. Checksum bytes are consumed but 
 
 ### Generate and load a custom conversion dictionary
 
-Power users can edit the OpenCC source files under `dicts/` and generate a runtime conversion pack with the workspace
+Power users can edit the `OpenCC` source files under `dicts/` and generate a runtime conversion pack with the workspace
 tool:
 
 ```bash
@@ -388,13 +389,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Custom OpenCC conversion dictionaries and Jieba user dictionaries are independent and can be combined in either order:
+Custom `OpenCC` conversion dictionaries and Jieba user dictionaries are independent and can be combined in either order:
 
 ```rust
 use opencc_jieba_rs::OpenCC;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Start with the custom OpenCC conversion pack, then add Jieba terms.
+    // Start with the custom `OpenCC` conversion pack, then add Jieba terms.
     let mut cc = OpenCC::try_new_with_dictionary_zstd("dictionary.json.zst")?;
     cc.load_user_dict("dicts/user_dict.txt")?;
 
@@ -429,18 +430,18 @@ remain loadable through compatibility fallbacks.
 
 ---
 
-## Custom OpenCC conversion dictionaries
+## Custom `OpenCC` conversion dictionaries
 
 For smaller runtime changes, you do not need to rebuild or replace the complete Zstd conversion pack. `OpenCC` can apply
-custom mappings directly to individual OpenCC dictionary slots after the converter has been created.
+custom mappings directly to individual `OpenCC` dictionary slots after the converter has been created.
 
 Custom conversion dictionaries are separate from Jieba user dictionaries:
 
-- **OpenCC custom dictionaries** change conversion mappings such as `帕兰蒂尔 → 柏蘭蒂爾`.
+- **O`penCC custom dictionaries`** change conversion mappings such as `帕兰蒂尔 → 柏蘭蒂爾`.
 - **Jieba user dictionaries** change tokenization, frequencies, and POS tags.
 
 They can be used independently or together. For domain-specific phrases, a Jieba entry can preserve the phrase as one
-token while a custom OpenCC slot provides its conversion.
+token while a custom `OpenCC` slot provides its conversion.
 
 ### Load custom mappings from pairs
 
@@ -470,7 +471,7 @@ unchanged.
 
 Custom dictionary loading is transactional: validation or parsing errors do not partially modify the converter.
 
-### Load custom mappings from OpenCC text files
+### Load custom mappings from `OpenCC` text files
 
 Use `CustomDictFileSpec` to load one or more OpenCC-style dictionary files:
 
@@ -492,7 +493,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Files are applied in the listed order and use the normal OpenCC dictionary format:
+Files are applied in the listed order and use the normal `OpenCC` dictionary format:
 
 ```text
 source<TAB>target
@@ -603,7 +604,7 @@ Validation occurs before mutation, so invalid arguments leave the tokenizer unch
 
 The method uses `Arc::make_mut()` for safe copy-on-write mutation: when the tokenizer is shared, it is cloned before
 modification, and other owners retain their original dictionary. An unshared tokenizer is modified without cloning.
-This changes the instance's Jieba segmentation dictionary, not OpenCC conversion mappings.
+This changes the instance's Jieba segmentation dictionary, not `OpenCC` conversion mappings.
 
 Use `load_user_dict()` for dictionary files, or `load_user_dict_entries()` for multiple in-memory `UserDictEntry` values
 with required frequencies. `add_word()` is convenient for a single word and also supports automatic frequency selection.
@@ -694,7 +695,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 This is useful for dynamic sources such as GUI text input, databases, configuration files, generated terminology, or
-network data. In-memory Jieba entries affect tokenization only; they do not modify OpenCC conversion mappings.
+network data. In-memory Jieba entries affect tokenization only; they do not modify `OpenCC` conversion mappings.
 
 ### User dictionary format
 
@@ -901,7 +902,7 @@ opencc-jieba segment --mode tag --delim " " --separator ":"
 
 ### Lexicons
 
-The library and conversion CLI use embedded OpenCC conversion dictionaries and a combined Hans/Hant Jieba dictionary.
+The library and conversion CLI use embedded `OpenCC` conversion dictionaries and a combined Hans/Hant Jieba dictionary.
 No external dictionary files are needed for ordinary conversion or segmentation.
 
 ---
@@ -913,11 +914,13 @@ No external dictionary files are needed for ordinary conversion or segmentation.
 - `rayon` and `rayon-core` are pinned for Rust 1.75 compatibility. Keep `Cargo.lock` when
   reproducing repository builds; other dependency requirements permit compatible updates.
 
-> ⚠️ MSRV note: This crate is developed with Rust 1.75.0 in mind.
-> Most users on modern Rust do not need special setup.
+> Rust compatibility: edition **2021**, developed and tested with **Rust 1.75.0**.
+> No `rust-version` requirement is imposed on crate consumers. Older
+> compilers may work but are not verified; dependencies can require newer compilers.
+> Omitting a minimum version does not guarantee compatibility below 1.75.0.
 >
 > For older toolchains, see:
-> [MSRV-1.75.0-GUIDE.md](./MSRV-1.75.0-GUIDE.md)
+> [Rust 1.75.0 compatibility guide](https://github.com/laisuk/opencc-jieba-rs/blob/v0.9.0/MSRV-1.75.0-GUIDE.md)
 
 ---
 
@@ -963,7 +966,7 @@ release date marked `Unreleased` until the release is finalized.
 ## License
 
 - This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
-- See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled OpenCC lexicons (Apache-2.0),
+- See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled `OpenCC lexicons` (Apache-2.0),
   Jieba and the Zstandard decoder (MIT), and Fx hashing (MIT OR Apache-2.0).
 
 ## Contributing
