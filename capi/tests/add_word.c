@@ -30,6 +30,13 @@ int main(void) {
     assert(tokens != NULL && tokens[0] != NULL);
     assert(strcmp(tokens[0], "dynamiccapiword") == 0 && tokens[1] == NULL);
     opencc_jieba_free_string_array(tokens);
+    bool (*add_word_extended)(void *, const char *, bool, size_t, const char *) =
+        opencc_jieba_add_word_extended;
+    assert(add_word_extended(instance, u8"计算机程序", true, 100000, "nz"));
+    tokens = opencc_jieba_cut(instance, u8"計算機程序", false);
+    assert(tokens != NULL && tokens[0] != NULL);
+    assert(strcmp(tokens[0], u8"計算機程序") == 0 && tokens[1] == NULL);
+    opencc_jieba_free_string_array(tokens);
     check_version();
     opencc_jieba_delete(instance);
     return 0;

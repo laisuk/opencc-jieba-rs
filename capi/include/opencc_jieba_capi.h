@@ -204,7 +204,7 @@ void opencc_jieba_delete(void *instance);
 void opencc_jieba_free(void *instance);
 
 /**
- * @brief Adds or updates one Jieba word on an existing instance (since 0.8.1.1).
+ * @brief Adds or updates one Jieba word on an existing instance (since v0.8.1.1).
  *
  * @param instance Live, mutable instance returned by any `opencc_jieba_new*()`.
  * @param word Required UTF-8, NUL-terminated word; empty or whitespace-containing
@@ -212,18 +212,64 @@ void opencc_jieba_free(void *instance);
  * @param has_freq False selects automatic frequency (Rust None); true selects
  *                 the exact frequency (Rust Some(freq)), including zero.
  * @param freq Frequency used only when has_freq is true.
- * @param tag Optional UTF-8, NUL-terminated POS tag. NULL selects Rust None;
- *            any non-NULL tag selects Some(tag). Whitespace is rejected.
+ * @param tag Optional UTF-8, NUL-terminated POS tag for new entries. NULL omits the
+ *            tag. A non-NULL empty string supplies an empty tag. Whitespace
+ *            is rejected. Jieba retains the stored tag when updating an entry.
  *
  * Strings remain caller-owned and need only remain valid during the call.
  * Callers must synchronize concurrent access to the same instance. Mutation
  * must not race with conversion, segmentation, or any other instance access.
  *
  * @return true on success, clearing stale thread-local C API errors; false on
- *         NULL instance/word, invalid UTF-8, or Rust validation failure, recording
- *         details for `opencc_jieba_last_error()` on the calling thread.
+ *         NULL instance/word, invalid UTF-8, Rust validation failure, or a caught panic.
+ *         Use `opencc_jieba_last_error()` on the calling thread for failure details.
  */
 bool opencc_jieba_add_word(
+    void *instance,
+    const char *word,
+    bool has_freq,
+    size_t freq,
+    const char *tag
+);
+
+/**
+ * @brief Adds or updates a Jieba word and its Simplified/Traditional counterpart
+ *        on an existing instance (since v0.9.1).
+ *
+ * Uses `zho_check()` to determine the conversion direction.
+ * - Simplified Chinese converts using `s2t`.
+ * - Traditional Chinese converts using `t2s`.
+ * - For an undetermined script, registers the original word only.
+ *
+ * Both forms use the same optional frequency and POS tag arguments. If frequency
+ * is automatic, Jieba determines it for each form. An identical converted
+ * word is registered only once.
+ *
+ * @note Counterpart generation uses only basic `s2t` and `t2s` script conversion.
+ *       Registering both forms helps Jieba recognize custom phrase boundaries
+ *       when segmenting text in either script. Regional OpenCC dictionary
+ *       slots handle vocabulary conversion for `s2tw`, `s2twp`, `s2hk`,
+ *       `tw2s`, `tw2sp`, and `hk2s`.
+ *
+ * @param instance Live, mutable instance returned by any `opencc_jieba_new*()`.
+ * @param word Required UTF-8, NUL-terminated word; empty or whitespace-containing
+ *             words are rejected.
+ * @param has_freq False selects automatic frequency (Rust None); true selects
+ *                 the exact frequency (Rust Some(freq)), including zero.
+ * @param freq Frequency used only when has_freq is true.
+ * @param tag Optional UTF-8, NUL-terminated POS tag for new entries. NULL omits the
+ *            tag. A non-NULL empty string supplies an empty tag. Whitespace
+ *            is rejected. Jieba retains the stored tag when updating an entry.
+ *
+ * Strings remain caller-owned and need only remain valid during the call.
+ * Callers must synchronize concurrent access to the same instance. Mutation
+ * must not race with conversion, segmentation, or any other instance access.
+ *
+ * @return true on success, clearing stale thread-local C API errors; false on
+ *         NULL instance/word, invalid UTF-8, Rust validation failure, or a caught panic.
+ *         Use `opencc_jieba_last_error()` on the calling thread for failure details.
+ */
+bool opencc_jieba_add_word_extended(
     void *instance,
     const char *word,
     bool has_freq,

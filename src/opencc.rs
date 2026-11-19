@@ -1021,6 +1021,160 @@ impl OpenCC {
         Ok(())
     }
 
+    /// Adds or updates a word and its Simplified/Traditional Chinese counterpart
+    /// in this instance's Jieba segmentation dictionary.
+    ///
+    /// This extends [`OpenCC::add_word`] by automatically registering both the
+    /// original word and its converted counterpart, when they differ.
+    ///
+    /// The conversion direction is determined using [`OpenCC::zho_check`]:
+    ///
+    /// - `2` (Simplified): converts the word using `s2t`.
+    /// - `1` (Traditional): converts the word using `t2s`.
+    /// - `0` (undetermined): registers the original word only.
+    ///
+    /// Both forms receive the same optional frequency and POS tag.
+    /// If conversion produces an identical word, it is registered only once.
+    ///
+    /// # Limitations
+    ///
+    /// This method supports Simplified/Traditional **script conversion only**.
+    /// It does not generate region-specific vocabulary variants using configurations
+    /// such as `s2tw`, `s2twp`, `tw2s`, `tw2sp`, `s2hk`, or `hk2s`.
+    ///
+    /// For example, `计算机` converts to `計算機`, not `電腦`.
+    ///
+    /// Use a custom dictionary or register regional terms explicitly when needed.
+    ///
+    /// This method affects Jieba segmentation only. It does not modify the
+    /// OpenCC conversion dictionaries.
+    ///
+    /// A high word frequency encourages Jieba to preserve a word during
+    /// segmentation, but does not guarantee preservation in every context.
+    ///
+    /// # Arguments
+    ///
+    /// - `word`: The word or phrase to register. It must be non-empty and must
+    ///   not contain whitespace.
+    /// - `freq`: Optional word frequency. `Some(n)` explicitly sets the
+    ///   frequency; `None` lets Jieba determine its default.
+    /// - `tag`: Optional POS tag. A supplied tag must not contain whitespace
+    ///   or NUL characters.
+    ///
+    /// # Sharing and mutation
+    ///
+    /// The tokenizer is stored in an [`Arc`](std::sync::Arc).
+    /// This method uses [`Arc::make_mut`](std::sync::Arc::make_mut) once to obtain
+    /// mutable access, cloning the tokenizer only when necessary.
+    ///
+    /// Existing shared tokenizer snapshots remain unchanged.
+    /// Both word registrations occur on this instance's updated tokenizer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpenccError::UserDictParse`] if:
+    ///
+    /// - `word` is empty or contains whitespace.
+    /// - `tag` contains whitespace or a NUL character (`'\0'`).
+    ///
+    /// Validation occurs before mutation. Invalid arguments leave the
+    /// tokenizer unchanged.
+    ///
+    /// # Examples
+    ///
+    /// Register both Simplified and Traditional forms:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    ///
+    /// cc.add_word_extended("计算机程序", Some(100_000), Some("nz"))?;
+    /// cc.add_word_extended("人工智能", Some(100_000), Some("n"))?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Let Jieba determine the frequency:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut cc = OpenCC::new();
+    ///
+    /// cc.add_word_extended("自然语言处理", None, Some("n"))?;
+    /// cc.add_word_extended("星际量子茶壶", None, None)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Invalid entries return an error:
+    ///
+    /// ```
+    /// use opencc_jieba_rs::OpenCC;
+    ///
+    /// let mut cc = OpenCC::new();
+    ///
+    /// assert!(cc.add_word_extended("", None, None).is_err());
+    /// assert!(cc.add_word_extended("hello world", None, None).is_err());
+    /// assert!(cc.add_word_extended("测试", Some(10), Some("bad tag")).is_err());
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`OpenCC::add_word`] — register a single word without conversion.
+    /// - [`OpenCC::zho_check`] — detect Simplified or Traditional Chinese.
+    /// - [`OpenCC::load_user_dict_entries`] — register multiple structured entries.
+    /// - [`OpenCC::jieba`] — direct access to the underlying tokenizer.
+    ///
+    /// # Since
+    /// v0.9.1
+    pub fn add_word_extended(
+        &mut self,
+        word: &str,
+        freq: Option<usize>,
+        tag: Option<&str>,
+    ) -> Result<(), OpenccError> {
+        // Validate before modifying the tokenizer.
+        if word.is_empty() || word.chars().any(char::is_whitespace) {
+            return Err(OpenccError::UserDictParse(
+                "word must not be empty or contain whitespace".into(),
+            ));
+        }
+
+        if tag.is_some_and(|tag| tag.chars().any(char::is_whitespace) || tag.contains('\0')) {
+            return Err(OpenccError::UserDictParse(
+                "tag must not contain whitespace or NUL".into(),
+            ));
+        }
+
+        // Detect script and convert using s2t/t2s only.
+        let converted = match self.zho_check(word) {
+            2 => Some(self.convert(word, "s2t", false)),
+            1 => Some(self.convert(word, "t2s", false)),
+            _ => None,
+        };
+
+        // Obtain mutable access once.
+        let jieba = Arc::make_mut(&mut self.jieba);
+
+        // Always register the original word.
+        jieba.add_word(word, freq, tag);
+
+        // Register the counterpart only when different.
+        if let Some(converted) = converted {
+            if converted != word {
+                jieba.add_word(&converted, freq, tag);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Internal fallible constructor for [`OpenCC`].
     ///
     /// This method initializes the embedded Jieba tokenizer from the compressed
@@ -1443,7 +1597,7 @@ impl OpenCC {
             let rest = &s[start..];
 
             // Store candidate byte ends for this suffix.
-            // Most OpenCC phrase lengths are small; 64 is enough for normal mask-backed keys.
+            // Most `OpenCC` phrase lengths are small; 64 is enough for normal mask-backed keys.
             let mut ends = [0usize; 64];
             let mut count = 0usize;
 

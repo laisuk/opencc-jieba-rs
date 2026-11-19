@@ -432,6 +432,78 @@ mod tests {
         );
     }
 
+    // Add Word Extended Tests
+
+    #[test]
+    fn test_add_word_extended_simplified() {
+        let mut cc = OpenCC::new();
+
+        cc.add_word_extended("计算机程序", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba.cut("计算机程序", false).len(), 1);
+        assert_eq!(cc.jieba.cut("計算機程序", false).len(), 1);
+    }
+
+    #[test]
+    fn test_add_word_extended_traditional() {
+        let mut cc = OpenCC::new();
+
+        cc.add_word_extended("繁體電腦", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba.cut("繁體電腦", false).len(), 1);
+        assert_eq!(cc.jieba.cut("繁体电脑", false).len(), 1);
+    }
+
+    #[test]
+    fn test_add_word_extended_preserves_context_sensitive_conversion() {
+        let mut cc = OpenCC::new();
+
+        assert_eq!(cc.convert("头发干燥", "s2t", false), "頭髮乾燥");
+
+        cc.add_word_extended("头发干燥", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba_cut("头发干燥", false), vec!["头发干燥"]);
+        assert_eq!(cc.jieba_cut("頭髮乾燥", false), vec!["頭髮乾燥"]);
+    }
+
+    #[test]
+    fn test_add_word_extended_traditional_hair_dryness() {
+        let mut cc = OpenCC::new();
+
+        cc.add_word_extended("頭髮乾燥", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba_cut("頭髮乾燥", false), vec!["頭髮乾燥"]);
+        assert_eq!(cc.jieba_cut("头发干燥", false), vec!["头发干燥"]);
+    }
+
+    #[test]
+    fn test_add_word_extended_validation() {
+        let mut cc = OpenCC::new();
+
+        assert!(cc.add_word_extended("", None, None).is_err());
+        assert!(cc.add_word_extended("hello world", None, None).is_err());
+        assert!(cc
+            .add_word_extended("测试", Some(100), Some("bad tag"))
+            .is_err());
+        assert!(cc
+            .add_word_extended("测试", Some(100), Some("bad\0tag"))
+            .is_err());
+    }
+
+    #[test]
+    fn test_add_word_extended_undetermined() {
+        let mut cc = OpenCC::new();
+
+        assert_eq!(cc.zho_check("OpenCC"), 0);
+
+        cc.add_word_extended("OpenCC", Some(100_000), Some("nz"))
+            .unwrap();
+    }
+
     #[test]
     fn test_user_dict_loading() {
         let input = "云计算和区块链技术在帕兰提尔学习";

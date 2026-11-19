@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## \[0.9.1] - Unreleased
+
+### Added
+
+- Added `OpenCC::add_word_extended()`, `opencc_jieba_add_word_extended()`, and
+  `OpenccJiebaHelper::addWordExtended()`. These register a word and, when distinct,
+  its basic Simplified or Traditional counterpart in Jieba. Undetermined input
+  registers only the supplied word. Regional `OpenCC` dictionaries still handle
+  vocabulary conversion.
+- Added Rust, C, and C++ regression coverage for cross-script registration and
+  segmentation, optional arguments, validation, and thread-local C API errors.
+
+### Changed
+
+- Updated the Simplified-to-Traditional phrase dictionary and Taiwan vocabulary
+  mappings in both directions, and rebuilt the bundled `OpenCC` dictionary.
+- Shared validation, panic handling, and thread-local error reporting between the
+  two C word-registration functions. Both signatures are preserved and the C ABI
+  number remains 1.
+
+---
+
 ## \[0.9.0] - 2026-11-18
 
 Changes for the upcoming v0.9.0 release, accumulated since the v0.8.1 tag.

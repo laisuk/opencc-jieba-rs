@@ -158,12 +158,20 @@ public:
         const std::optional<std::size_t> freq = std::nullopt,
         const std::optional<std::string_view> &tag = std::nullopt
     ) const {
-        const std::string wordOwned(word);
-        const std::string tagOwned(tag.value_or(std::string_view{}));
-        return opencc_jieba_add_word(
-            instance_, wordOwned.c_str(), freq.has_value(), freq.value_or(0),
-            tag ? tagOwned.c_str() : nullptr
-        );
+        return registerJiebaWord(opencc_jieba_add_word, word, freq, tag);
+    }
+
+    /**
+     * Registers the word and its Simplified/Traditional counterpart when distinct.
+     * Accepts the same arguments and follows the same error and synchronization
+     * contract as addWord(). Available since v0.9.1.
+     */
+    [[nodiscard]] bool addWordExtended(
+        const std::string_view word,
+        const std::optional<std::size_t> freq = std::nullopt,
+        const std::optional<std::string_view> &tag = std::nullopt
+    ) const {
+        return registerJiebaWord(opencc_jieba_add_word_extended, word, freq, tag);
     }
 
     // ---------------------------
@@ -456,6 +464,20 @@ private:
     void *instance_ = nullptr;
     std::string config_ = "s2t";
     bool punctuationEnabled_ = false;
+
+    [[nodiscard]] bool registerJiebaWord(
+        decltype(&opencc_jieba_add_word) registerWord,
+        std::string_view word,
+        std::optional<std::size_t> freq,
+        const std::optional<std::string_view> &tag
+    ) const {
+        const std::string wordOwned(word);
+        const std::string tagOwned(tag.value_or(std::string_view{}));
+        return registerWord(
+            instance_, wordOwned.c_str(), freq.has_value(), freq.value_or(0),
+            tag ? tagOwned.c_str() : nullptr
+        );
+    }
 
     using StringTransformFn = char *(*)(const void *, const char *);
 

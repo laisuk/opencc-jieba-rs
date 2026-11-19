@@ -270,6 +270,16 @@ files.
 You can also use `opencc-jieba-rs` via a C API for integration with C/C++ projects. The maintained C and C++ headers
 live in [`capi/include`](./capi/include); add that directory to your compiler's include path.
 
+| Registration                                                                  | C                                           | C++17 helper        |
+|-------------------------------------------------------------------------------|---------------------------------------------|---------------------|
+| Supplied word only                                                            | `opencc_jieba_add_word()` (v0.8.1.1)        | `addWord()`         |
+| Supplied word and a distinct Simplified/Traditional counterpart when detected | `opencc_jieba_add_word_extended()` (v0.9.1) | `addWordExtended()` |
+
+In C, set `has_freq` to false for automatic frequency or true for an explicit value, including zero. Pass `NULL` to omit
+the POS tag. In C++, omit either optional argument or pass `std::nullopt`.
+See [word registration across scripts](#add-a-word-with-simplifiedtraditional-variants) for how this affects regional
+conversion.
+
 ### Example
 
 ```c
@@ -609,6 +619,37 @@ This changes the instance's Jieba segmentation dictionary, not `OpenCC` conversi
 Use `load_user_dict()` for dictionary files, or `load_user_dict_entries()` for multiple in-memory `UserDictEntry` values
 with required frequencies. `add_word()` is convenient for a single word and also supports automatic frequency selection.
 The public `pub jieba: Arc<Jieba>` field remains available for advanced direct Jieba access.
+
+### Add a word with Simplified/Traditional variants
+
+`OpenCC::add_word()` registers the supplied word only. `OpenCC::add_word_extended()` also registers a distinct
+Simplified/Traditional counterpart when `zho_check()` determines the script. It uses `s2t` for Simplified input and
+`t2s` for Traditional input. Undetermined input registers only the supplied word.
+
+Registering both forms helps Jieba recognize custom phrase boundaries across scripts. Regional OpenCC dictionary
+slots still handle vocabulary conversion for `s2tw`, `s2twp`, `s2hk`, `tw2s`, `tw2sp`, and `hk2s`. For example,
+registering `计算机` adds the counterpart `計算機`, while the Taiwan phrase dictionary handles conversion to `電腦`.
+The basic conversions use phrase context. For example, `s2t` produces `頭髮乾燥` from `头发干燥`, and registering
+either form with `add_word_extended()` adds both spellings to Jieba.
+A high frequency makes Jieba more likely to keep the word intact.
+
+```rust
+use opencc_jieba_rs::OpenCC;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cc = OpenCC::new();
+
+    // Registers 计算机程序 and 計算機程序.
+    cc.add_word_extended("计算机程序", Some(100_000), Some("nz"))?;
+
+    // Registers 應用程式 and 应用程式.
+    cc.add_word_extended("應用程式", Some(100_000), Some("nz"))?;
+
+    Ok(())
+}
+```
+
+Both forms use the same optional frequency and POS tag. When frequency is omitted, Jieba determines it for each form.
 
 ### Default user dictionary path
 

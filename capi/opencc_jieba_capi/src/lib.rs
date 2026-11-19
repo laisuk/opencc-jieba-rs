@@ -8,7 +8,8 @@
 #![deny(clippy::missing_safety_doc, clippy::not_unsafe_ptr_arg_deref)]
 
 use opencc_jieba_rs::{
-    CustomDictMode, CustomDictSpec, DetofuLevel, DictSlot, KeywordMethod, OpenCC, UserDictEntry,
+    CustomDictMode, CustomDictSpec, DetofuLevel, DictSlot, KeywordMethod, OpenCC, OpenccError,
+    UserDictEntry,
 };
 use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
@@ -217,8 +218,8 @@ pub unsafe extern "C" fn opencc_jieba_free(instance: *mut OpenCC) {
 
 /// Adds or updates one Jieba word on an existing instance.
 /// `has_freq` selects Some(freq), including zero; otherwise frequency is automatic.
-/// NULL `tag` means no tag. Returns false and records a thread-local error on
-/// invalid arguments or Rust validation failure; success clears stale errors.
+/// NULL `tag` omits the tag. A non-NULL empty string supplies an empty tag.
+/// Failure returns false and records a thread-local error. Success clears stale errors.
 ///
 /// # Safety
 /// Non-NULL `instance` must be an aligned, live `OpenCC` with exclusive access
@@ -236,6 +237,64 @@ pub unsafe extern "C" fn opencc_jieba_add_word(
     freq: usize,
     tag: *const c_char,
 ) -> bool {
+    unsafe {
+        add_jieba_word(
+            instance,
+            word,
+            has_freq,
+            freq,
+            tag,
+            OpenCC::add_word,
+            "Panic while adding Jieba word",
+        )
+    }
+}
+
+/// Adds a Jieba word and its Simplified/Traditional counterpart.
+///
+/// Uses OpenCC::add_word_extended() to bridge segmentation across scripts.
+/// Particularly useful with regional conversion configurations such as
+/// s2tw, s2twp, s2hk, tw2s, tw2sp, and hk2s.
+///
+/// Frequency, tag, and error reporting follow [`opencc_jieba_add_word`].
+///
+/// # Safety
+/// The pointer validity and exclusive access requirements are the same as
+/// those of [`opencc_jieba_add_word`].
+#[no_mangle]
+pub unsafe extern "C" fn opencc_jieba_add_word_extended(
+    instance: *mut OpenCC,
+    word: *const c_char,
+    has_freq: bool,
+    freq: usize,
+    tag: *const c_char,
+) -> bool {
+    unsafe {
+        add_jieba_word(
+            instance,
+            word,
+            has_freq,
+            freq,
+            tag,
+            OpenCC::add_word_extended,
+            "Panic while adding extended Jieba word",
+        )
+    }
+}
+
+type RegisterJiebaWord =
+    fn(&mut OpenCC, &str, Option<usize>, Option<&str>) -> Result<(), OpenccError>;
+
+// Both exports require the same pointer validity and exclusive instance access.
+unsafe fn add_jieba_word(
+    instance: *mut OpenCC,
+    word: *const c_char,
+    has_freq: bool,
+    freq: usize,
+    tag: *const c_char,
+    register: RegisterJiebaWord,
+    panic_message: &str,
+) -> bool {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if instance.is_null() || word.is_null() {
             return Err("Invalid argument: instance/word is NULL".to_owned());
@@ -246,9 +305,13 @@ pub unsafe extern "C" fn opencc_jieba_add_word(
         } else {
             Some(unsafe { cstr_to_str(tag) }.ok_or_else(|| "Invalid UTF-8 tag".to_owned())?)
         };
-        unsafe { &mut *instance }
-            .add_word(word, has_freq.then_some(freq), tag)
-            .map_err(|err| err.to_string())
+        register(
+            unsafe { &mut *instance },
+            word,
+            has_freq.then_some(freq),
+            tag,
+        )
+        .map_err(|err| err.to_string())
     }));
     match result {
         Ok(Ok(_)) => {
@@ -260,7 +323,7 @@ pub unsafe extern "C" fn opencc_jieba_add_word(
             false
         }
         Err(_) => {
-            set_c_api_last_error("Panic while adding Jieba word");
+            set_c_api_last_error(panic_message);
             false
         }
     }
@@ -2317,49 +2380,45 @@ mod add_word_tests {
             let unicode_space = CString::new("bad\u{3000}word").unwrap();
             let space_tag = CString::new("n\ttag").unwrap();
             let invalid = [0xff_u8, 0];
-            for (inst, w, t, expected) in [
-                (ptr::null_mut(), word.as_ptr(), ptr::null(), "NULL"),
-                (instance, ptr::null(), ptr::null(), "NULL"),
-                (instance, empty.as_ptr(), ptr::null(), "word must not"),
-                (instance, space_word.as_ptr(), ptr::null(), "word must not"),
-                (
-                    instance,
-                    unicode_space.as_ptr(),
-                    ptr::null(),
-                    "word must not",
-                ),
-                (instance, word.as_ptr(), space_tag.as_ptr(), "tag must not"),
-                (instance, invalid.as_ptr().cast(), ptr::null(), "UTF-8 word"),
-                (
+            for add_word in [opencc_jieba_add_word, opencc_jieba_add_word_extended] {
+                for (inst, w, t, expected) in [
+                    (ptr::null_mut(), word.as_ptr(), ptr::null(), "NULL"),
+                    (instance, ptr::null(), ptr::null(), "NULL"),
+                    (instance, empty.as_ptr(), ptr::null(), "word must not"),
+                    (instance, space_word.as_ptr(), ptr::null(), "word must not"),
+                    (
+                        instance,
+                        unicode_space.as_ptr(),
+                        ptr::null(),
+                        "word must not",
+                    ),
+                    (instance, word.as_ptr(), space_tag.as_ptr(), "tag must not"),
+                    (instance, invalid.as_ptr().cast(), ptr::null(), "UTF-8 word"),
+                    (
+                        instance,
+                        word.as_ptr(),
+                        invalid.as_ptr().cast(),
+                        "UTF-8 tag",
+                    ),
+                ] {
+                    assert!(!add_word(inst, w, false, 0, t));
+                    let error = opencc_jieba_last_error();
+                    assert!(!error.is_null());
+                    assert!(CStr::from_ptr(error).to_str().unwrap().contains(expected));
+                    opencc_jieba_free_string(error);
+                    assert!(get_c_api_last_error().is_some());
+                    assert!(add_word(instance, word.as_ptr(), false, 0, ptr::null()));
+                    assert!(get_c_api_last_error().is_none());
+                }
+                // A non-NULL empty tag is accepted as Some("").
+                assert!(add_word(
                     instance,
                     word.as_ptr(),
-                    invalid.as_ptr().cast(),
-                    "UTF-8 tag",
-                ),
-            ] {
-                assert!(!opencc_jieba_add_word(inst, w, false, 0, t));
-                let error = opencc_jieba_last_error();
-                assert!(!error.is_null());
-                assert!(CStr::from_ptr(error).to_str().unwrap().contains(expected));
-                opencc_jieba_free_string(error);
-                assert!(get_c_api_last_error().is_some());
-                assert!(opencc_jieba_add_word(
-                    instance,
-                    word.as_ptr(),
-                    false,
-                    0,
-                    ptr::null()
+                    true,
+                    100_000,
+                    empty.as_ptr()
                 ));
-                assert!(get_c_api_last_error().is_none());
             }
-            // A non-NULL empty tag is accepted as Some("").
-            assert!(opencc_jieba_add_word(
-                instance,
-                word.as_ptr(),
-                true,
-                100_000,
-                empty.as_ptr()
-            ));
             assert_eq!(
                 CStr::from_ptr(opencc_jieba_version_string())
                     .to_str()
@@ -2368,6 +2427,177 @@ mod add_word_tests {
             );
             assert_eq!(opencc_jieba_abi_number(), 1);
             opencc_jieba_delete(instance);
+        }
+    }
+
+    #[test]
+    fn extended_word_registers_both_scripts() {
+        unsafe {
+            let instance = opencc_jieba_new();
+            assert!(!instance.is_null());
+
+            for (word, counterpart) in [
+                ("星际量子咖啡馆", "星際量子咖啡館"),
+                ("銀河草莓引擎", "银河草莓引擎"),
+            ] {
+                let word = CString::new(word).unwrap();
+                let counterpart = CString::new(counterpart).unwrap();
+                assert!(!(*instance).jieba.has_word(counterpart.to_str().unwrap()));
+                assert!(opencc_jieba_add_word(
+                    instance,
+                    word.as_ptr(),
+                    true,
+                    100_000,
+                    b"nz\0".as_ptr().cast()
+                ));
+                assert!(!(*instance).jieba.has_word(counterpart.to_str().unwrap()));
+
+                assert!(opencc_jieba_add_word_extended(
+                    instance,
+                    word.as_ptr(),
+                    true,
+                    100_000,
+                    b"nz\0".as_ptr().cast()
+                ));
+
+                for input in [&word, &counterpart] {
+                    let tags = opencc_jieba_tag(instance, input.as_ptr(), false);
+                    assert!(!tags.is_null());
+                    assert_eq!(CStr::from_ptr((*tags).word), input.as_c_str());
+                    assert_eq!(CStr::from_ptr((*tags).tag).to_bytes(), b"nz");
+                    assert!((*tags.add(1)).word.is_null());
+                    opencc_jieba_free_tag_array(tags);
+                }
+
+                assert!(opencc_jieba_add_word_extended(
+                    instance,
+                    word.as_ptr(),
+                    true,
+                    0,
+                    ptr::null()
+                ));
+                for input in [&word, &counterpart] {
+                    let tokens = opencc_jieba_cut(instance, input.as_ptr(), false);
+                    assert!(!tokens.is_null() && !(*tokens).is_null());
+                    assert_ne!(CStr::from_ptr(*tokens), input.as_c_str());
+                    opencc_jieba_free_string_array(tokens);
+                }
+            }
+            opencc_jieba_delete(instance);
+        }
+    }
+
+    #[test]
+    fn add_word_extended_preserves_context_sensitive_conversion() {
+        let mut cc = OpenCC::new();
+
+        assert_eq!(cc.convert("头发干燥", "s2t", false), "頭髮乾燥");
+
+        cc.add_word_extended("头发干燥", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba_cut("头发干燥", false), vec!["头发干燥"]);
+        assert_eq!(cc.jieba_cut("頭髮乾燥", false), vec!["頭髮乾燥"]);
+    }
+
+    #[test]
+    fn add_word_extended_traditional_hair_dryness() {
+        let mut cc = OpenCC::new();
+
+        cc.add_word_extended("頭髮乾燥", Some(100_000), Some("nz"))
+            .unwrap();
+
+        assert_eq!(cc.jieba_cut("頭髮乾燥", false), vec!["頭髮乾燥"]);
+        assert_eq!(cc.jieba_cut("头发干燥", false), vec!["头发干燥"]);
+    }
+
+    #[test]
+    fn extended_word_registers_undetermined_and_identity_forms_once() {
+        unsafe {
+            let instance = opencc_jieba_new();
+            let single = opencc_jieba_new();
+            assert!(!instance.is_null() && !single.is_null());
+            // The character check detects Simplified, but the phrase dictionary
+            // preserves this spelling in s2t.
+            for (word, script) in [("dynamiccapiword", 0), ("七里香", 2)] {
+                let input = CString::new(word).unwrap();
+                assert_eq!(opencc_jieba_zho_check(instance, input.as_ptr()), script);
+                assert_eq!((*instance).convert(word, "s2t", false), word);
+                assert!(opencc_jieba_add_word_extended(
+                    instance,
+                    input.as_ptr(),
+                    false,
+                    usize::MAX,
+                    ptr::null()
+                ));
+                assert!(opencc_jieba_add_word(
+                    single,
+                    input.as_ptr(),
+                    false,
+                    usize::MAX,
+                    ptr::null()
+                ));
+                assert!((*instance).jieba.has_word(word));
+                assert_eq!(
+                    (*instance).jieba.suggest_freq(word),
+                    (*single).jieba.suggest_freq(word),
+                    "automatic frequency should reflect a single registration"
+                );
+            }
+            opencc_jieba_delete(single);
+            opencc_jieba_delete(instance);
+        }
+    }
+
+    #[test]
+    fn add_word_errors_are_isolated_per_thread() {
+        fn last_error() -> String {
+            unsafe {
+                let error = opencc_jieba_last_error();
+                let message = CStr::from_ptr(error).to_str().unwrap().to_owned();
+                opencc_jieba_free_string(error);
+                message
+            }
+        }
+
+        unsafe {
+            assert!(!opencc_jieba_add_word(
+                ptr::null_mut(),
+                ptr::null(),
+                false,
+                0,
+                ptr::null()
+            ));
+            let parent_error = last_error();
+            assert!(parent_error.contains("NULL"));
+
+            std::thread::spawn(|| {
+                assert_eq!(last_error(), "No error");
+                let instance = opencc_jieba_new();
+                assert!(!instance.is_null());
+                assert!(!opencc_jieba_add_word_extended(
+                    instance,
+                    b"\0".as_ptr().cast(),
+                    false,
+                    0,
+                    ptr::null()
+                ));
+                assert!(last_error().contains("word must not"));
+                assert!(opencc_jieba_add_word_extended(
+                    instance,
+                    b"dynamiccapiword\0".as_ptr().cast(),
+                    false,
+                    0,
+                    ptr::null()
+                ));
+                assert_eq!(last_error(), "No error");
+                opencc_jieba_delete(instance);
+            })
+            .join()
+            .unwrap();
+
+            assert_eq!(last_error(), parent_error);
+            opencc_jieba_clear_last_error();
         }
     }
 }
