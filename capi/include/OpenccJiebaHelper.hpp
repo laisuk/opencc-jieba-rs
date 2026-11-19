@@ -152,6 +152,8 @@ public:
      * Returns false on native failure; inspect lastError() on the same thread.
      * Callers must synchronize access: mutation must not race with conversion,
      * segmentation, or any other access to this instance.
+     *
+     * @since C API v0.8.1.1.
      */
     [[nodiscard]] bool addWord(
         const std::string_view word,
@@ -164,7 +166,9 @@ public:
     /**
      * Registers the word and its Simplified/Traditional counterpart when distinct.
      * Accepts the same arguments and follows the same error and synchronization
-     * contract as addWord(). Available since v0.9.1.
+     * contract as addWord().
+     *
+     * @since Project v0.9.1 (C API v0.9.1.0).
      */
     [[nodiscard]] bool addWordExtended(
         const std::string_view word,

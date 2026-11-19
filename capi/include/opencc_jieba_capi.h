@@ -204,7 +204,9 @@ void opencc_jieba_delete(void *instance);
 void opencc_jieba_free(void *instance);
 
 /**
- * @brief Adds or updates one Jieba word on an existing instance (since v0.8.1.1).
+ * @brief Adds or updates one Jieba word on an existing instance.
+ *
+ * @since C API v0.8.1.1.
  *
  * @param instance Live, mutable instance returned by any `opencc_jieba_new*()`.
  * @param word Required UTF-8, NUL-terminated word; empty or whitespace-containing
@@ -234,7 +236,7 @@ bool opencc_jieba_add_word(
 
 /**
  * @brief Adds or updates a Jieba word and its Simplified/Traditional counterpart
- *        on an existing instance (since v0.9.1).
+ *        on an existing instance.
  *
  * Uses `zho_check()` to determine the conversion direction.
  * - Simplified Chinese converts using `s2t`.
@@ -250,6 +252,8 @@ bool opencc_jieba_add_word(
  *       when segmenting text in either script. Regional OpenCC dictionary
  *       slots handle vocabulary conversion for `s2tw`, `s2twp`, `s2hk`,
  *       `tw2s`, `tw2sp`, and `hk2s`.
+ *
+ * @since Project v0.9.1 (C API v0.9.1.0).
  *
  * @param instance Live, mutable instance returned by any `opencc_jieba_new*()`.
  * @param word Required UTF-8, NUL-terminated word; empty or whitespace-containing
