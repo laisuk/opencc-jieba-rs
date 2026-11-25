@@ -3043,15 +3043,13 @@ impl OpenCC {
         let _strip_text = strip_regex().replace_all(&input[..check_length], "");
         let max_bytes = find_max_utf8_length(_strip_text.as_ref(), 200);
         let strip_text = &_strip_text[..max_bytes];
-        let code = if strip_text != self.ts(strip_text) {
+        if strip_text != self.ts(strip_text) {
             1
         } else if strip_text != self.st(strip_text) {
             2
         } else {
             0
-        };
-
-        code
+        }
     }
 
     /// Converts Chinese punctuation between Simplified and Traditional styles.
