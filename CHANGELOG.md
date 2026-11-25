@@ -26,6 +26,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   two C word-registration functions. Both signatures are preserved and the C ABI
   number remains 1.
 
+### Fixed
+
+- Backported selected ruzstd v0.9.1 and later decoder fixes from
+  `opencc-fmmseg`. The vendored decoder now checks block sizes and repeat
+  offsets, rejects reserved sequence compression mode bits, and allocates
+  history lazily. It accepts Zstandard windows up to 128 MiB.
+
 ---
 
 ## \[0.9.0] - 2026-11-18
