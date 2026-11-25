@@ -4,8 +4,18 @@ This directory contains a decoder-only adaptation of source code from **ruzstd 0
 Moritz Borcherding and contributors.
 
 Upstream: https://github.com/KillingSpark/zstd-rs
-Version used: 0.9.0
+Original baseline: 0.9.0
 License: MIT (see `LICENSE-RUZSTD`)
+
+Selected decoder changes were backported
+from [ruzstd v0.9.1](https://github.com/KillingSpark/zstd-rs/releases/tag/v0.9.1)
+and these subsequent upstream commits:
+
+- [91a3a6eb](https://github.com/KillingSpark/zstd-rs/commit/91a3a6eb) applies the decoded-size limit to literals,
+  including blocks without sequences.
+- [96b83ce9](https://github.com/KillingSpark/zstd-rs/commit/96b83ce9) rejects reserved sequence compression mode bits.
+- [d7f37b8c](https://github.com/KillingSpark/zstd-rs/commit/d7f37b8c) bounds compressed bodies before scratch-buffer
+  growth.
 
 OpenCC adaptation:
 

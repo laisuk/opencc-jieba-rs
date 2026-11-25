@@ -72,7 +72,7 @@ fn dictionary_ids_and_window_limit() {
         Err(FrameDecoderError::DictNotProvided { dict_id: 7 })
     ));
 
-    let large_window = [0x28, 0xb5, 0x2f, 0xfd, 0, 17 << 3];
+    let large_window = [0x28, 0xb5, 0x2f, 0xfd, 0, 18 << 3];
     assert!(matches!(
         decompress(&large_window),
         Err(FrameDecoderError::WindowSizeTooBig { .. })

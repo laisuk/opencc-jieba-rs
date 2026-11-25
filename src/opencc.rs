@@ -532,13 +532,14 @@ impl OpenCC {
     /// Replaces this instance's OpenCC conversion mappings from a custom
     /// Zstd-compressed dictionary pack.
     ///
-    /// Decoding uses the vendored pure Rust decoder derived from ruzstd 0.9.0,
+    /// Decoding uses the vendored pure Rust decoder derived from ruzstd 0.9.0
+    /// with selected v0.9.1 and subsequent upstream fixes,
     /// without requiring `dictionary-build` or the native `zstd` dependency.
     /// The first Zstandard frame must contain a JSON conversion pack. Trailing
     /// input is ignored; a leading skippable frame is rejected. Frames with or
     /// without a frame content size are accepted. A declared size up to 64 MiB
     /// is only a preallocation hint, not an output limit. Decoding rejects
-    /// windows larger than 100 MiB and nonzero Zstandard dictionary IDs (external
+    /// windows larger than 128 MiB and nonzero Zstandard dictionary IDs (external
     /// compression dictionaries are unsupported). Checksum bytes are consumed
     /// but their values are not verified.
     ///

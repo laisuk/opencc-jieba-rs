@@ -65,7 +65,6 @@ impl DecoderScratch {
 
         self.huf.table.reset();
     }
-
 }
 
 pub struct HuffmanScratch {

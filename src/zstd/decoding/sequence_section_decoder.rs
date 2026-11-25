@@ -19,7 +19,6 @@ pub fn decode_sequences(
 ) -> Result<(), DecodeSequenceError> {
     let bytes_read = maybe_update_fse_tables(section, source, scratch)?;
 
-
     let bit_stream = &source[bytes_read..];
 
     let mut br = BitReaderReversed::new(bit_stream);
@@ -325,9 +324,7 @@ fn maybe_update_fse_tables(
             )?;
             scratch.ll_rle = None;
         }
-        ModeType::Repeat => {
-            /* Nothing to do */
-        }
+        ModeType::Repeat => { /* Nothing to do */ }
     };
 
     let of_source = &source[bytes_read..];
@@ -355,9 +352,7 @@ fn maybe_update_fse_tables(
             )?;
             scratch.of_rle = None;
         }
-        ModeType::Repeat => {
-            /* Nothing to do */
-        }
+        ModeType::Repeat => { /* Nothing to do */ }
     };
 
     let ml_source = &source[bytes_read..];
@@ -385,9 +380,7 @@ fn maybe_update_fse_tables(
             )?;
             scratch.ml_rle = None;
         }
-        ModeType::Repeat => {
-            /* Nothing to do */
-        }
+        ModeType::Repeat => { /* Nothing to do */ }
     };
 
     Ok(bytes_read)

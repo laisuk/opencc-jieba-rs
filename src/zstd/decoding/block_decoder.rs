@@ -15,6 +15,13 @@ use crate::zstd::decoding::scratch::DecoderScratch;
 use crate::zstd::decoding::sequence_execution::execute_sequences;
 use std::io::Read;
 
+fn check_block_size(size: usize, max: usize) -> Result<(), DecompressBlockError> {
+    if size > max {
+        return Err(DecompressBlockError::BlockSizeLimitExceeded { size, max });
+    }
+    Ok(())
+}
+
 pub struct BlockDecoder {
     header_buffer: [u8; 3],
     internal_state: DecoderState,
@@ -39,6 +46,7 @@ impl BlockDecoder {
         header: &BlockHeader,
         workspace: &mut DecoderScratch, //reuse this as often as possible. Not only if the trees are reused but also reuse the allocations when building new trees
         mut source: impl Read,
+        block_limit: usize,
     ) -> Result<u64, DecodeBlockContentError> {
         match self.internal_state {
             DecoderState::ReadyToDecodeNextBody => { /* Happy :) */ }
@@ -47,6 +55,7 @@ impl BlockDecoder {
             }
         }
 
+        check_block_size(header.decompressed_size as usize, block_limit)?;
         let block_type = header.block_type;
         match block_type {
             BlockType::RLE => {
@@ -83,7 +92,7 @@ impl BlockDecoder {
             }
 
             BlockType::Compressed => {
-                self.decompress_block(header, workspace, source)?;
+                self.decompress_block(header, workspace, source, block_limit)?;
 
                 self.internal_state = DecoderState::ReadyToDecodeNextHeader;
                 Ok(u64::from(header.content_size))
@@ -96,7 +105,9 @@ impl BlockDecoder {
         header: &BlockHeader,
         workspace: &mut DecoderScratch, //reuse this as often as possible. Not only if the trees are reused but also reuse the allocations when building new trees
         mut source: impl Read,
+        block_limit: usize,
     ) -> Result<(), DecompressBlockError> {
+        check_block_size(header.content_size as usize, block_limit)?;
         workspace
             .block_content_buffer
             .resize(header.content_size as usize, 0);
@@ -106,6 +117,7 @@ impl BlockDecoder {
 
         let mut section = LiteralsSection::new();
         let bytes_in_literals_header = section.parse_from_header(raw)?;
+        check_block_size(section.regenerated_size as usize, block_limit)?;
         let raw = &raw[bytes_in_literals_header as usize..];
 
         let upper_limit_for_literals = match section.compressed_size {
@@ -126,20 +138,24 @@ impl BlockDecoder {
 
         let raw_literals = &raw[..upper_limit_for_literals];
 
-        workspace.literals_buffer.clear(); //all literals of the previous block must have been used in the sequence execution anyways. just be defensive here
+        workspace.literals_buffer.clear(); //all literals of the previous block must have been used in the sequence execution anyway. just be defensive here
         let bytes_used_in_literals_section = decode_literals(
             &section,
             &mut workspace.huf,
             raw_literals,
             &mut workspace.literals_buffer,
         )?;
-        assert!(
-            section.regenerated_size == workspace.literals_buffer.len() as u32,
+        assert_eq!(
+            section.regenerated_size,
+            workspace.literals_buffer.len() as u32,
             "Wrong number of literals: {}, Should have been: {}",
             workspace.literals_buffer.len(),
             section.regenerated_size
         );
-        assert!(bytes_used_in_literals_section == upper_limit_for_literals as u32);
+        assert_eq!(
+            bytes_used_in_literals_section,
+            upper_limit_for_literals as u32
+        );
 
         let raw = &raw[upper_limit_for_literals..];
 
@@ -147,12 +163,12 @@ impl BlockDecoder {
         let bytes_in_sequence_header = seq_section.parse_from_header(raw)?;
         let raw = &raw[bytes_in_sequence_header as usize..];
 
-        assert!(
+        assert_eq!(
             u32::from(bytes_in_literals_header)
                 + bytes_used_in_literals_section
                 + u32::from(bytes_in_sequence_header)
-                + raw.len() as u32
-                == header.content_size
+                + raw.len() as u32,
+            header.content_size
         );
 
         if seq_section.num_sequences != 0 {
@@ -162,7 +178,7 @@ impl BlockDecoder {
                 &mut workspace.fse,
                 &mut workspace.sequences,
             )?;
-            execute_sequences(workspace)?;
+            execute_sequences(workspace, block_limit)?;
         } else {
             if !raw.is_empty() {
                 return Err(DecompressBlockError::DecodeSequenceError(
@@ -184,7 +200,6 @@ impl BlockDecoder {
         &mut self,
         mut r: impl Read,
     ) -> Result<(BlockHeader, u8), BlockHeaderReadError> {
-
         r.read_exact(&mut self.header_buffer[0..3])?;
 
         let btype = self.block_type()?;
@@ -257,5 +272,29 @@ impl BlockDecoder {
         u32::from(self.header_buffer[0] >> 3) //push out type and last_block flags. Retain 5 bit
             | (u32::from(self.header_buffer[1]) << 5)
             | (u32::from(self.header_buffer[2]) << 13)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_compressed_body_leaves_scratch_unallocated() {
+        let mut decoder = new();
+        let mut scratch = DecoderScratch::new(1024);
+        // The header declares 1025 bytes. Nobody is needed to reject it.
+        let (header, _) = decoder.read_block_header(&[0x0d, 0x20, 0][..]).unwrap();
+        assert!(matches!(
+            decoder.decode_block_content(&header, &mut scratch, &[][..], 1024),
+            Err(DecodeBlockContentError::DecompressBlockError(
+                DecompressBlockError::BlockSizeLimitExceeded {
+                    size: 1025,
+                    max: 1024
+                }
+            ))
+        ));
+        assert_eq!(scratch.block_content_buffer.capacity(), 0);
+        assert_eq!(scratch.buffer.len(), 0);
     }
 }

@@ -1,4 +1,4 @@
-//! Zstandard frame decoding internals derived from ruzstd 0.9.0.
+//! Zstandard frame decoding internals with selected fixes backported from ruzstd.
 
 pub mod errors;
 mod frame_decoder;

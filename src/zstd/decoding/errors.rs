@@ -215,6 +215,10 @@ impl fmt::Display for BlockSizeError {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum DecompressBlockError {
+    BlockSizeLimitExceeded {
+        size: usize,
+        max: usize,
+    },
     BlockContentReadError(Error),
     MalformedSectionHeader {
         expected_len: usize,
@@ -244,6 +248,9 @@ impl std::error::Error for DecompressBlockError {
 impl fmt::Display for DecompressBlockError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            DecompressBlockError::BlockSizeLimitExceeded { size, max } => {
+                write!(f, "Block size {size} exceeds the limit of {max} bytes")
+            }
             DecompressBlockError::BlockContentReadError(e) => {
                 write!(f, "Error while reading the block content: {e}")
             }
@@ -542,6 +549,7 @@ impl From<HuffmanTableError> for DecompressLiteralsError {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ExecuteSequencesError {
+    BlockSizeLimitExceeded { max: usize },
     DecodebufferError(DecodeBufferError),
     NotEnoughBytesForSequence { wanted: usize, have: usize },
     ZeroOffset,
@@ -550,6 +558,9 @@ pub enum ExecuteSequencesError {
 impl fmt::Display for ExecuteSequencesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ExecuteSequencesError::BlockSizeLimitExceeded { max } => {
+                write!(f, "Decoded block exceeds the limit of {max} bytes")
+            }
             ExecuteSequencesError::DecodebufferError(e) => {
                 write!(f, "{e:?}")
             }
@@ -726,6 +737,7 @@ impl fmt::Display for LiteralsSectionType {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum SequencesHeaderParseError {
+    ReservedBitsSet { got: u8 },
     NotEnoughBytes { need_at_least: u8, got: usize },
 }
 
@@ -734,6 +746,12 @@ impl std::error::Error for SequencesHeaderParseError {}
 impl fmt::Display for SequencesHeaderParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            SequencesHeaderParseError::ReservedBitsSet { got } => {
+                write!(
+                    f,
+                    "Reserved bits in Symbol_Compression_Modes must be zero (got {got:#04x})"
+                )
+            }
             SequencesHeaderParseError::NotEnoughBytes { need_at_least, got } => {
                 write!(
                     f,

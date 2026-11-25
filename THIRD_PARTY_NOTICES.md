@@ -7,8 +7,8 @@ different terms. The following notices are provided for attribution and license 
 
 ## 1) Open Chinese Convert (OpenCC) — Dictionaries & Configs
 
-**Component:** OpenCC lexicon files (dictionaries/configs)  
-**Upstream:** Open Chinese Convert (OpenCC)  
+**Component:** `OpenCC` lexicon files (dictionaries/configs)  
+**Upstream:** Open Chinese Convert (`OpenCC`)  
 **License:** **Apache License 2.0**  
 **Files in this distribution:** `dicts/` (and any derived packs generated from these dictionaries)  
 **License files included:**
@@ -16,7 +16,7 @@ different terms. The following notices are provided for attribution and license 
 - `dicts/LICENSE` (Apache-2.0, copied from upstream)
 
 **Attribution:**  
-Copyright © OpenCC contributors
+Copyright © `OpenCC` contributors
 
 **Modifications (if any):**
 
@@ -26,8 +26,8 @@ Copyright © OpenCC contributors
 
 **Notes on usage:**
 
-- The OpenCC lexicon is treated as the canonical linguistic source.
-- Any artifacts derived directly from the OpenCC lexicon (e.g., compiled packs) are considered derivative and are
+- The `OpenCC` lexicon is treated as the canonical linguistic source.
+- Any artifacts derived directly from the `OpenCC` lexicon (e.g., compiled packs) are considered derivative and are
   distributed together with the Apache-2.0 license and notices.
 
 ---
@@ -35,15 +35,15 @@ Copyright © OpenCC contributors
 ## 2) Project License Clarification
 
 - **Our source code:** MIT License (see `LICENSE` in the repository root).
-- **Bundled OpenCC lexicon (and derivatives):** Apache License 2.0 (see `dicts/LICENSE`).
+- **Bundled `OpenCC` lexicon (and derivatives):** Apache License 2.0 (see `dicts/LICENSE`).
 - Licenses are **additive**: using this software means you agree to the terms of both MIT (for our code) and Apache-2.0
-  (for the OpenCC lexicon files included or fetched at runtime, as applicable).
+  (for the `OpenCC` lexicon files included or fetched at runtime, as applicable).
 
 ---
 
 ## 3) ruzstd — Vendored Zstandard Decoder
 
-**Component:** Decoder-only adaptation of ruzstd 0.9.0
+**Component:** Decoder-only adaptation of ruzstd 0.9.0 with selected v0.9.1 and subsequent upstream decoder fixes
 
 **Upstream:** [zstd-rs](https://github.com/KillingSpark/zstd-rs), Moritz Borcherding and contributors
 

@@ -1,6 +1,7 @@
 //! Minimal decoder-only Zstandard implementation for OpenCC embedded resources.
 //!
 //! Derived from ruzstd 0.9.0 (MIT), by Moritz Borcherding and contributors.
+//! Includes selected v0.9.1 and subsequent upstream decoder fixes.
 //! Encoder, streaming wrapper, dictionary builder, fuzz/test helpers, and no_std
 //! compatibility layers have intentionally been omitted.
 //!

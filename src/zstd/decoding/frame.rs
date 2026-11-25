@@ -153,9 +153,7 @@ impl FrameHeader {
     /// Unlike [`Self::frame_content_size`], this distinguishes an absent FCS from
     /// an explicitly declared size of zero.
     pub fn frame_content_size_opt(&self) -> Option<u64> {
-        if self.descriptor.frame_content_size_flag() != 0
-            || self.descriptor.single_segment_flag()
-        {
+        if self.descriptor.frame_content_size_flag() != 0 || self.descriptor.single_segment_flag() {
             Some(self.frame_content_size)
         } else {
             None

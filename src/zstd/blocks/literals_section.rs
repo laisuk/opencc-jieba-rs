@@ -28,7 +28,6 @@ pub struct LiteralsSection {
 }
 
 /// The way which a literal section is encoded.
-#[allow(clippy::upper_case_acronyms)]
 pub enum LiteralsSectionType {
     /// Literals are stored uncompressed.
     Raw,

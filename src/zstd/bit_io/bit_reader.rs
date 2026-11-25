@@ -60,7 +60,10 @@ impl<'s> BitReader<'s> {
             let full_bytes_needed = (n - bits_left_in_current_byte) / 8;
             let bits_in_last_byte_needed = n - bits_left_in_current_byte - full_bytes_needed * 8;
 
-            assert_eq!(bits_left_in_current_byte + full_bytes_needed * 8 + bits_in_last_byte_needed, n);
+            assert_eq!(
+                bits_left_in_current_byte + full_bytes_needed * 8 + bits_in_last_byte_needed,
+                n
+            );
 
             let mut bit_shift = bits_left_in_current_byte; //this many bits are already set in value
 

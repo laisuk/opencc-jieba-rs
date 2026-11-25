@@ -1,5 +1,5 @@
-use std::io::Read;
 use std::alloc::{alloc, dealloc, Layout};
+use std::io::Read;
 use std::ptr::NonNull;
 use std::slice;
 
@@ -9,7 +9,7 @@ pub struct RingBuffer {
     // 1.
     //    a.`buf` must be a valid allocation of capacity `cap`
     //    b. ...unless `cap=0`, in which case it is dangling
-    // 2. If tail≥head
+    // 2. If tail≥head:
     //    a. `head..tail` must contain initialized memory.
     //    b. Else, `head..` and `..tail` must be initialized
     // 3. `head` and `tail` are in bounds (≥ 0 and < cap)
@@ -66,23 +66,26 @@ impl RingBuffer {
             return;
         }
 
-        self.reserve_amortized(amount - free);
+        self.reserve_amortized(self.len() + amount);
     }
 
     #[inline(never)]
     #[cold]
-    fn reserve_amortized(&mut self, amount: usize) {
+    fn reserve_amortized(&mut self, required: usize) {
         // SAFETY: if we were succesfully able to construct this layout when we allocated then it's also valid do so now
         let current_layout = unsafe { Layout::array::<u8>(self.cap).unwrap_unchecked() };
 
-        // Always have at least 1 unused element as the sentinel.
-        let new_cap = usize::max(
-            self.cap.next_power_of_two(),
-            (self.cap + amount).next_power_of_two(),
-        ) + 1;
+        // Leave room for two blocks beyond a power-of-two history window.
+        // The extra byte is the ring's sentinel.
+        const SLACK: usize = 2 * crate::zstd::common::MAX_BLOCK_SIZE as usize;
+        let new_cap = if required <= SLACK {
+            required.next_power_of_two() + 1
+        } else {
+            (required - SLACK).next_power_of_two() + SLACK + 1
+        };
 
         // Check that the capacity isn't bigger than isize::MAX, which is the max allowed by LLVM, or that
-        // we are on a >= 64 bit system which will never allow that much memory to be allocated
+        // we are on a >= 64-bit system which will never allow that much memory to be allocated
         #[allow(clippy::assertions_on_constants)]
         {
             debug_assert!(usize::BITS >= 64 || new_cap < isize::MAX as usize);
@@ -256,14 +259,14 @@ impl RingBuffer {
     /// SAFETY:
     /// For this to be safe two requirements need to hold:
     /// 1. start + len <= self.len() so we do not copy uninitialised memory
-    /// 2. More then len reserved space so we do not write out-of-bounds
+    /// 2. More than len reserved space so we do not write out-of-bounds
     #[warn(unsafe_op_in_unsafe_fn)]
     pub unsafe fn extend_from_within_unchecked(&mut self, start: usize, len: usize) {
         debug_assert!(start + len <= self.len());
         debug_assert!(self.free() >= len);
 
         if self.head < self.tail {
-            // Continuous source section and possibly non continuous write section:
+            // Continuous source section and possibly non-continuous write section:
             //
             //            H           T
             // Read:  ____XXXXSSSSXXXX________
@@ -361,7 +364,7 @@ impl RingBuffer {
                 // and does not overlap `src`.
                 unsafe { copy_bytes_overshooting(src, dst, len) }
             } else {
-                // Possibly non continuous read section and continuous destination section:
+                // Possibly non-continuous read section and continuous destination section:
                 //
                 //            T           H
                 // Read:  XXXX____________XXSSSSXX
@@ -481,7 +484,6 @@ impl RingBuffer {
         self.tail = (self.tail + fill_length) % self.cap;
         Ok(())
     }
-
 }
 
 impl Drop for RingBuffer {
@@ -519,7 +521,7 @@ unsafe fn copy_bytes_overshooting(
     dst: (*mut u8, usize),
     copy_at_least: usize,
 ) {
-    // By default use usize as the copy size
+    // By default, use usize as the copy size
     #[cfg(all(not(target_feature = "sse2"), not(target_feature = "neon")))]
     type CopyType = usize;
 
@@ -569,6 +571,23 @@ unsafe fn copy_bytes_overshooting(
 #[cfg(test)]
 mod tests {
     use super::RingBuffer;
+
+    #[test]
+    fn growth_past_power_of_two_keeps_two_blocks_of_slack() {
+        let window = 1024 * 1024;
+        let mut rb = RingBuffer::new();
+        rb.extend_and_fill(b'a', window);
+        rb.drop_first_n(1);
+        rb.extend(b"bc");
+        assert_eq!(
+            rb.cap,
+            window + 2 * crate::zstd::common::MAX_BLOCK_SIZE as usize + 1
+        );
+        let (first, second) = rb.as_slices();
+        assert!(first[..window - 1].iter().all(|&b| b == b'a'));
+        assert_eq!(&first[window - 1..], b"bc");
+        assert!(second.is_empty());
+    }
 
     #[test]
     fn smoke() {
@@ -625,7 +644,7 @@ mod tests {
 
     #[test]
     fn edge_cases() {
-        // Fill exactly, then empty then fill again
+        // Fill exactly, then empty fill again
         let mut rb = RingBuffer::new();
         rb.reserve(16);
         assert_eq!(17, rb.cap);

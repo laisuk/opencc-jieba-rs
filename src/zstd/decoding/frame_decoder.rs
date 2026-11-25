@@ -13,9 +13,9 @@ use std::vec::Vec;
 
 /// The default maximum window size, in bytes, that a [FrameDecoder] accepts.
 ///
-/// Defaults to 100mb to bound allocation for malformed or hostile frames. The
-/// spec permits far larger windows; this internal decoder keeps a fixed limit.
-pub const DEFAULT_MAX_WINDOW_SIZE: u64 = 1024 * 1024 * 100;
+/// The 128 MiB limit bounds the retained history window. The format permits
+/// larger windows.
+pub const DEFAULT_MAX_WINDOW_SIZE: u64 = 1024 * 1024 * 128;
 
 /// Low level Zstandard decoder that can be used to decompress frames with fine control over when and how many bytes are decoded.
 ///
@@ -148,6 +148,13 @@ impl FrameDecoder {
 
         let mut block_dec = decoding::block_decoder::new();
 
+        // A single-segment window is inferred from FCS, which may be inaccurate.
+        let format_limit = crate::zstd::common::MAX_BLOCK_SIZE as usize;
+        let block_limit = if state.frame_header.descriptor.single_segment_flag() {
+            format_limit
+        } else {
+            state.decoder_scratch.buffer.window_size.min(format_limit)
+        };
         let buffer_size_before = state.decoder_scratch.buffer.len();
         loop {
             let (block_header, _) = block_dec
@@ -155,7 +162,12 @@ impl FrameDecoder {
                 .map_err(err::FailedToReadBlockHeader)?;
 
             block_dec
-                .decode_block_content(&block_header, &mut state.decoder_scratch, &mut source)
+                .decode_block_content(
+                    &block_header,
+                    &mut state.decoder_scratch,
+                    &mut source,
+                    block_limit,
+                )
                 .map_err(err::FailedToReadBlockBody)?;
 
             if block_header.last_block {

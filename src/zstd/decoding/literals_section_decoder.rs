@@ -48,7 +48,8 @@ fn decompress_literals(
     let compressed_size = section.compressed_size.ok_or(err::MissingCompressedSize)? as usize;
     let num_streams = section.num_streams.ok_or(err::MissingNumStreams)?;
 
-    target.reserve(section.regenerated_size as usize);
+    let expected = section.regenerated_size as usize;
+    target.reserve(expected);
     let source = &source[0..compressed_size];
     let mut bytes_read = 0;
 
@@ -109,6 +110,12 @@ fn decompress_literals(
             decoder.init_state(&mut br);
 
             while br.bits_remaining() > -(scratch.table.max_num_bits as isize) {
+                if target.len() == expected {
+                    return Err(err::DecodedLiteralCountMismatch {
+                        decoded: expected + 1,
+                        expected,
+                    });
+                }
                 target.push(decoder.decode_symbol());
                 decoder.next_state(&mut br);
             }
@@ -123,7 +130,7 @@ fn decompress_literals(
         bytes_read += source.len() as u32;
     } else {
         //just decode the one stream
-        assert!(num_streams == 1);
+        assert_eq!(num_streams, 1);
         let mut decoder = HuffmanDecoder::new(&scratch.table);
         let mut br = BitReaderReversed::new(source);
         let mut skipped_bits = 0;
@@ -140,16 +147,22 @@ fn decompress_literals(
         }
         decoder.init_state(&mut br);
         while br.bits_remaining() > -(scratch.table.max_num_bits as isize) {
+            if target.len() == expected {
+                return Err(err::DecodedLiteralCountMismatch {
+                    decoded: expected + 1,
+                    expected,
+                });
+            }
             target.push(decoder.decode_symbol());
             decoder.next_state(&mut br);
         }
         bytes_read += source.len() as u32;
     }
 
-    if target.len() != section.regenerated_size as usize {
+    if target.len() != expected {
         return Err(DecompressLiteralsError::DecodedLiteralCountMismatch {
             decoded: target.len(),
-            expected: section.regenerated_size as usize,
+            expected,
         });
     }
 

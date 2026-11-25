@@ -360,7 +360,8 @@ zstd -19 src/dictionary_lib/dicts/dict_hans_hant.txt -o src/dictionary_lib/dicts
 > The runtime uses .zst files generated with zstd.  
 > These are included in the crate, but the .txt source files are not.
 
-Runtime loading uses a private, vendored pure Rust decoder derived from ruzstd 0.9.0 for both embedded dictionaries
+Runtime loading uses a private, vendored pure Rust decoder derived from ruzstd 0.9.0 with
+selected v0.9.1 and subsequent upstream fixes for both embedded dictionaries
 and custom packs. Default builds do not require native `zstd` / `zstd-sys` or a C compiler for Zstandard.
 The optional `dictionary-build` feature enables native `zstd` for pack compression only.
 
@@ -375,7 +376,7 @@ included in the published crate; obtain them from the repository. The workspace 
 automatically.
 
 The loader reads one Zstandard frame and ignores trailing input. Frames without a frame content size are supported;
-a declared size up to 64 MiB is only an allocation hint. Windows larger than 100 MiB, nonzero compression dictionary
+a declared size up to 64 MiB is only an allocation hint. Windows larger than 128 MiB, nonzero compression dictionary
 IDs, and leading skippable frames are rejected. Checksum bytes are consumed but their values are not verified.
 
 ### Generate and load a custom conversion dictionary
@@ -626,7 +627,7 @@ The public `pub jieba: Arc<Jieba>` field remains available for advanced direct J
 Simplified/Traditional counterpart when `zho_check()` determines the script. It uses `s2t` for Simplified input and
 `t2s` for Traditional input. Undetermined input registers only the supplied word.
 
-Registering both forms helps Jieba recognize custom phrase boundaries across scripts. Regional OpenCC dictionary
+Registering both forms helps Jieba recognize custom phrase boundaries across scripts. Regional `OpenCC` dictionary
 slots still handle vocabulary conversion for `s2tw`, `s2twp`, `s2hk`, `tw2s`, `tw2sp`, and `hk2s`. For example,
 registering `计算机` adds the counterpart `計算機`, while the Taiwan phrase dictionary handles conversion to `電腦`.
 The basic conversions use phrase context. For example, `s2t` produces `頭髮乾燥` from `头发干燥`, and registering

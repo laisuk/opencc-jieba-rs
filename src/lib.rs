@@ -283,7 +283,8 @@
 //! ## Zstandard decoding and Cargo features
 //!
 //! Embedded OpenCC and Jieba dictionaries and custom conversion packs are
-//! decoded by a private, vendored pure Rust decoder derived from ruzstd 0.9.0.
+//! decoded by a private, vendored pure Rust decoder derived from ruzstd 0.9.0
+//! with selected v0.9.1 and subsequent upstream fixes.
 //! Runtime decoding is available with the default features and does not require
 //! the native `zstd` / `zstd-sys` dependency or a C compiler for Zstandard.
 //!

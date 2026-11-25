@@ -46,7 +46,6 @@ impl core::fmt::Display for Sequence {
 #[derive(Copy, Clone)]
 pub struct CompressionModes(u8);
 /// The compression mode used for symbol compression
-#[allow(clippy::upper_case_acronyms)]
 pub enum ModeType {
     /// A predefined FSE distribution table is used, and no distribution table
     /// will be present.
@@ -64,6 +63,13 @@ pub enum ModeType {
 }
 
 impl CompressionModes {
+    fn parse(byte: u8) -> Result<Self, SequencesHeaderParseError> {
+        if byte & 0b11 != 0 {
+            return Err(SequencesHeaderParseError::ReservedBitsSet { got: byte });
+        }
+        Ok(Self(byte))
+    }
+
     /// Deserialize a two bit mode value into a [ModeType]
     pub fn decode_mode(m: u8) -> ModeType {
         match m {
@@ -122,7 +128,7 @@ impl SequencesHeader {
                     });
                 }
                 self.num_sequences = u32::from(source[0]);
-                self.modes = Some(CompressionModes(source[1]));
+                self.modes = Some(CompressionModes::parse(source[1])?);
                 bytes_read += 2;
             }
             128..=254 => {
@@ -141,7 +147,7 @@ impl SequencesHeader {
                             got: source.len(),
                         });
                     }
-                    self.modes = Some(CompressionModes(source[2]));
+                    self.modes = Some(CompressionModes::parse(source[2])?);
                     bytes_read += 1;
                 }
             }
@@ -153,11 +159,28 @@ impl SequencesHeader {
                     });
                 }
                 self.num_sequences = u32::from(source[1]) + (u32::from(source[2]) << 8) + 0x7F00;
-                self.modes = Some(CompressionModes(source[3]));
+                self.modes = Some(CompressionModes::parse(source[3])?);
                 bytes_read += 4;
             }
         }
 
         Ok(bytes_read)
+    }
+}
+
+// Header-width cases adapted from ruzstd commit 96b83ce9 (MIT).
+#[cfg(test)]
+#[test]
+fn reserved_sequence_modes_bits_are_rejected_at_every_header_width() {
+    for header in [&[1, 0][..], &[0x80, 1, 0], &[0xff, 0, 0, 0]] {
+        assert!(SequencesHeader::new().parse_from_header(header).is_ok());
+        for reserved in 1..=3 {
+            let mut invalid = header.to_vec();
+            *invalid.last_mut().unwrap() = 0x54 | reserved;
+            assert!(matches!(
+                SequencesHeader::new().parse_from_header(&invalid),
+                Err(SequencesHeaderParseError::ReservedBitsSet { got }) if got == 0x54 | reserved
+            ));
+        }
     }
 }

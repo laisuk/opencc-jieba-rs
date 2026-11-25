@@ -1,6 +1,7 @@
 # Internal Zstandard decoder
 
-Adapted from ruzstd 0.9.0 for opencc-jieba-rs; requires Rust 1.75.
+Derived from ruzstd 0.9.0 with selected decoder improvements from v0.9.1
+and subsequent upstream safety fixes, adapted for Rust 1.75.
 See LICENSE-RUZSTD and NOTICE.md for attribution.
 
 ## Entry point and retained dependencies
@@ -26,9 +27,15 @@ frame is an error.
 
 Checksum bytes are consumed, and truncated checksums are errors. Checksums are
 not validated; the upstream hash feature was never enabled by this crate.
-The decoder keeps its 100 MiB window limit and format-level window validation.
+The decoder accepts windows up to 128 MiB and allocates history lazily,
+including when reusing a decoder. For frames with an explicit window, raw
+and RLE output, compressed bodies, and regenerated compressed output are
+bounded by the smaller of the window and 128 KiB. Single-segment frames use
+the 128 KiB block limit to preserve tolerance for inaccurate FCS values.
+Their declared window still participates in the frame-level window check
+and history retention.
 
-OpenCC's JSON conversion packs and plaintext Jieba dictionaries are payloads, not Zstandard decoding dictionaries.
+OpenCC JSON conversion packs and plaintext Jieba dictionaries are payloads, not Zstandard decoding dictionaries.
 No Zstandard decoding dictionary is supplied, so nonzero dictionary IDs return
 `DictNotProvided`. Invalid history offsets retain their decoding errors,
 including `NotEnoughBytesInDictionary` with zero available bytes where
@@ -46,6 +53,20 @@ The embedded-artifact regression verifies that the committed Zstandard frame
 has an FCS matching its actual decompressed compact JSON payload. Separate regressions
 retain coverage for legacy frames without an FCS and for incorrect FCS values
 being treated only as allocation hints.
+
+## Decoder fixes
+
+The v0.9.1 backport adds the 128 MiB window limit, per-block size checks,
+checked repeat-offset arithmetic, and ring-buffer growth with space for
+two blocks beyond a power-of-two history window. The subsequent patches
+bound regenerated literals and compressed bodies and reject reserved
+sequence compression mode bits. See NOTICE.md for upstream provenance.
+
+The local implementation budgets all literals before sequence execution,
+including literals emitted after the last match. Each match is checked
+against the remaining budget before it is copied. Huffman output is also
+bounded by its declared regenerated literal count. The backport retains
+Rust 1.75-compatible operations and the existing dependency set.
 
 ## Trimming scope
 
