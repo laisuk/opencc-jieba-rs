@@ -1462,62 +1462,35 @@ impl OpenCC {
         hmm: bool,
         out: &mut ConversionOutput<'_>,
     ) {
-        let tokens = self.jieba.cut(chunk, hmm);
-
-        'tok: for token in tokens {
-            let phrase = token.word;
-            if phrase.is_empty() {
-                continue 'tok;
+        // This callback only reads dictionaries and writes to out while Jieba
+        // holds its thread-local scratch.
+        self.jieba.cut_words(chunk, hmm, |phrase, len| {
+            if len == 1 {
+                if phrase.chars().next().is_some_and(is_delimiter) {
+                    out.push_str(phrase);
+                } else {
+                    Self::convert_by_char(phrase, dictionaries, out);
+                }
+                return;
             }
 
-            let (is_single, single_char_opt, phrase_len) = Self::single_and_len(phrase);
-
-            if is_single {
-                if let Some(c) = single_char_opt {
-                    if is_delimiter(c) {
-                        out.push_str(phrase);
-                        continue 'tok;
+            // Preserve the multi-character length calculation in u16.
+            let phrase_len = 2 + (len - 2) as u16;
+            for dict in dictionaries {
+                if dict.has_key_len(phrase_len) {
+                    if let Some(t) = dict.get(phrase) {
+                        out.push_str(t);
+                        return;
                     }
                 }
-                Self::convert_by_char(phrase, dictionaries, out);
-                continue 'tok;
             }
-
-            for dict in dictionaries {
-                if !dict.has_key_len(phrase_len) {
-                    continue;
-                }
-                if let Some(t) = dict.get(phrase) {
-                    out.push_str(t);
-                    continue 'tok;
-                }
-            }
-
-            // Self::convert_by_char(phrase, dictionaries, out);
 
             if phrase_len < 3 {
                 Self::convert_by_char(phrase, dictionaries, out);
             } else {
                 Self::convert_by_fallback_fmm(phrase, dictionaries, out);
             }
-        }
-    }
-
-    /// Returns whether a string is a single scalar value together with its length.
-    ///
-    /// This avoids re-scanning short Jieba tokens in the hot path where delimiter
-    /// detection and dictionary length gating need to distinguish single-character
-    /// tokens from multi-character phrases.
-    ///
-    /// The tuple layout is `(is_single, single_char_if_any, char_len)`.
-    #[inline(always)]
-    fn single_and_len(s: &str) -> (bool, Option<char>, u16) {
-        let mut it = s.chars();
-        match (it.next(), it.next()) {
-            (None, _) => (true, None, 0),
-            (Some(c), None) => (true, Some(c), 1),
-            (Some(_), Some(_)) => (false, None, 2 + it.count() as u16),
-        }
+        });
     }
 
     /// Fallback character-by-character conversion (in-place).
@@ -3937,6 +3910,28 @@ mod tests {
             assert_eq!(out, input);
         }
         assert_eq!(cc.phrases_cut_convert_cow("甲", &[&changes], false), "丁");
+    }
+
+    #[test]
+    fn chunk_conversion_keeps_fallback_precedence_and_delimiters() {
+        let cc = opencc_with_dictionary(Dictionary::default(), &["甲乙𠀀丙", "后台"]);
+        let first = dict(&[("甲乙", "短"), ("𠀀", "異"), ("后台", "後臺"), ("，", "!")]);
+        let second = dict(&[("甲乙", "次"), ("后台", "後台"), ("丙", "尾")]);
+        let input = "甲乙𠀀丙，后台\r\n🙂 ".repeat(512);
+        let expected = "短異尾，後臺\r\n🙂 ".repeat(512);
+
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            for hmm in [false, true] {
+                assert_eq!(
+                    pool.install(|| cc.phrases_cut_convert(&input, &[&first, &second], hmm)),
+                    expected
+                );
+            }
+        }
     }
 
     #[test]

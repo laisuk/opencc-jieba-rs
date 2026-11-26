@@ -61,6 +61,8 @@ const MIXED: &str =
 const OOV: &str = "杭研硕士小明云端量子茶壶龘靐齉爩";
 const SAMPLES: usize = 7;
 const TARGET: Duration = Duration::from_millis(40);
+const CSV_HEADER: &str =
+    "case,input_bytes,iterations_per_sample,min_ns,median_ns,max_ns,alloc_calls,allocated_bytes";
 
 fn allocations(mut f: impl FnMut()) -> (u64, u64) {
     ALLOCS.store(0, Relaxed);
@@ -176,11 +178,21 @@ fn cold() {
 }
 
 fn main() {
+    if let Some(mode) = std::env::args().nth(1) {
+        if mode == "--review-connector-scaling" {
+            review_connector_scaling();
+            return;
+        }
+        if mode == "--review" || mode == "--review-snapshot" {
+            review(mode == "--review-snapshot");
+            return;
+        }
+    }
     if std::env::args().any(|arg| arg == "--cold") {
         cold();
         return;
     }
-    println!("case,input_bytes,iterations_per_sample,min_ns,median_ns,max_ns,alloc_calls,allocated_bytes");
+    println!("{CSV_HEADER}");
     // Separate processes reset OnceLocks, TLS and the Rayon pool. Process launch
     // itself is not timed; OS file/page caches are NOT flushed.
     for sample in 1..=5 {
@@ -357,4 +369,136 @@ fn main() {
     bench("dict.core.suggest_freq", 0, || {
         black_box(core.suggest_freq("星际量子茶壶"));
     });
+}
+
+fn review(snapshot: bool) {
+    use std::io::{self, Write};
+
+    let corpus = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ChangFeng_Simp.txt"),
+    )
+    .unwrap();
+    let fixtures = [
+        ("novel", corpus),
+        ("traditional", TRAD.repeat(256)),
+        ("mixed", MIXED.repeat(256)),
+        ("oov", OOV.repeat(256)),
+        ("uninterrupted", "南京市长江大桥自然语言处理".repeat(512)),
+        (
+            "connectors",
+            "API-vNext.WES-5.4.5+alpha_beta/xyz ".repeat(256),
+        ),
+        ("short", SIMP.to_owned()),
+    ];
+    let mut core = Jieba::new();
+    let mut public = OpenCC::new();
+    let pools = [1, 4].map(|threads| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap()
+    });
+    if snapshot {
+        let mut output = io::BufWriter::new(io::stdout().lock());
+        for (name, input) in &fixtures {
+            writeln!(output, "{name}").unwrap();
+            writeln!(output, "{:?}", core.cut_all(input)).unwrap();
+            for hmm in [false, true] {
+                writeln!(output, "{:?}", core.cut(input, hmm)).unwrap();
+                writeln!(output, "{:?}", core.cut_for_search(input, hmm)).unwrap();
+                writeln!(output, "{:?}", core.tag(input, hmm)).unwrap();
+                for pool in &pools {
+                    let cut = pool.install(|| public.jieba_cut(input, hmm));
+                    let search = pool.install(|| public.jieba_cut_for_search(input, hmm));
+                    writeln!(output, "{cut:?}").unwrap();
+                    writeln!(output, "{search:?}").unwrap();
+                }
+            }
+            for config in ["s2t", "s2twp", "t2s"] {
+                let serial = pools[0].install(|| public.convert(input, config, false));
+                assert_eq!(
+                    serial,
+                    pools[1].install(|| public.convert(input, config, false))
+                );
+                writeln!(output, "{serial:?}").unwrap();
+            }
+        }
+        let mut custom = Jieba::empty();
+        custom.set_hmm_model(
+            jieba_rs::HmmModel::load(&mut Cursor::new(include_bytes!(
+                "../src/jieba_rs/hmm.model"
+            )))
+            .unwrap(),
+        );
+        core.add_word("𠀀星际量子茶壶", Some(10_000_000), Some("nz"));
+        public
+            .add_word("星际量子茶壶", Some(10_000_000), Some("nz"))
+            .unwrap();
+        let edge = "𠀀星际量子茶壶 𠀀龘靐齉 WES-5.4.5\r\n\tAPI-foo，🙂";
+        for model in [&core, &custom] {
+            writeln!(output, "{:?}", model.cut_all(edge)).unwrap();
+            for hmm in [false, true] {
+                writeln!(output, "{:?}", model.cut(edge, hmm)).unwrap();
+                writeln!(output, "{:?}", model.cut_for_search(edge, hmm)).unwrap();
+                writeln!(output, "{:?}", model.tag(edge, hmm)).unwrap();
+            }
+        }
+        writeln!(output, "{:?}", public.convert(edge, "s2twp", true)).unwrap();
+        output.flush().unwrap();
+        return;
+    }
+    println!("{CSV_HEADER}");
+    for (name, input) in &fixtures {
+        if std::env::var("JIEBA_REVIEW_CASE").is_ok_and(|filter| filter != *name) {
+            continue;
+        }
+        bench(&format!("{name}.core.full"), input.len(), || {
+            black_box(core.cut_all(black_box(input)));
+        });
+        for hmm in [false, true] {
+            bench(&format!("{name}.core.cut.{hmm}"), input.len(), || {
+                black_box(core.cut(black_box(input), hmm));
+            });
+            bench(&format!("{name}.core.search.{hmm}"), input.len(), || {
+                black_box(core.cut_for_search(black_box(input), hmm));
+            });
+        }
+        for (pool, threads) in pools.iter().zip([1, 4]) {
+            pool.install(|| {
+                for hmm in [false, true] {
+                    bench(
+                        &format!("{name}.wrapper.cut.{threads}.{hmm}"),
+                        input.len(),
+                        || {
+                            black_box(public.jieba_cut(black_box(input), hmm));
+                        },
+                    );
+                }
+                bench(
+                    &format!("{name}.wrapper.convert.{threads}"),
+                    input.len(),
+                    || {
+                        black_box(public.convert(black_box(input), "s2twp", false));
+                    },
+                );
+            });
+        }
+    }
+}
+
+fn review_connector_scaling() {
+    let core = Jieba::new();
+    println!("{CSV_HEADER}");
+    for repeats in [32, 256, 2048] {
+        let input = format!("{}omega", "Alpha-beta_42.".repeat(repeats));
+        for hmm in [false, true] {
+            bench(
+                &format!("connector-scaling-{repeats}.core.search.{hmm}"),
+                input.len(),
+                || {
+                    black_box(core.cut_for_search(black_box(&input), hmm));
+                },
+            );
+        }
+    }
 }

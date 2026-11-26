@@ -54,6 +54,27 @@ is not an exhaustive attribution of which changes originated locally.
   These implementations require regression review when importing changes;
   equivalent results across upstream versions have not been established.
 
+## Segmentation performance
+
+- `cut_for_search()` advances UTF-8 byte offsets and Unicode scalar offsets
+  together as it visits the parts of a connector-separated token. It advances
+  past filtered parts and their separators too, so later parts retain their
+  original offsets. Connector parts still precede dictionary n-grams and the
+  original token in the search result.
+- Serial and parallel `OpenCC` conversion use the crate-private `cut_words()`
+  adapter to consume `cut_each()` output directly. The adapter uses the scalar
+  length already computed by Jieba and avoids allocating a `Vec<Token>` per
+  conversion chunk. Jieba holds its mutable thread-local scratch borrow during
+  emission, so callbacks must avoid reentering segmentation on the same thread.
+  The conversion callback reads the dictionaries and writes to the output buffer.
+- Trie lookahead remains at 3 and HMM emission uses its existing callbacks.
+  Benchmarking lookahead distances 0, 2, and 4 and passing scalar lengths
+  through HMM callbacks found inconsistent gains or workload-specific slowdowns.
+
+The [performance review](../../benchmarks/jieba/CONSERVATIVE-PERFORMANCE.md)
+records the stage profile, allocation and timing measurements, and exact-output
+comparisons for segmentation, POS tagging, and conversion.
+
 ## Dictionary and model integration
 
 `src/opencc.rs::DICT_HANS_HANT_ZSTD` embeds

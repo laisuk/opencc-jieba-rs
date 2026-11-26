@@ -17,6 +17,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   vocabulary conversion.
 - Added Rust, C, and C++ regression coverage for cross-script registration and
   segmentation, optional arguments, validation, and thread-local C API errors.
+- Added regression tests for connector-heavy search tokens, mixed-width Unicode
+  offsets, supplementary-plane characters, and runtime-loaded HMM models.
+- Added serial and parallel conversion regression coverage for dictionary
+  precedence, FMM fallback, delimiter preservation, and both HMM modes.
+- Extended the Jieba benchmark harness with performance review, complete
+  output snapshot comparison, and connector-scaling modes.
+- Added a detailed performance report and CSV measurements under
+  `benchmarks/jieba/`, documenting accepted and rejected optimization candidates,
+  stage profiling, allocation statistics, and reproduction instructions.
 
 ### Changed
 
@@ -25,6 +34,33 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Shared validation, panic handling, and thread-local error reporting between the
   two C word-registration functions. Both signatures are preserved and the C ABI
   number remains 1.
+
+### Performance
+
+- Streamed Jieba words directly into the` OpenCC` conversion output buffer,
+  eliminating intermediate token vectors in both serial and parallel conversion.
+- Reused Unicode word lengths already computed by Jieba, avoiding redundant
+  character counting during conversion.
+- Optimized connector-separated tokens in Jieba search mode by maintaining
+  incremental UTF-8 byte and Unicode scalar offsets instead of repeatedly
+  scanning token prefixes, reducing quadratic offset calculation to linear work.
+- Reduced serial novel conversion allocation and reallocation requests from
+  468,189 to 37 (99.992% reduction), with cumulative requested allocation bytes
+  reduced by approximately 84.8%.
+- Improved conversion performance on a real-world Chinese novel of approximately
+  one million characters:
+    - Serial conversion: 199.92 ms → 167.03–184.57 ms.
+    - Four-thread conversion: 70.47 ms → 60.47–62.21 ms.
+    - Across 14 conversion benchmark cases, geometric mean execution time decreased
+      by 13.0–14.4%.
+- Improved search-mode performance on a 28 KB connector-heavy identifier from
+  approximately 3.81 ms to 0.38–0.41 ms (9.3–10.0× faster).
+- Retained the existing Trie lookahead distance of 3 and HMM emission path
+  after alternative implementations demonstrated inconsistent performance
+  gains or workload-specific regressions.
+- Preserved byte-for-byte baseline output equivalence across segmentation modes,
+  token offsets, POS tagging, custom dictionaries, runtime HMM models, and
+  serial and parallel conversion. Rust 1.75.0 compatibility is maintained.
 
 ### Fixed
 

@@ -939,6 +939,14 @@ impl Jieba {
         });
     }
 
+    /// Emit each word and its Unicode length while segmentation scratch is borrowed.
+    /// The callback must not call a segmentation method on this thread.
+    pub(crate) fn cut_words(&self, sentence: &str, hmm: bool, mut emit: impl FnMut(&str, usize)) {
+        self.cut_each(sentence, hmm, |token, _, _| {
+            emit(token.word, token.end - token.start);
+        });
+    }
+
     /// Cut the input text
     ///
     /// ## Params
@@ -1028,22 +1036,24 @@ impl Jieba {
                 .iter()
                 .any(|&b| hmm::is_skip_connector(b))
             {
-                let mut offset = 0;
+                let mut byte_start = token.byte_start;
+                let mut start = token.start;
                 for part in token.word.split(hmm::is_skip_connector_char) {
                     // Only parts that could be searched on their own: a purely
                     // numeric fragment of a version or part number (the `6` of
                     // `3.6.3`) is noise, and so is a single character.
+                    let end = start + char_count(part);
                     if part.len() >= 2 && part.bytes().any(|b| b.is_ascii_alphabetic()) {
-                        let byte_start = token.byte_start + offset;
                         new_words.push(Token {
                             word: part,
-                            start: token.start + char_count(&token.word[..offset]),
-                            end: token.start + char_count(&token.word[..offset + part.len()]),
+                            start,
+                            end,
                             byte_start,
                             byte_end: byte_start + part.len(),
                         });
                     }
-                    offset += part.len() + 1;
+                    byte_start += part.len() + 1;
+                    start = end + 1;
                 }
             }
             // The dictionary matches of the block the token came from
